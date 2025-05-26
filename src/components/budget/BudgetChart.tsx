@@ -35,7 +35,7 @@ export function BudgetChart({ budgetMonth }: BudgetChartProps) {
     );
   }
 
-  const operationalChartData: { name: string; Budgeted: number; Spent: number }[] = [];
+  const operationalChartDataItems: { name: string; Budgeted: number; Spent: number }[] = [];
 
   budgetMonth.categories.forEach(cat => {
     const catNameLower = cat.name.toLowerCase();
@@ -56,9 +56,8 @@ export function BudgetChart({ budgetMonth }: BudgetChartProps) {
     }
 
     // Only add to chart if there's a budget or spending to show, or if the category name itself is non-empty
-    // This prevents adding categories that might be an empty string or have no financial activity
     if (cat.name.trim() !== "" && (categoryBudgeted > 0 || categorySpent > 0)) {
-       operationalChartData.push({
+       operationalChartDataItems.push({
         name: cat.name,
         Budgeted: categoryBudgeted,
         Spent: categorySpent,
@@ -66,8 +65,11 @@ export function BudgetChart({ budgetMonth }: BudgetChartProps) {
     }
   });
 
+  // Sort categories by budgeted amount in descending order
+  const sortedOperationalChartData = [...operationalChartDataItems].sort((a, b) => b.Budgeted - a.Budgeted);
 
-  if (operationalChartData.length === 0) {
+
+  if (sortedOperationalChartData.length === 0) {
      return (
       <Card className="mt-6">
         <CardHeader>
@@ -85,11 +87,11 @@ export function BudgetChart({ budgetMonth }: BudgetChartProps) {
     <Card className="mt-6 shadow-lg">
       <CardHeader>
         <CardTitle>Operational Spending Breakdown</CardTitle>
-        <CardDescription>Budgeted vs. spent for operational categories. Excludes Savings & Credit Card Payments.</CardDescription>
+        <CardDescription>Budgeted vs. spent for operational categories, sorted by budget. Excludes Savings & Credit Card Payments.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={operationalChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <BarChart data={sortedOperationalChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
             <XAxis
               dataKey="name"
@@ -98,16 +100,16 @@ export function BudgetChart({ budgetMonth }: BudgetChartProps) {
               tickLine={false}
               axisLine={false}
               interval={0}
-              angle={operationalChartData.length > 6 ? -35 : 0} // Adjusted angle condition
-              textAnchor={operationalChartData.length > 6 ? "end" : "middle"}
-              height={operationalChartData.length > 6 ? 80 : 40} // Adjusted height
+              angle={sortedOperationalChartData.length > 6 ? -35 : 0} 
+              textAnchor={sortedOperationalChartData.length > 6 ? "end" : "middle"}
+              height={sortedOperationalChartData.length > 6 ? 80 : 40} 
             />
             <YAxis stroke={chartTextColor} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
             <Tooltip
               contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)'}}
               labelStyle={{ color: chartTextColor, fontSize: '12px', fontWeight: 'bold' }}
               itemStyle={{ color: chartTextColor, fontSize: '12px' }}
-              cursor={{fill: 'hsl(var(--accent) / 0.2)'}} // Slightly less opaque cursor
+              cursor={{fill: 'hsl(var(--accent) / 0.2)'}} 
             />
             <Legend wrapperStyle={{ color: chartTextColor, fontSize: '12px', paddingTop: '10px' }} />
             <Bar dataKey="Budgeted" fill={primaryColor} radius={[4, 4, 0, 0]} barSize={20} />
@@ -118,3 +120,4 @@ export function BudgetChart({ budgetMonth }: BudgetChartProps) {
     </Card>
   );
 }
+

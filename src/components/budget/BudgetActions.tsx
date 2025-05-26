@@ -34,7 +34,7 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
     toast({
       title: result.success ? "Month Closed" : "Month Close Info",
       description: result.message,
-      variant: result.success ? "default" : "default", // Keep default to allow for info or success toasts
+      variant: result.success ? "default" : "default", 
       action: result.success ? <CheckCircle className="text-green-500" /> : <AlertTriangle className="text-yellow-500" />,
     });
   };
@@ -47,7 +47,7 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
     <div className="my-6 p-4 bg-card border rounded-lg shadow-sm">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Button onClick={onEditBudget} variant="outline" className="w-full" disabled={disablePrimaryActions}>
-          <Edit3 className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Edit Budget"}
+          <Edit3 className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Manage Budget"}
         </Button>
         <Button onClick={onAddIncome} variant="outline" className="w-full" disabled={disablePrimaryActions}>
             <Coins className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Income"}

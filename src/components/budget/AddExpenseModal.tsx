@@ -223,15 +223,11 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         setMode('cameraView');
       } else {
         toast({ variant: "destructive", title: "Camera Switch Failed", description: "Could not switch to the selected camera."});
-        // Revert to previous camera or idle? For now, let it stay on current if switch failed
-        // or handleEnableCamera again if necessary to reset to a working camera.
       }
     }
   };
   
   useEffect(() => {
-    // This effect ensures that if permission is granted *after* an initial denial,
-    // we try to enumerate devices and set a default camera.
     const enumerateAndSetCameras = async () => {
       if (hasCameraPermission === true && availableCameras.length === 0) {
         try {
@@ -286,20 +282,14 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      // Ensure canvas dimensions match video to avoid stretching
-      const aspectRatio = video.videoWidth / video.videoHeight;
-      const displayWidth = video.clientWidth;
-      const displayHeight = video.clientHeight;
-
-      // Set canvas size to match video's intrinsic size for best quality
+      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
       const context = canvas.getContext('2d');
       if (context) {
-        // Draw the video frame onto the canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg', 0.9); // Use JPEG for smaller size, quality 0.9
+        const dataUri = canvas.toDataURL('image/jpeg', 0.9); 
         setImagePreviewUrl(dataUri);
         setImageDataUri(dataUri);
         setSelectedImageFile(null); 
@@ -419,7 +409,16 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
         </DialogHeader>
         
-        <video ref={videoRef} className={cn("w-full h-auto object-cover aspect-video rounded-md bg-muted", mode !== 'cameraView' && 'hidden')} autoPlay muted playsInline />
+        <video 
+            ref={videoRef} 
+            className={cn(
+                "w-full rounded-md bg-muted", 
+                mode === 'cameraView' ? 'block h-[70vh] max-h-[500px] object-contain' : 'hidden aspect-video'
+            )} 
+            autoPlay 
+            muted 
+            playsInline 
+        />
         <canvas ref={canvasRef} className="hidden"></canvas>
 
         <div className="grid gap-4 py-4">
@@ -629,3 +628,5 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     
 
   
+
+    

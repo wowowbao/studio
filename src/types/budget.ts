@@ -6,13 +6,19 @@ export interface Expense {
   dateAdded: string; // ISO string date
 }
 
+export interface SubCategory {
+  id: string; // uuid
+  name: string;
+  budgetedAmount: number;
+  expenses: Expense[];
+}
+
 export interface BudgetCategory {
   id: string; // uuid
   name: string;
-  // icon: string; // Lucide icon name - REMOVED
-  budgetedAmount: number;
-  expenses: Expense[]; // Changed from spentAmount
-  // spentAmount is now a derived property
+  budgetedAmount: number; // Budget for the main category itself, if it doesn't have subcategories or if it's a "parent-level" budget
+  expenses: Expense[];
+  subcategories?: SubCategory[];
 }
 
 export interface BudgetMonth {
@@ -25,11 +31,10 @@ export interface BudgetMonth {
 }
 
 export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver'>> & {
-  // When updating categories, we expect the full category structure including expenses
-  categories?: Array<Omit<BudgetCategory, 'id' | 'icon'> & { id?: string; spentAmount?: never }>;
+  categories?: Array<Omit<BudgetCategory, 'id'> & { id?: string; subcategories?: Array<Omit<SubCategory, 'id'> & { id?: string }> }>;
 };
 
-export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount'>[] = [
+export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount' | 'subcategories'>[] = [
   { name: "Groceries", expenses: [] },
   { name: "Rent/Mortgage", expenses: [] },
   { name: "Utilities", expenses: [] },

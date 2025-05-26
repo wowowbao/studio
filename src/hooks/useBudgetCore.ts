@@ -1,11 +1,11 @@
 
 "use client";
-import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload, Expense } from '@/types/budget';
+import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload, Expense, SubCategory } from '@/types/budget';
 import { DEFAULT_CATEGORIES } from '@/types/budget';
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-const DEFAULT_START_MONTH = '2025-06'; // App default start month
+const DEFAULT_START_MONTH = '2025-06'; // App default start month updated
 
 // Helper to get current YYYY-MM string - now used as a fallback, not primary default
 export const getCurrentYearMonth = (): string => {
@@ -29,7 +29,7 @@ const DISPLAY_MONTH_KEY_PREFIX = 'budgetFlowDisplayMonth_';
 
 // Function to get user-specific storage key
 const getUserSpecificKey = (baseKey: string) => {
-  const pseudoUserId = "localUser";
+  const pseudoUserId = "localUser"; // For password-protected local storage
   return `${baseKey}${pseudoUserId}`;
 };
 
@@ -48,20 +48,19 @@ export const useBudgetCore = () => {
       const storedBudgets = localStorage.getItem(budgetKey);
       if (storedBudgets) {
         const parsedBudgets = JSON.parse(storedBudgets) as Record<string, BudgetMonth>;
-        // Ensure expenses array and isRolledOver flag exist for all categories/months
+        // Ensure expenses array, isRolledOver flag, and subcategories array exist
         Object.values(parsedBudgets).forEach(month => {
           month.categories.forEach(cat => {
-            if (!cat.expenses) {
-              cat.expenses = [];
-            }
+            if (!cat.expenses) cat.expenses = [];
+            if (!cat.subcategories) cat.subcategories = [];
+            cat.subcategories.forEach(subCat => {
+              if(!subCat.expenses) subCat.expenses = [];
+            });
           });
-          if (month.isRolledOver === undefined) {
-            month.isRolledOver = false;
-          }
+          if (month.isRolledOver === undefined) month.isRolledOver = false;
         });
         setBudgetMonths(parsedBudgets);
       } else {
-        // If no stored budgets, initialize with the default start month
         const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
         setBudgetMonths({ [DEFAULT_START_MONTH]: newMonth });
       }
@@ -69,12 +68,10 @@ export const useBudgetCore = () => {
       const storedDisplayMonth = localStorage.getItem(displayMonthKey);
       const currentBudgetsData = storedBudgets ? JSON.parse(storedBudgets) : {};
 
-      // If stored display month exists and is part of loaded budgets, use it. Otherwise, default to DEFAULT_START_MONTH.
       if (storedDisplayMonth && Object.keys(currentBudgetsData).includes(storedDisplayMonth)) {
          setCurrentDisplayMonthId(storedDisplayMonth);
       } else {
         setCurrentDisplayMonthId(DEFAULT_START_MONTH);
-        // Ensure the default start month budget exists if we're setting it as current
         setBudgetMonths(prev => {
           if (!prev[DEFAULT_START_MONTH]) {
             const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
@@ -86,7 +83,6 @@ export const useBudgetCore = () => {
 
     } catch (error) {
       console.error("Failed to load budgets from localStorage:", error);
-      // Fallback to default start month on error
       const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
       setBudgetMonths({ [DEFAULT_START_MONTH]: newMonth });
       setCurrentDisplayMonthId(DEFAULT_START_MONTH);
@@ -124,6 +120,7 @@ export const useBudgetCore = () => {
         id: uuidv4(),
         budgetedAmount: 0,
         expenses: [],
+        subcategories: [],
       })),
       savingsGoal: 0,
       isRolledOver: false,
@@ -154,14 +151,22 @@ export const useBudgetCore = () => {
         updatedMonth.savingsGoal = payload.savingsGoal;
       }
       if (payload.categories) {
-        updatedMonth.categories = payload.categories.map(cat => ({
-          id: cat.id || uuidv4(),
-          name: cat.name,
-          budgetedAmount: cat.budgetedAmount === undefined ? 0 : cat.budgetedAmount,
-          expenses: cat.expenses || (monthToUpdate.categories.find(c => c.id === cat.id)?.expenses) || [],
-        }));
+        updatedMonth.categories = payload.categories.map(catPayload => {
+          const existingCat = monthToUpdate.categories.find(c => c.id === catPayload.id);
+          return {
+            id: catPayload.id || uuidv4(),
+            name: catPayload.name,
+            budgetedAmount: catPayload.budgetedAmount === undefined ? 0 : catPayload.budgetedAmount,
+            expenses: catPayload.expenses || existingCat?.expenses || [],
+            subcategories: (catPayload.subcategories || existingCat?.subcategories || []).map(subCatPayload => ({
+              id: subCatPayload.id || uuidv4(),
+              name: subCatPayload.name,
+              budgetedAmount: subCatPayload.budgetedAmount === undefined ? 0 : subCatPayload.budgetedAmount,
+              expenses: subCatPayload.expenses || existingCat?.subcategories?.find(sc => sc.id === subCatPayload.id)?.expenses || [],
+            })),
+          };
+        });
       }
-      // isRolledOver is handled by rolloverUnspentBudget
       return { ...prev, [yearMonthId]: updatedMonth };
     });
   }, [createNewMonthBudget]);
@@ -174,6 +179,7 @@ export const useBudgetCore = () => {
       name: categoryName,
       budgetedAmount: 0,
       expenses: [],
+      subcategories: [],
     };
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
@@ -187,7 +193,7 @@ export const useBudgetCore = () => {
     });
   }, [ensureMonthExists]);
 
-  const updateCategoryInMonth = useCallback((yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'icon'>>) => {
+  const updateCategoryInMonth = useCallback((yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories'>>) => {
     ensureMonthExists(yearMonthId);
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
@@ -196,13 +202,13 @@ export const useBudgetCore = () => {
         [yearMonthId]: {
           ...month,
           categories: month.categories.map(cat =>
-            cat.id === categoryId ? { ...cat, ...updatedCategoryData } : cat
+            cat.id === categoryId ? { ...cat, ...updatedCategoryData, subcategories: cat.subcategories || [] } : cat
           ),
         },
       };
     });
   }, [ensureMonthExists]);
-
+  
   const deleteCategoryFromMonth = useCallback((yearMonthId: string, categoryId: string) => {
     ensureMonthExists(yearMonthId);
     setBudgetMonths(prev => {
@@ -217,8 +223,61 @@ export const useBudgetCore = () => {
     });
   }, [ensureMonthExists]);
 
+  const addSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => {
+    setBudgetMonths(prev => {
+      const month = { ...prev[monthId] };
+      if (!month) return prev;
+      month.categories = month.categories.map(cat => {
+        if (cat.id === parentCategoryId) {
+          const newSubCategory: SubCategory = {
+            id: uuidv4(),
+            name: subCategoryName,
+            budgetedAmount: subCategoryBudget,
+            expenses: [],
+          };
+          return { ...cat, subcategories: [...(cat.subcategories || []), newSubCategory] };
+        }
+        return cat;
+      });
+      return { ...prev, [monthId]: month };
+    });
+  }, []);
 
-  const addExpense = useCallback((yearMonthId: string, categoryId: string, amount: number, description: string) => {
+  const updateSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => {
+    setBudgetMonths(prev => {
+      const month = { ...prev[monthId] };
+      if (!month) return prev;
+      month.categories = month.categories.map(cat => {
+        if (cat.id === parentCategoryId) {
+          return {
+            ...cat,
+            subcategories: (cat.subcategories || []).map(sub =>
+              sub.id === subCategoryId ? { ...sub, name: newName, budgetedAmount: newBudget } : sub
+            ),
+          };
+        }
+        return cat;
+      });
+      return { ...prev, [monthId]: month };
+    });
+  }, []);
+
+  const deleteSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryId: string) => {
+    setBudgetMonths(prev => {
+      const month = { ...prev[monthId] };
+      if (!month) return prev;
+      month.categories = month.categories.map(cat => {
+        if (cat.id === parentCategoryId) {
+          return { ...cat, subcategories: (cat.subcategories || []).filter(sub => sub.id !== subCategoryId) };
+        }
+        return cat;
+      });
+      return { ...prev, [monthId]: month };
+    });
+  }, []);
+
+
+  const addExpense = useCallback((yearMonthId: string, categoryOrSubCategoryId: string, amount: number, description: string, isSubCategory: boolean = false) => {
     ensureMonthExists(yearMonthId);
     const newExpense: Expense = {
       id: uuidv4(),
@@ -227,51 +286,55 @@ export const useBudgetCore = () => {
       dateAdded: new Date().toISOString(),
     };
     setBudgetMonths(prev => {
-      const month = prev[yearMonthId];
+      const month = { ...prev[yearMonthId] };
       if (!month) return prev;
       if (month.isRolledOver) {
         console.warn(`Cannot add expense to ${yearMonthId} as it has been rolled over.`);
-        // Optionally, inform the user via toast or alert here
         return prev;
       }
-      return {
-        ...prev,
-        [yearMonthId]: {
-          ...month,
-          categories: month.categories.map(cat =>
-            cat.id === categoryId
-            ? { ...cat, expenses: [...cat.expenses, newExpense] }
-            : cat
-          ),
-        },
-      };
+
+      month.categories = month.categories.map(cat => {
+        if (!isSubCategory && cat.id === categoryOrSubCategoryId) {
+          return { ...cat, expenses: [...cat.expenses, newExpense] };
+        } else if (isSubCategory && cat.subcategories?.find(sub => sub.id === categoryOrSubCategoryId)) {
+          return {
+            ...cat,
+            subcategories: cat.subcategories.map(sub =>
+              sub.id === categoryOrSubCategoryId ? { ...sub, expenses: [...sub.expenses, newExpense] } : sub
+            ),
+          };
+        }
+        return cat;
+      });
+      return { ...prev, [yearMonthId]: month };
     });
   }, [ensureMonthExists]);
-
-  const deleteExpense = useCallback((yearMonthId: string, categoryId: string, expenseId: string) => {
+  
+  const deleteExpense = useCallback((yearMonthId: string, categoryOrSubCategoryId: string, expenseId: string, isSubCategory: boolean = false) => {
     ensureMonthExists(yearMonthId);
     setBudgetMonths(prev => {
-      const month = prev[yearMonthId];
+      const month = { ...prev[yearMonthId] };
       if (!month) return prev;
       if (month.isRolledOver) {
         console.warn(`Cannot delete expense from ${yearMonthId} as it has been rolled over.`);
-         // Optionally, inform the user
         return prev;
       }
-      return {
-        ...prev,
-        [yearMonthId]: {
-          ...month,
-          categories: month.categories.map(cat =>
-            cat.id === categoryId
-            ? { ...cat, expenses: cat.expenses.filter(exp => exp.id !== expenseId) }
-            : cat
-          ),
-        },
-      };
+      month.categories = month.categories.map(cat => {
+        if (!isSubCategory && cat.id === categoryOrSubCategoryId) {
+          return { ...cat, expenses: cat.expenses.filter(exp => exp.id !== expenseId) };
+        } else if (isSubCategory && cat.subcategories?.find(sub => sub.id === categoryOrSubCategoryId)) {
+          return {
+            ...cat,
+            subcategories: cat.subcategories.map(sub =>
+              sub.id === categoryOrSubCategoryId ? { ...sub, expenses: sub.expenses.filter(exp => exp.id !== expenseId) } : sub
+            ),
+          };
+        }
+        return cat;
+      });
+      return { ...prev, [yearMonthId]: month };
     });
   }, [ensureMonthExists]);
-
 
   const duplicateMonthBudget = useCallback((sourceMonthId: string, targetMonthId: string) => {
     const sourceBudget = getBudgetForMonth(sourceMonthId);
@@ -285,7 +348,13 @@ export const useBudgetCore = () => {
       id: uuidv4(),
       name: cat.name,
       budgetedAmount: cat.budgetedAmount,
-      expenses: [],
+      expenses: [], // Expenses are not carried over
+      subcategories: (cat.subcategories || []).map(subCat => ({
+        id: uuidv4(),
+        name: subCat.name,
+        budgetedAmount: subCat.budgetedAmount,
+        expenses: [], // Expenses are not carried over
+      })),
     }));
 
     const newMonthData: BudgetMonth = {
@@ -294,7 +363,7 @@ export const useBudgetCore = () => {
       month: targetMonthNum,
       categories: newCategories,
       savingsGoal: sourceBudget.savingsGoal,
-      isRolledOver: false, // New month is not rolled over
+      isRolledOver: false,
     };
 
     setBudgetMonths(prev => ({ ...prev, [targetMonthId]: newMonthData }));
@@ -323,7 +392,6 @@ export const useBudgetCore = () => {
       const month = prev[yearMonthId];
       if (month.isRolledOver) {
         console.warn(`Cannot set savings goal for ${yearMonthId} as it has been rolled over.`);
-        // Optionally, inform the user
         return prev;
       }
       return {
@@ -352,16 +420,24 @@ export const useBudgetCore = () => {
     let totalPositiveUnspent = 0;
     monthBudget.categories.forEach(cat => {
       if (cat.name.toLowerCase() !== 'savings') {
-        const spentAmount = cat.expenses.reduce((sum, exp) => sum + exp.amount, 0);
-        const unspentInCategory = cat.budgetedAmount - spentAmount;
-        if (unspentInCategory > 0) {
-          totalPositiveUnspent += unspentInCategory;
+        // Calculate unspent from main category expenses
+        const mainCatSpent = cat.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const mainCatUnspent = cat.budgetedAmount - mainCatSpent;
+        if (mainCatUnspent > 0) {
+          totalPositiveUnspent += mainCatUnspent;
         }
+        // Calculate unspent from subcategories
+        (cat.subcategories || []).forEach(subCat => {
+            const subCatSpent = subCat.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+            const subCatUnspent = subCat.budgetedAmount - subCatSpent;
+            if (subCatUnspent > 0) {
+                totalPositiveUnspent += subCatUnspent;
+            }
+        });
       }
     });
 
     if (totalPositiveUnspent <= 0) {
-      // Mark as rolled over even if no positive unspent, to prevent repeated attempts
       setBudgetMonths(prev => ({
         ...prev,
         [yearMonthId]: { ...prev[yearMonthId], isRolledOver: true },
@@ -390,7 +466,6 @@ export const useBudgetCore = () => {
     return { success: true, message: `Successfully rolled over $${totalPositiveUnspent.toFixed(2)} to savings for ${yearMonthId}.` };
   }, [getBudgetForMonth]);
 
-
   return {
     budgetMonths,
     currentDisplayMonthId,
@@ -410,5 +485,8 @@ export const useBudgetCore = () => {
     deleteCategoryFromMonth,
     setSavingsGoalForMonth,
     rolloverUnspentBudget,
+    addSubCategory,
+    updateSubCategory,
+    deleteSubCategory,
   };
 };

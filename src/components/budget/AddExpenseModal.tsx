@@ -1,18 +1,16 @@
 
 "use client";
 import { useState, useEffect } from "react";
-import type { BudgetCategory } from "@/types/budget";
+import type { BudgetCategory, SubCategory } from "@/types/budget";
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import * as LucideIcons from "lucide-react"; // No longer needed for category icons
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -20,35 +18,62 @@ interface AddExpenseModalProps {
   monthId: string;
 }
 
+interface CategoryOption {
+  value: string;
+  label: string;
+  isSubcategory: boolean;
+  parentCategoryId?: string; // Only for subcategories
+}
+
 export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalProps) {
   const { getBudgetForMonth, addExpense, isLoading } = useBudget();
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [selectedTargetId, setSelectedTargetId] = useState<string>(""); // Can be categoryId or subCategoryId
+  const [isTargetSubcategory, setIsTargetSubcategory] = useState<boolean>(false);
   const [amount, setAmount] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [availableCategories, setAvailableCategories] = useState<BudgetCategory[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && monthId && !isLoading) {
       const budgetData = getBudgetForMonth(monthId);
-      if (budgetData && budgetData.categories.length > 0) {
-        setAvailableCategories(budgetData.categories);
-        if (budgetData.categories.length > 0 && (!selectedCategoryId || !budgetData.categories.find(c => c.id === selectedCategoryId))) {
-          setSelectedCategoryId(budgetData.categories[0].id); // Default to first category if current selection is invalid or empty
+      const options: CategoryOption[] = [];
+      if (budgetData) {
+        budgetData.categories.forEach(cat => {
+          // Only add parent category as an option if it has NO subcategories
+          if (!cat.subcategories || cat.subcategories.length === 0) {
+            options.push({ value: cat.id, label: cat.name, isSubcategory: false });
+          }
+          (cat.subcategories || []).forEach(sub => {
+            options.push({ value: sub.id, label: `${cat.name} > ${sub.name}`, isSubcategory: true, parentCategoryId: cat.id });
+          });
+        });
+      }
+      setCategoryOptions(options);
+
+      if (options.length > 0) {
+        const currentSelectionStillValid = options.some(opt => opt.value === selectedTargetId);
+        if (!selectedTargetId || !currentSelectionStillValid) {
+          setSelectedTargetId(options[0].value);
+          setIsTargetSubcategory(options[0].isSubcategory);
+        } else {
+          // refresh isTargetSubcategory based on current selection
+          const currentOpt = options.find(opt => opt.value === selectedTargetId);
+          if (currentOpt) setIsTargetSubcategory(currentOpt.isSubcategory);
         }
       } else {
-        setAvailableCategories([]);
-        setSelectedCategoryId("");
+        setSelectedTargetId("");
+        setIsTargetSubcategory(false);
       }
       setAmount("");
       setDescription("");
     }
-  }, [isOpen, monthId, getBudgetForMonth, isLoading, selectedCategoryId]);
+  }, [isOpen, monthId, getBudgetForMonth, isLoading, selectedTargetId]);
 
   const handleSubmit = () => {
     const numericAmount = parseFloat(amount);
-    if (!selectedCategoryId) {
-      toast({ title: "Error", description: "Please select a category.", variant: "destructive" });
+    if (!selectedTargetId) {
+      toast({ title: "Error", description: "Please select a category or subcategory.", variant: "destructive" });
       return;
     }
     if (isNaN(numericAmount) || numericAmount <= 0) {
@@ -60,7 +85,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       return;
     }
 
-    addExpense(monthId, selectedCategoryId, numericAmount, description);
+    addExpense(monthId, selectedTargetId, numericAmount, description, isTargetSubcategory);
     toast({
       title: "Expense Added",
       description: `${description}: $${numericAmount.toFixed(2)} added.`,
@@ -68,6 +93,15 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     });
     onClose();
   };
+  
+  const handleSelectionChange = (value: string) => {
+    const selectedOption = categoryOptions.find(opt => opt.value === value);
+    if (selectedOption) {
+      setSelectedTargetId(selectedOption.value);
+      setIsTargetSubcategory(selectedOption.isSubcategory);
+    }
+  };
+
 
   if (!isOpen) return null;
 
@@ -79,30 +113,24 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         </DialogHeader>
         {isLoading ? (
           <p>Loading categories...</p>
-        ) : availableCategories.length === 0 ? (
-          <p className="text-muted-foreground py-4">No categories available for this month. Please add categories first in 'Edit Budget'.</p>
+        ) : categoryOptions.length === 0 ? (
+          <p className="text-muted-foreground py-4">No categories or subcategories available for this month. Please add them first in 'Edit Budget'.</p>
         ) : (
           <div className="grid gap-6 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right col-span-1">
                 Category
               </Label>
-              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+              <Select value={selectedTargetId} onValueChange={handleSelectionChange}>
                 <SelectTrigger id="category" className="col-span-3">
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder="Select target" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableCategories.map(cat => {
-                    // const IconComponent = (LucideIcons as any)[cat.icon] || LucideIcons.HelpCircle; // Icon removed
-                    return (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        <div className="flex items-center">
-                          {/* <IconComponent className="mr-2 h-4 w-4 text-current" /> // Icon removed */}
-                          {cat.name}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                  {categoryOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -140,7 +168,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
               <XCircle className="mr-2 h-4 w-4" /> Cancel
             </Button>
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={isLoading || availableCategories.length === 0}>
+          <Button onClick={handleSubmit} disabled={isLoading || categoryOptions.length === 0}>
             <CheckCircle className="mr-2 h-4 w-4" /> Add Expense
           </Button>
         </DialogFooter>

@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { useBudget } from "@/hooks/useBudget";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { CornerDownRight, Trash2, CheckCircle, AlertTriangle } from "lucide-react";
+import { CornerDownRight, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface CategoryCardProps {
@@ -15,7 +15,7 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category }: CategoryCardProps) {
-  const { deleteExpense, currentDisplayMonthId } = useBudget(); // Call useBudget at the top level
+  const { deleteExpense, currentDisplayMonthId } = useBudget();
   const { toast } = useToast();
 
   const mainCategorySpentAmount = category.expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -26,21 +26,46 @@ export function CategoryCard({ category }: CategoryCardProps) {
   if (category.budgetedAmount > 0) {
     mainCategoryProgress = (mainCategorySpentAmount / category.budgetedAmount) * 100;
   } else if ((isSavingsCategory || isCCPaymentsCategory) && mainCategorySpentAmount > 0) {
-    mainCategoryProgress = 100;
+    mainCategoryProgress = 100; // Show full progress if any amount is saved/paid and goal is 0
   }
 
   const mainCategoryRemaining = category.budgetedAmount - mainCategorySpentAmount;
   const mainCategoryIsOverBudget = !isSavingsCategory && !isCCPaymentsCategory && mainCategoryRemaining < 0;
+  const mainGoalMet = (isSavingsCategory || isCCPaymentsCategory) && category.budgetedAmount > 0 && mainCategorySpentAmount >= category.budgetedAmount;
 
-  const mainProgressIndicatorClassName = cn(
-    (mainCategoryIsOverBudget) ? "bg-destructive" : "bg-primary"
+  const spentAmountSpanClassName = cn(
+    "font-semibold",
+    {
+      "text-green-600 dark:text-green-500": 
+        (isCCPaymentsCategory && mainCategorySpentAmount > 0) ||
+        (isSavingsCategory && mainCategorySpentAmount > 0)
+    }
   );
-  const mainDescriptionClassName = cn(
-    (mainCategoryIsOverBudget) ? "text-destructive font-semibold" : "text-muted-foreground"
-  );
+
+  let mainProgressIndicatorClassName = "bg-primary"; // Default for regular categories
+  if (isCCPaymentsCategory && mainCategorySpentAmount > 0) {
+    mainProgressIndicatorClassName = "bg-green-500";
+  } else if (isSavingsCategory && mainCategorySpentAmount > 0) {
+    mainProgressIndicatorClassName = "bg-green-500";
+  } else if (mainCategoryIsOverBudget) {
+    mainProgressIndicatorClassName = "bg-destructive";
+  }
+  
+  // If goal is met for Savings/CC, override to green even if it was primary
+  if (mainGoalMet) {
+    mainProgressIndicatorClassName = "bg-green-500";
+  }
+
+
+  let descriptionTextOverallClassName = "text-muted-foreground"; // Default
+  if ((isSavingsCategory || isCCPaymentsCategory) && mainGoalMet) {
+    descriptionTextOverallClassName = "text-green-600 dark:text-green-500 font-semibold";
+  } else if (mainCategoryIsOverBudget) {
+    descriptionTextOverallClassName = "text-destructive font-semibold";
+  }
+
 
   const handleDeleteExpense = (expenseId: string, targetId: string, isSub: boolean, expenseDescription: string) => {
-    // currentDisplayMonthId is now available from the top-level useBudget() call
     deleteExpense(currentDisplayMonthId, targetId, expenseId, isSub);
     toast({
       title: "Expense Deleted",
@@ -92,16 +117,16 @@ export function CategoryCard({ category }: CategoryCardProps) {
             {isSavingsCategory ? "Main Goal" : isCCPaymentsCategory ? "Payment Goal" : "Main Budgeted"}: <span className="font-semibold">${category.budgetedAmount.toFixed(2)}</span>
           </div>
           <div className="text-sm mb-2">
-            {isSavingsCategory ? "Main Saved" : isCCPaymentsCategory ? "Paid This Month" : "Main Spent"}: <span className="font-semibold">${mainCategorySpentAmount.toFixed(2)}</span>
+            {isSavingsCategory ? "Main Saved" : isCCPaymentsCategory ? "Paid This Month" : "Main Spent"}: <span className={spentAmountSpanClassName}>${mainCategorySpentAmount.toFixed(2)}</span>
           </div>
-          {(category.budgetedAmount > 0 || isSavingsCategory || isCCPaymentsCategory) && (
+          {(category.budgetedAmount > 0 || ((isSavingsCategory || isCCPaymentsCategory) && mainCategorySpentAmount > 0)) && (
             <Progress
               value={Math.min(mainCategoryProgress, 100)}
-              className={cn("h-3 mb-2", (mainCategoryIsOverBudget) ? "bg-destructive/30" : "")}
+              className={cn("h-3 mb-2", (mainCategoryIsOverBudget && !(isSavingsCategory || isCCPaymentsCategory)) ? "bg-destructive/30" : "")}
               indicatorClassName={mainProgressIndicatorClassName}
             />
           )}
-          <CardDescription className={mainDescriptionClassName}>
+          <CardDescription className={descriptionTextOverallClassName}>
             {isSavingsCategory ? (
               category.budgetedAmount > 0 ?
                 (mainCategorySpentAmount >= category.budgetedAmount ? `Main Goal of $${category.budgetedAmount.toFixed(2)} met! Saved $${mainCategorySpentAmount.toFixed(2)}.` : `$${(category.budgetedAmount - mainCategorySpentAmount).toFixed(2)} to reach main goal`)
@@ -179,3 +204,4 @@ export function CategoryCard({ category }: CategoryCardProps) {
     </Card>
   );
 }
+

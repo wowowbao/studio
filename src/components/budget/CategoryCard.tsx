@@ -26,7 +26,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
   if (category.budgetedAmount > 0) {
     mainCategoryProgress = (mainCategorySpentAmount / category.budgetedAmount) * 100;
   } else if ((isSavingsCategory || isCCPaymentsCategory) && mainCategorySpentAmount > 0) {
-    mainCategoryProgress = 100; // Show full progress if any amount is saved/paid and goal is 0
+    mainCategoryProgress = 100; 
   }
 
   const mainCategoryRemaining = category.budgetedAmount - mainCategorySpentAmount;
@@ -42,7 +42,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
     }
   );
 
-  let mainProgressIndicatorClassName = "bg-primary"; // Default for regular categories
+  let mainProgressIndicatorClassName = "bg-primary"; 
   if (isCCPaymentsCategory && mainCategorySpentAmount > 0) {
     mainProgressIndicatorClassName = "bg-green-500";
   } else if (isSavingsCategory && mainCategorySpentAmount > 0) {
@@ -51,17 +51,32 @@ export function CategoryCard({ category }: CategoryCardProps) {
     mainProgressIndicatorClassName = "bg-destructive";
   }
   
-  // If goal is met for Savings/CC, override to green even if it was primary
   if (mainGoalMet) {
     mainProgressIndicatorClassName = "bg-green-500";
   }
 
+  let mainRemainingTextClass = "text-muted-foreground"; // Default
+  let mainRemainingIsBold = false;
 
-  let descriptionTextOverallClassName = "text-muted-foreground"; // Default
-  if ((isSavingsCategory || isCCPaymentsCategory) && mainGoalMet) {
-    descriptionTextOverallClassName = "text-green-600 dark:text-green-500 font-semibold";
+  if (isSavingsCategory || isCCPaymentsCategory) {
+    if (mainGoalMet) {
+        mainRemainingTextClass = "text-green-600 dark:text-green-500";
+        mainRemainingIsBold = true;
+    }
+    // else, it stays default text-muted-foreground if goal not met or no goal
   } else if (mainCategoryIsOverBudget) {
-    descriptionTextOverallClassName = "text-destructive font-semibold";
+    mainRemainingTextClass = "text-destructive";
+    mainRemainingIsBold = true;
+  } else { // Regular category, not overspent
+    if (category.budgetedAmount > 0) {
+        const spentRatio = mainCategorySpentAmount / category.budgetedAmount;
+        if (spentRatio < 0.8) { // Less than 80% spent
+            mainRemainingTextClass = "text-green-600 dark:text-green-500";
+        } else if (spentRatio <= 1) { // Between 80% and 100% spent (inclusive)
+            mainRemainingTextClass = "text-amber-600 dark:text-amber-500";
+        }
+    }
+    // If budgetedAmount is 0 and not overspent (i.e., spent is 0), it remains text-muted-foreground.
   }
 
 
@@ -82,7 +97,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
     }
     const remaining = subCategory.budgetedAmount - spent;
     const isOverBudget = remaining < 0;
-    return { spent, progress, remaining, isOverBudget, expenses: subCategory.expenses };
+    return { spent, progress, remaining, isOverBudget, expenses: subCategory.expenses, subCategory };
   };
 
   const renderExpenseItem = (expense: Expense, targetId: string, isSub: boolean) => (
@@ -126,7 +141,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
               indicatorClassName={mainProgressIndicatorClassName}
             />
           )}
-          <CardDescription className={descriptionTextOverallClassName}>
+          <CardDescription className={cn(mainRemainingTextClass, { "font-semibold": mainRemainingIsBold })}>
             {isSavingsCategory ? (
               category.budgetedAmount > 0 ?
                 (mainCategorySpentAmount >= category.budgetedAmount ? `Main Goal of $${category.budgetedAmount.toFixed(2)} met! Saved $${mainCategorySpentAmount.toFixed(2)}.` : `$${(category.budgetedAmount - mainCategorySpentAmount).toFixed(2)} to reach main goal`)
@@ -159,9 +174,26 @@ export function CategoryCard({ category }: CategoryCardProps) {
               <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Subcategories</h4>
               <ul className="space-y-3">
                 {category.subcategories.map(sub => {
-                  const { spent, progress, remaining, isOverBudget, expenses: subExpenses } = calculateSubCategoryInfo(sub);
-                  const subProgressIndicatorClassName = cn(isOverBudget ? "bg-destructive" : "bg-primary/80");
-                  const subDescriptionClassName = cn(isOverBudget ? "text-destructive" : "text-muted-foreground/90", "text-xs");
+                  const subInfo = calculateSubCategoryInfo(sub);
+                  const subProgressIndicatorClassName = cn(subInfo.isOverBudget ? "bg-destructive" : "bg-primary/80");
+                  
+                  let subRemainingTextClass = "text-muted-foreground/90";
+                  let subRemainingIsBold = false;
+
+                  if (subInfo.isOverBudget) {
+                      subRemainingTextClass = "text-destructive";
+                      subRemainingIsBold = true;
+                  } else { // Not overspent
+                      if (subInfo.subCategory.budgetedAmount > 0) {
+                          const subSpentRatio = subInfo.spent / subInfo.subCategory.budgetedAmount;
+                          if (subSpentRatio < 0.8) { // Less than 80% spent
+                              subRemainingTextClass = "text-green-600 dark:text-green-500";
+                          } else if (subSpentRatio <= 1) { // Between 80% and 100% spent (inclusive)
+                              subRemainingTextClass = "text-amber-600 dark:text-amber-500";
+                          }
+                      }
+                  }
+
                   return (
                     <li key={sub.id} className="pl-2 border-l-2 border-border">
                       <div className="flex items-center justify-between text-sm">
@@ -172,24 +204,24 @@ export function CategoryCard({ category }: CategoryCardProps) {
                         <span className="font-semibold">${sub.budgetedAmount.toFixed(2)}</span>
                       </div>
                       <div className="text-xs">
-                        Spent: <span className="font-medium">${spent.toFixed(2)}</span>
+                        Spent: <span className="font-medium">${subInfo.spent.toFixed(2)}</span>
                       </div>
                       {sub.budgetedAmount > 0 && (
                          <Progress
-                            value={Math.min(progress, 100)}
-                            className={cn("h-2 my-1", isOverBudget ? "bg-destructive/30" : "bg-secondary")}
+                            value={Math.min(subInfo.progress, 100)}
+                            className={cn("h-2 my-1", subInfo.isOverBudget ? "bg-destructive/30" : "bg-secondary")}
                             indicatorClassName={subProgressIndicatorClassName}
                           />
                       )}
-                      <p className={subDescriptionClassName}>
-                        {isOverBudget ? `Overspent by $${Math.abs(remaining).toFixed(2)}` : `Remaining: $${remaining.toFixed(2)}`}
+                      <p className={cn("text-xs", subRemainingTextClass, { "font-semibold": subRemainingIsBold })}>
+                        {subInfo.isOverBudget ? `Overspent by $${Math.abs(subInfo.remaining).toFixed(2)}` : `Remaining: $${subInfo.remaining.toFixed(2)}`}
                       </p>
                       {/* Subcategory Expenses List */}
-                      {subExpenses && subExpenses.length > 0 && (
+                      {subInfo.expenses && subInfo.expenses.length > 0 && (
                         <div className="mt-2 pt-1 border-t border-border/30">
                           <h6 className="text-2xs font-semibold uppercase text-muted-foreground/70 mb-0.5">Transactions</h6>
                           <ul className="space-y-0.5 max-h-20 overflow-y-auto pr-1">
-                            {subExpenses.map(exp => renderExpenseItem(exp, sub.id, true))}
+                            {subInfo.expenses.map(exp => renderExpenseItem(exp, sub.id, true))}
                           </ul>
                         </div>
                       )}

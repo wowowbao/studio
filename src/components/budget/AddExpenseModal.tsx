@@ -92,16 +92,28 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     setAiSuggestionError(null);
     setIsAiProcessing(false);
     setMode('idle');
-    // Don't reset camera permission, but stop stream if active
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
+    // setHasCameraPermission(null); // Don't reset this, so the alert persists if denied
   };
   
   useEffect(() => {
     if (isOpen && monthId && !budgetLoading) {
-      resetFormFields(); 
+      // Keep essential parts of reset, but don't fully reset camera permission status
+      // so the 'denied' alert persists if that was the case.
+      setSelectedTargetId("");
+      setIsTargetSubcategory(false);
+      setAmount("");
+      setDescription("");
+      setDate(new Date());
+      setSelectedImageFile(null);
+      setImagePreviewUrl(null); // Clear preview on open
+      setImageDataUri(null);    // Clear data URI on open
+      setAiSuggestionError(null);
+      setIsAiProcessing(false);
+      setMode('idle');        // Start in idle mode
 
       const budgetData = getBudgetForMonth(monthId);
       const options: CategoryOption[] = [];
@@ -117,11 +129,11 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       }
       setCategoryOptions(options);
     } else if (!isOpen && cameraStream) {
-      // Cleanup camera stream when modal is closed externally
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
-  }, [isOpen, monthId, getBudgetForMonth, budgetLoading, cameraStream]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, monthId, getBudgetForMonth, budgetLoading]); // Removed cameraStream from deps to avoid re-triggering stream stop on unrelated changes
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,7 +164,12 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   };
 
   const getCameraPermissionAndStream = async () => {
-    if (cameraStream) return true; // Already have a stream
+    if (cameraStream) { // If a stream already exists, ensure video element uses it
+      if (videoRef.current && videoRef.current.srcObject !== cameraStream) {
+         videoRef.current.srcObject = cameraStream;
+      }
+      return true;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       setHasCameraPermission(true);
@@ -164,7 +181,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     } catch (error) {
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
-      setCameraStream(null);
+      setCameraStream(null); // Ensure stream is cleared on error
       toast({
         variant: 'destructive',
         title: 'Camera Access Denied',
@@ -175,18 +192,18 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   };
 
   const handleEnableCamera = async () => {
-    setIsAiProcessing(true); // To disable buttons while camera initializes
+    setIsAiProcessing(true); 
     const permissionGranted = await getCameraPermissionAndStream();
     setIsAiProcessing(false);
     if (permissionGranted) {
       setMode('cameraView');
     } else {
-      setMode('idle'); // Stay in idle if permission denied or error
+      setMode('idle'); 
     }
   };
   
   const handleCapturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
@@ -194,17 +211,18 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg'); // Or image/png
+        const dataUri = canvas.toDataURL('image/jpeg'); 
         setImagePreviewUrl(dataUri);
         setImageDataUri(dataUri);
-        setSelectedImageFile(null); // Clear any uploaded file
+        setSelectedImageFile(null); 
         setMode('preview');
-        // Stop camera stream after capture
         if (cameraStream) {
           cameraStream.getTracks().forEach(track => track.stop());
           setCameraStream(null);
         }
       }
+    } else {
+        toast({ variant: "destructive", title: "Camera Error", description: "Camera not ready. Please try again."});
     }
   };
 
@@ -238,7 +256,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
              setAiSuggestionError(`AI suggested category ID '${result.suggestedCategoryId}' not found.`);
           }
         }
-        if (result.suggestedAmount !== undefined) {
+        if (result.suggestedAmount !== undefined && result.suggestedAmount !== null) {
           setAmount(String(result.suggestedAmount.toFixed(2)));
         }
         if (result.suggestedDescription) {
@@ -261,7 +279,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       handleAiCategorize();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageDataUri, mode]); // Run when imageDataUri changes or mode becomes 'preview'
+  }, [imageDataUri, mode]); 
 
   const handleSubmit = () => {
     const numericAmount = parseFloat(amount);
@@ -313,8 +331,11 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
         </DialogHeader>
         
+        {/* Video element always rendered for ref stability, visibility controlled by CSS */}
+        <video ref={videoRef} className={cn("w-full h-auto object-cover aspect-video rounded-md bg-muted", mode !== 'cameraView' && 'hidden')} autoPlay muted playsInline />
+        <canvas ref={canvasRef} className="hidden"></canvas> {/* Hidden canvas for capture */}
+
         <div className="grid gap-4 py-4">
-           {/* Image Upload / Camera Section */}
            {mode === 'idle' && (
              <div className="flex flex-col items-center space-y-3 py-4 border rounded-lg p-4 bg-muted/20">
                 <p className="text-base font-medium">Add Receipt Image</p>
@@ -352,7 +373,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                         Take Picture
                     </Button>
                 </div>
-                {hasCameraPermission === false && ( // Show if explicitly denied
+                {hasCameraPermission === false && (
                     <Alert variant="destructive" className="mt-2 w-full">
                         <LocalAlertTriangle className="h-4 w-4" />
                         <AlertTitle>Camera Access Denied</AlertTitle>
@@ -367,12 +388,9 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
            {mode === 'cameraView' && (
              <div className="space-y-3 p-2 border rounded-lg">
                 <Label className="text-base font-medium">Camera View</Label>
-                <div className="relative w-full aspect-video bg-muted rounded-md overflow-hidden">
-                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                </div>
-                <canvas ref={canvasRef} className="hidden"></canvas> {/* Hidden canvas for capture */}
+                {/* Video element is now outside this block, controlled by its own className */}
                 <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={handleCapturePhoto} className="flex-1">
+                    <Button onClick={handleCapturePhoto} className="flex-1" disabled={isAiProcessing}>
                         <Camera className="mr-2 h-4 w-4" /> Capture Photo
                     </Button>
                     <Button variant="outline" onClick={() => {
@@ -381,8 +399,8 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                             setCameraStream(null);
                           }
                         setMode('idle');
-                        setHasCameraPermission(null); // Allow re-prompt or re-check
-                    }} className="flex-1">
+                        // setHasCameraPermission(null); // Keep permission status for potential immediate re-attempt
+                    }} className="flex-1" disabled={isAiProcessing}>
                         <XCircle className="mr-2 h-4 w-4" /> Back to Options
                     </Button>
                 </div>
@@ -396,9 +414,12 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                         <Image src={imagePreviewUrl} alt="Receipt preview" layout="fill" objectFit="contain" />
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
-                        <Button variant="outline" onClick={handleClearImage} className="w-full">
+                         <Button variant="outline" onClick={handleEnableCamera} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
+                            <Camera className="mr-2 h-4 w-4" /> Retake
+                        </Button>
+                        <Button variant="outline" onClick={handleClearImage} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
                             <FileImage className="mr-2 h-4 w-4" />
-                            Use Different Image
+                            Upload Different
                         </Button>
                     </div>
                 </div>
@@ -418,8 +439,6 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
               </Alert>
             )}
           
-
-          {/* Form Fields */}
           {budgetLoading ? (
             <p>Loading categories...</p>
           ) : categoryOptions.length === 0 ? (
@@ -510,7 +529,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           </DialogClose>
           <Button onClick={handleSubmit} disabled={budgetLoading || categoryOptions.length === 0 || isAiProcessing}>
             {isAiProcessing && !imageDataUri ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-            {isAiProcessing && !imageDataUri ? "Initializing..." : (isAiProcessing ? "Processing..." : "Add Expense")}
+            {isAiProcessing && !imageDataUri ? "Processing..." : (isAiProcessing ? "Processing..." : "Add Expense")}
           </Button>
         </DialogFooter>
       </DialogContent>

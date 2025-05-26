@@ -9,7 +9,7 @@ export function MonthNavigator() {
   const { currentDisplayMonthId, navigateToPreviousMonth, navigateToNextMonth } = useBudget();
 
   const displayDate = parseYearMonth(currentDisplayMonthId);
-  const monthName = displayDate.toLocaleString('default', { month: 'long' });
+  const monthName = displayDate.toLocaleString('default', { month: 'short' }); // Changed from 'long' to 'short'
   const year = displayDate.getFullYear();
 
   return (

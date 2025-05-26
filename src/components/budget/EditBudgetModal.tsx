@@ -167,14 +167,14 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         <SelectValue placeholder="Select icon" />
                       </SelectTrigger>
                       <SelectContent>
-                        <ScrollArea className="h-72"> {/* Increased height */}
+                        <ScrollArea className="h-[20rem]"> {/* Increased height from h-72 */}
                           {ALL_ICONS.map(iconName => {
                             const CurrentIcon = (LucideIcons as any)[iconName];
                             if (!CurrentIcon || typeof CurrentIcon !== 'function') return null; // Extra safety
                             return (
                               <SelectItem key={iconName} value={iconName}>
-                                <div className="flex items-center text-popover-foreground"> {/* Ensure text color is applied */}
-                                  <CurrentIcon className="mr-2 h-4 w-4" /> {/* text-current should inherit from parent */}
+                                <div className="flex items-center text-popover-foreground">
+                                  <CurrentIcon className="mr-2 h-4 w-4 text-current" /> {/* Added text-current */}
                                   {iconName}
                                 </div>
                               </SelectItem>

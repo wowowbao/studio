@@ -5,7 +5,9 @@ import { DEFAULT_CATEGORIES } from '@/types/budget';
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-// Helper to get current YYYY-MM string
+const DEFAULT_START_MONTH = '2025-06'; // App default start month
+
+// Helper to get current YYYY-MM string - now used as a fallback, not primary default
 export const getCurrentYearMonth = (): string => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -34,7 +36,7 @@ const getUserSpecificKey = (baseKey: string) => {
 
 export const useBudgetCore = () => {
   const [budgetMonths, setBudgetMonths] = useState<Record<string, BudgetMonth>>({});
-  const [currentDisplayMonthId, setCurrentDisplayMonthId] = useState<string>(getCurrentYearMonth());
+  const [currentDisplayMonthId, setCurrentDisplayMonthId] = useState<string>(DEFAULT_START_MONTH);
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
@@ -59,23 +61,24 @@ export const useBudgetCore = () => {
         });
         setBudgetMonths(parsedBudgets);
       } else {
-        const initialMonthId = getCurrentYearMonth();
-        const newMonth = createNewMonthBudget(initialMonthId);
-        setBudgetMonths({ [initialMonthId]: newMonth });
+        // If no stored budgets, initialize with the default start month
+        const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
+        setBudgetMonths({ [DEFAULT_START_MONTH]: newMonth });
       }
       
       const storedDisplayMonth = localStorage.getItem(displayMonthKey);
       const currentBudgetsData = storedBudgets ? JSON.parse(storedBudgets) : {};
 
+      // If stored display month exists and is part of loaded budgets, use it. Otherwise, default to DEFAULT_START_MONTH.
       if (storedDisplayMonth && Object.keys(currentBudgetsData).includes(storedDisplayMonth)) {
          setCurrentDisplayMonthId(storedDisplayMonth);
       } else {
-        const currentMonthDefault = getCurrentYearMonth();
-        setCurrentDisplayMonthId(currentMonthDefault);
+        setCurrentDisplayMonthId(DEFAULT_START_MONTH);
+        // Ensure the default start month budget exists if we're setting it as current
         setBudgetMonths(prev => {
-          if (!prev[currentMonthDefault]) {
-            const newMonth = createNewMonthBudget(currentMonthDefault);
-            return { ...prev, [currentMonthDefault]: newMonth };
+          if (!prev[DEFAULT_START_MONTH]) {
+            const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
+            return { ...prev, [DEFAULT_START_MONTH]: newMonth };
           }
           return prev;
         });
@@ -83,10 +86,10 @@ export const useBudgetCore = () => {
 
     } catch (error) {
       console.error("Failed to load budgets from localStorage:", error);
-      const initialMonthId = getCurrentYearMonth();
-      const newMonth = createNewMonthBudget(initialMonthId);
-      setBudgetMonths({ [initialMonthId]: newMonth });
-      setCurrentDisplayMonthId(initialMonthId);
+      // Fallback to default start month on error
+      const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
+      setBudgetMonths({ [DEFAULT_START_MONTH]: newMonth });
+      setCurrentDisplayMonthId(DEFAULT_START_MONTH);
     }
     setIsLoading(false);
   }, []); 

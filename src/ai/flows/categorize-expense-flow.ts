@@ -1,0 +1,93 @@
+
+'use server';
+/**
+ * @fileOverview An AI agent to categorize expenses from receipt images.
+ *
+ * - categorizeExpenseFromImage - A function that handles expense categorization using an image.
+ * - CategorizeExpenseInput - The input type for the categorizeExpenseFromImage function.
+ * - CategorizeExpenseOutput - The return type for the categorizeExpenseFromImage function.
+ */
+
+import {ai} from '@/ai/genkit';
+import {z} from 'genkit';
+
+const CategoryInfoSchema = z.object({
+  id: z.string().describe('The unique identifier of the category or subcategory.'),
+  name: z.string().describe('The display name of the category or subcategory.'),
+});
+
+export const CategorizeExpenseInputSchema = z.object({
+  imageDataUri: z
+    .string()
+    .describe(
+      "A photo of a receipt, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
+  availableCategories: z
+    .array(CategoryInfoSchema)
+    .describe('A list of available categories and subcategories the expense can be assigned to, including their IDs and names.'),
+});
+export type CategorizeExpenseInput = z.infer<typeof CategorizeExpenseInputSchema>;
+
+export const CategorizeExpenseOutputSchema = z.object({
+  suggestedCategoryId: z.string().optional().describe('The ID of the suggested category or subcategory for the expense.'),
+  suggestedAmount: z.number().optional().describe('The suggested monetary amount of the expense.'),
+  suggestedDescription: z.string().optional().describe('A suggested description for the expense (e.g., store name or item).'),
+  aiError: z.string().optional().describe('Any error message if the AI failed to process the request.'),
+});
+export type CategorizeExpenseOutput = z.infer<typeof CategorizeExpenseOutputSchema>;
+
+export async function categorizeExpenseFromImage(input: CategorizeExpenseInput): Promise<CategorizeExpenseOutput> {
+  // Ensure there are categories to choose from
+  if (!input.availableCategories || input.availableCategories.length === 0) {
+    return {
+      aiError: "No categories available to suggest from. Please add categories to your budget first."
+    };
+  }
+  return categorizeExpenseFlow(input);
+}
+
+const prompt = ai.definePrompt({
+  name: 'categorizeExpensePrompt',
+  input: {schema: CategorizeExpenseInputSchema},
+  output: {schema: CategorizeExpenseOutputSchema},
+  prompt: `You are an intelligent expense categorization assistant.
+Analyze the provided receipt image.
+The user has the following available budget categories/subcategories (with their IDs and names):
+{{{json availableCategories}}}
+
+Based on the image content:
+1.  Determine the most appropriate category/subcategory for this expense and set 'suggestedCategoryId' to its ID.
+2.  Extract the total monetary amount of the expense and set 'suggestedAmount'.
+3.  Create a brief description for the expense (e.g., store name, primary item purchased) and set 'suggestedDescription'.
+
+If you cannot confidently determine any of these, leave the respective field blank in the output.
+If there's a clear error in processing (e.g., image is not a receipt), set 'aiError'.
+
+Image of the receipt:
+{{media url=imageDataUri}}`,
+});
+
+const categorizeExpenseFlow = ai.defineFlow(
+  {
+    name: 'categorizeExpenseFlow',
+    inputSchema: CategorizeExpenseInputSchema,
+    outputSchema: CategorizeExpenseOutputSchema,
+  },
+  async (input: CategorizeExpenseInput) => {
+    // Basic validation
+    if (!input.imageDataUri.startsWith('data:image/')) {
+        return { aiError: 'Invalid image data URI format.' };
+    }
+    if (input.availableCategories.length === 0) {
+        return { aiError: 'No categories provided for suggestion.' };
+    }
+
+    try {
+      const {output} = await prompt(input);
+      return output || { aiError: 'AI processing returned no output.' };
+    } catch (e: any) {
+      console.error("Error in categorizeExpenseFlow:", e);
+      return { aiError: e.message || 'An unexpected error occurred during AI processing.' };
+    }
+  }
+);

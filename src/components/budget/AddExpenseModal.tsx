@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, Calendar as CalendarIcon, UploadCloud, FileImage, Trash2, Loader2, Camera, AlertCircle, RefreshCcw } from "lucide-react";
+import { CheckCircle, XCircle, Calendar as CalendarIcon, UploadCloud, FileImage, Trash2, Loader2, Camera, AlertCircle, RefreshCcw, Info } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -95,29 +95,19 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
-    // setAvailableCameras([]); // Don't reset this, it's discovered on permission
-    // setSelectedCameraId(undefined); // Reset selected camera
   };
   
   useEffect(() => {
     if (isOpen && monthId && !budgetLoading) {
-      setSelectedTargetId("");
-      setIsTargetSubcategory(false);
-      setAmount("");
-      setDescription("");
-      setDate(new Date());
-      setSelectedImageFile(null);
-      setImagePreviewUrl(null);
-      setImageDataUri(null);
-      setAiSuggestionError(null);
-      setIsAiProcessing(false);
-      setMode('idle');
+      resetFormFields(); // Call reset here to ensure state is clean on open
 
       const budgetData = getBudgetForMonth(monthId);
       const options: CategoryOption[] = [];
       if (budgetData) {
         budgetData.categories.forEach(cat => {
-          if (!cat.isSystemCategory && (!cat.subcategories || cat.subcategories.length === 0)) {
+          if (cat.isSystemCategory) { // Always add system categories as direct targets
+            options.push({ value: cat.id, label: cat.name, isSubcategory: false });
+          } else if (!cat.subcategories || cat.subcategories.length === 0) { // Non-system without subs
             options.push({ value: cat.id, label: cat.name, isSubcategory: false });
           }
           (cat.subcategories || []).forEach(sub => {
@@ -127,13 +117,27 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           });
         });
       }
+      // Sort options: System categories first, then others alphabetically
+      options.sort((a, b) => {
+        const aIsSystem = budgetData?.categories.find(c => c.id === a.value)?.isSystemCategory || false;
+        const bIsSystem = budgetData?.categories.find(c => c.id === b.value)?.isSystemCategory || false;
+        if (aIsSystem && !bIsSystem) return -1;
+        if (!aIsSystem && bIsSystem) return 1;
+        if (aIsSystem && bIsSystem) { // Specific order for system categories
+            if (a.label === "Savings") return -1;
+            if (b.label === "Savings") return 1;
+            if (a.label === "Credit Card Payments") return -1; // After Savings
+            if (b.label === "Credit Card Payments") return 1;
+        }
+        return a.label.localeCompare(b.label);
+      });
       setCategoryOptions(options);
     } else if (!isOpen && cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, monthId, getBudgetForMonth, budgetLoading]);
+  }, [isOpen, monthId, budgetLoading]); // Removed getBudgetForMonth from deps as it's stable from useBudget
 
 
   const getCameraPermissionAndStream = async (deviceId?: string): Promise<MediaStream | null> => {
@@ -166,19 +170,18 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
 
       const currentStreamDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
 
-      if (!deviceId && videoDevices.length > 0) { // Initial call, no specific deviceId
+      if (!deviceId && videoDevices.length > 0) { 
         const rearCamera = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
         if (rearCamera && currentStreamDeviceId !== rearCamera.deviceId) {
-          // We got a stream, but it's not the preferred rear camera. Attempt to switch.
-          stream.getTracks().forEach(track => track.stop()); // Stop current non-preferred stream
-          setSelectedCameraId(rearCamera.deviceId); // Set preferred ID
-          return getCameraPermissionAndStream(rearCamera.deviceId); // Recursive call for preferred
+          stream.getTracks().forEach(track => track.stop()); 
+          setSelectedCameraId(rearCamera.deviceId); 
+          return getCameraPermissionAndStream(rearCamera.deviceId); 
         } else if (currentStreamDeviceId) {
           setSelectedCameraId(currentStreamDeviceId);
-        } else { // Fallback if no currentStreamDeviceId
+        } else { 
           setSelectedCameraId(videoDevices[0]?.deviceId);
         }
-      } else if (deviceId) { // Specific deviceId was requested
+      } else if (deviceId) { 
         setSelectedCameraId(deviceId);
       }
       
@@ -188,13 +191,13 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
       setCameraStream(null);
-      return null; // Indicate failure
+      return null; 
     }
   };
 
   const handleEnableCamera = async () => {
     setIsAiProcessing(true);
-    const stream = await getCameraPermissionAndStream(selectedCameraId); // Pass current selected or undefined
+    const stream = await getCameraPermissionAndStream(selectedCameraId); 
     setIsAiProcessing(false);
     if (stream) {
       setMode('cameraView');
@@ -219,7 +222,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       setIsAiProcessing(false);
 
       if (stream) {
-        setSelectedCameraId(nextCameraId); // Update selected ID *after* successfully getting stream
+        setSelectedCameraId(nextCameraId); 
         setMode('cameraView');
       } else {
         toast({ variant: "destructive", title: "Camera Switch Failed", description: "Could not switch to the selected camera."});
@@ -424,7 +427,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         <div className="grid gap-4 py-4">
            {mode === 'idle' && (
              <div className="flex flex-col items-center space-y-3 py-4 border rounded-lg p-4 bg-muted/20">
-                <p className="text-base font-medium">Add Receipt Image</p>
+                <p className="text-base font-medium">Add Receipt Image (Optional)</p>
                 <p className="text-xs text-muted-foreground text-center px-2">
                     Upload an existing image or take a new picture with your camera for AI-powered suggestions.
                 </p>
@@ -500,7 +503,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                 <div className="space-y-3 p-2 border rounded-lg">
                     <Label className="text-base font-medium">Image Preview</Label>
                     <div className="relative w-full aspect-video border rounded-md overflow-hidden bg-muted">
-                        <Image src={imagePreviewUrl} alt="Receipt preview" layout="fill" objectFit="contain" />
+                        <Image src={imagePreviewUrl} alt="Receipt preview" layout="fill" objectFit="contain" data-ai-hint="receipt payment"/>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
                          <Button variant="outline" onClick={handleEnableCamera} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
@@ -531,7 +534,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           {budgetLoading ? (
             <p>Loading categories...</p>
           ) : categoryOptions.length === 0 ? (
-            <p className="text-muted-foreground py-4">No categories or subcategories available for this month. Please add them first in 'Edit Budget'.</p>
+            <p className="text-muted-foreground py-4">No categories or subcategories available for this month. Please add them first in 'Manage Budget'.</p>
           ) : (
             <>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -542,7 +545,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   <SelectTrigger id="category" className="col-span-3">
                     <SelectValue placeholder="Select target" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-60"> {/* Added max-h-60 for scroll */}
                     {categoryOptions.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
@@ -607,6 +610,14 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   </PopoverContent>
                 </Popover>
               </div>
+               <Alert variant="default" className="mt-4 col-span-4">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle className="font-semibold">Quick Tip!</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    To record money transferred to savings, select the "Savings" category.
+                    For credit card payments, select "Credit Card Payments". These are treated as expenses to these specific categories.
+                  </AlertDescription>
+                </Alert>
             </>
           )}
         </div>

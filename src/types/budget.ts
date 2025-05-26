@@ -35,24 +35,14 @@ export interface BudgetMonth {
   month: number; // 1-12 (1 for January, 12 for December)
   incomes: IncomeEntry[];
   categories: BudgetCategory[];
-  // savingsGoal: number; // Removed: Now handled by "Savings" category budget
   isRolledOver?: boolean; // Flag to indicate if unspent budget has been rolled over
   startingCreditCardDebt?: number; // Debt at the start of the month
 }
 
-export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver' | 'incomes' | 'savingsGoal'>> & {
+export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver' | 'incomes'>> & {
   categories?: Array<Omit<BudgetCategory, 'id'> & { id?: string; subcategories?: Array<Omit<SubCategory, 'id'> & { id?: string }> }>;
   startingCreditCardDebt?: number;
 };
 
-export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount' | 'subcategories' | 'expenses'>[] = [
-  { name: "Savings", isSystemCategory: true },
-  { name: "Credit Card Payments", isSystemCategory: true },
-  { name: "Groceries" },
-  { name: "Rent/Mortgage" },
-  { name: "Utilities" },
-  { name: "Transport" },
-  { name: "Entertainment" },
-  { name: "Health" },
-  { name: "Other" },
-];
+// User-defined default categories are now empty. System categories will be handled by ensureSystemCategories if present.
+export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount' | 'subcategories' | 'expenses'>[] = [];

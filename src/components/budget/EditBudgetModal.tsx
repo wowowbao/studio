@@ -166,15 +166,17 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                       <SelectTrigger id={`categoryIcon-${cat.id}`} className="mt-1">
                         <SelectValue placeholder="Select icon" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <ScrollArea className="h-[20rem]"> {/* Increased height from h-72 */}
+                      <SelectContent> {/* This component applies text-popover-foreground */}
+                        <ScrollArea className="h-[25rem]"> 
                           {ALL_ICONS.map(iconName => {
                             const CurrentIcon = (LucideIcons as any)[iconName];
-                            if (!CurrentIcon || typeof CurrentIcon !== 'function') return null; // Extra safety
+                            if (!CurrentIcon || typeof CurrentIcon !== 'function') return null; 
                             return (
                               <SelectItem key={iconName} value={iconName}>
-                                <div className="flex items-center text-popover-foreground">
-                                  <CurrentIcon className="mr-2 h-4 w-4 text-current" /> {/* Added text-current */}
+                                {/* This div inherits text-popover-foreground from SelectContent and applies it to children */}
+                                <div className="flex items-center text-popover-foreground"> 
+                                  {/* Icon should inherit color via currentColor from the parent div */}
+                                  <CurrentIcon className="mr-2 h-4 w-4" /> 
                                   {iconName}
                                 </div>
                               </SelectItem>

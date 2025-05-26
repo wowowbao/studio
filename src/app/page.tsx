@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, LayoutDashboard, Moon, Sun, KeyRound, Lock } from 'lucide-react';
 import { useTheme } from "next-themes";
 
-const APP_PASSWORD = "2007"; // Updated password
+const APP_PASSWORD = "2007"; 
 
 export default function HomePage() {
   const [isPseudoAuthenticated, setIsPseudoAuthenticated] = useState(false);
@@ -104,7 +104,7 @@ export default function HomePage() {
                   type="password"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="••••" // Adjusted placeholder
+                  placeholder="Enter password" 
                   required
                   className="mt-1"
                 />

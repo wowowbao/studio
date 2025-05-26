@@ -18,13 +18,14 @@ interface BudgetContextType {
   setCurrentDisplayMonthId: (yearMonthId: string) => void;
   ensureMonthExists: (yearMonthId: string) => BudgetMonth;
   addCategoryToMonth: (yearMonthId: string, categoryName: string) => void;
-  updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories'>>) => void;
+  updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories' | 'isSystemCategory'>>) => void;
   deleteCategoryFromMonth: (yearMonthId: string, categoryId: string) => void;
   setSavingsGoalForMonth: (yearMonthId: string, goal: number) => void;
   rolloverUnspentBudget: (yearMonthId: string) => { success: boolean; message: string };
   addSubCategory: (monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => void;
   updateSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => void;
   deleteSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string) => void;
+  setMonthlyIncomeForMonth: (yearMonthId: string, income: number) => void;
 }
 
 export const BudgetContext = createContext<BudgetContextType | undefined>(undefined);

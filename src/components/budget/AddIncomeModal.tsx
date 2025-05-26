@@ -15,6 +15,7 @@ import { format, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { IncomeEntry } from "@/types/budget";
+import { Separator } from "@/components/ui/separator"; // Added Separator import
 
 interface AddIncomeModalProps {
   isOpen: boolean;
@@ -109,9 +110,47 @@ export function AddIncomeModal({ isOpen, onClose, monthId }: AddIncomeModalProps
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] pr-3">
           <div className="space-y-6 py-4">
+            {/* Section to list existing incomes - MOVED TO TOP */}
+            <div>
+              <h3 className="text-lg font-medium mb-3">Existing Income Entries</h3>
+              {sortedIncomes.length > 0 ? (
+                <ul className="space-y-2">
+                  {sortedIncomes.map((income) => {
+                    const incomeDate = new Date(income.dateAdded);
+                    const formattedDate = isValid(incomeDate) ? format(incomeDate, "MMM d, yyyy") : "Invalid Date";
+                    return (
+                      <li key={income.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
+                        <div className="flex-grow">
+                          <p className="font-medium text-sm">{income.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ${income.amount.toFixed(2)} on {formattedDate}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2"
+                          onClick={() => handleDeleteIncome(income.id, income.description)}
+                          aria-label="Delete income"
+                          disabled={isLoading}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                !isLoading && <p className="text-sm text-muted-foreground text-center py-2">No income entries recorded for this month yet.</p>
+              )}
+            </div>
+
+            {/* Separator if there are existing incomes */}
+            {sortedIncomes.length > 0 && <Separator className="my-4" />}
+
             {/* Section to add new income */}
             <div>
-              <h3 className="text-lg font-medium mb-3 border-b pb-2">Add New Income Entry</h3>
+              <h3 className="text-lg font-medium mb-3">Add New Income Entry</h3>
               <div className="grid gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="income-amount">Amount</Label>
@@ -163,42 +202,6 @@ export function AddIncomeModal({ isOpen, onClose, monthId }: AddIncomeModalProps
                 </Button>
               </div>
             </div>
-
-            {/* Section to list existing incomes */}
-            {sortedIncomes.length > 0 && (
-              <div className="mt-6 pt-4 border-t">
-                <h3 className="text-lg font-medium mb-3">Existing Income Entries</h3>
-                <ul className="space-y-2">
-                  {sortedIncomes.map((income) => {
-                    const incomeDate = new Date(income.dateAdded);
-                    const formattedDate = isValid(incomeDate) ? format(incomeDate, "MMM d, yyyy") : "Invalid Date";
-                    return (
-                      <li key={income.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
-                        <div className="flex-grow">
-                          <p className="font-medium text-sm">{income.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            ${income.amount.toFixed(2)} on {formattedDate}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2"
-                          onClick={() => handleDeleteIncome(income.id, income.description)}
-                          aria-label="Delete income"
-                          disabled={isLoading}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-             {sortedIncomes.length === 0 && !isLoading && (
-                <p className="text-sm text-muted-foreground text-center pt-4 border-t">No income entries recorded for this month yet.</p>
-             )}
           </div>
         </ScrollArea>
         <DialogFooter className="pt-4 border-t">

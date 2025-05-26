@@ -1,7 +1,7 @@
 
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, Target, Wallet, AlertCircle, Coins } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Coins } from "lucide-react";
 import type { BudgetMonth, BudgetCategory, SubCategory } from "@/types/budget";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +16,8 @@ const getCategorySpentAmount = (category: BudgetCategory | SubCategory): number 
 export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   if (!budgetMonth) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="h-4 bg-muted rounded w-1/2"></div>
@@ -37,13 +37,14 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   
   let totalBudgetedForAllCategories = 0; 
   let totalOperationalSpending = 0; 
-  let totalCreditCardPaymentsMade = 0;
   let creditCardPaymentsCategoryBudgetedAmount = 0;
+  // let savingsCategoryBudgetedAmount = 0; // Savings category is removed as a budget line item
 
   budgetMonth.categories.forEach(cat => {
     const catNameLower = cat.name.toLowerCase();
     const isCCPaymentsCat = cat.isSystemCategory && catNameLower === 'credit card payments';
-    
+    // const isSavingsCat = cat.isSystemCategory && catNameLower === 'savings'; // Savings category removed
+
     let effectiveCategoryBudget = 0;
     if (cat.subcategories && cat.subcategories.length > 0 && !cat.isSystemCategory) {
       cat.subcategories.forEach(sub => effectiveCategoryBudget += sub.budgetedAmount);
@@ -54,8 +55,12 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
 
     if (isCCPaymentsCat) {
       creditCardPaymentsCategoryBudgetedAmount += effectiveCategoryBudget;
-      totalCreditCardPaymentsMade += getCategorySpentAmount(cat); // Spending for CC Payments is tracked separately
-    } else { // Operational categories
+      // Spending for CC Payments is tracked separately and not part of operational spending
+    } 
+    // else if (isSavingsCat) { // Savings category removed
+    //   savingsCategoryBudgetedAmount += effectiveCategoryBudget;
+    // } 
+    else { // Operational categories
       if (cat.subcategories && cat.subcategories.length > 0) {
         cat.subcategories.forEach(sub => {
           totalOperationalSpending += getCategorySpentAmount(sub);
@@ -69,17 +74,13 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   const fundsToAllocate = totalIncomeReceived - totalBudgetedForAllCategories;
   const isOverAllocated = fundsToAllocate < 0;
 
-  // Budget for operational categories = Total Budget - CC Payments Budget
-  const operationalCategoriesBudget = totalBudgetedForAllCategories - creditCardPaymentsCategoryBudgetedAmount;
+  // Budget for operational categories = Total Budget - CC Payments Budget (Savings budget already excluded)
+  const operationalCategoriesBudget = totalBudgetedForAllCategories - creditCardPaymentsCategoryBudgetedAmount; // - savingsCategoryBudgetedAmount;
   const overallOperationalSpendingRemaining = operationalCategoriesBudget - totalOperationalSpending;
   const isOverSpentOverallOnOperational = overallOperationalSpendingRemaining < 0;
 
-  // New Savings Calculation: Income - OpEx - CC Payments Made
-  const amountActuallySaved = totalIncomeReceived - totalOperationalSpending - totalCreditCardPaymentsMade;
-
-
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6"> {/* Adjusted lg:grid-cols-3 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Income Received</CardTitle>
@@ -123,22 +124,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardContent>
       </Card>
 
-       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Savings Progress</CardTitle>
-          <Target className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            ${amountActuallySaved.toFixed(2)}
-            {budgetMonth.savingsGoal > 0 && <span className="text-lg text-muted-foreground"> / ${budgetMonth.savingsGoal.toFixed(2)} goal</span>}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Effective savings: (Income - Op. Spending - CC Payments).
-            {budgetMonth.savingsGoal > 0 ? ` Target: $${budgetMonth.savingsGoal.toFixed(2)}.` : ' No overall goal set.'}
-          </p>
-        </CardContent>
-      </Card>
+      {/* Savings Progress Card Removed */}
     </div>
   );
 }

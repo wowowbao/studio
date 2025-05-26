@@ -11,7 +11,7 @@ interface BudgetContextType {
   getBudgetForMonth: (yearMonthId: string) => BudgetMonth | undefined;
   updateMonthBudget: (yearMonthId: string, payload: BudgetUpdatePayload) => void;
   addExpense: (yearMonthId: string, categoryId: string, amount: number, description: string) => void;
-  deleteExpense: (yearMonthId: string, categoryId: string, expenseId: string) => void; // Added deleteExpense
+  deleteExpense: (yearMonthId: string, categoryId: string, expenseId: string) => void;
   duplicateMonthBudget: (sourceMonthId: string, targetMonthId: string) => void;
   navigateToPreviousMonth: () => void;
   navigateToNextMonth: () => void;
@@ -21,6 +21,7 @@ interface BudgetContextType {
   updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<BudgetCategory>) => void;
   deleteCategoryFromMonth: (yearMonthId: string, categoryId: string) => void;
   setSavingsGoalForMonth: (yearMonthId: string, goal: number) => void;
+  rolloverUnspentBudget: (yearMonthId: string) => { success: boolean; message: string };
 }
 
 export const BudgetContext = createContext<BudgetContextType | undefined>(undefined);

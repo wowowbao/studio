@@ -27,8 +27,6 @@ const DISPLAY_MONTH_KEY_PREFIX = 'budgetFlowDisplayMonth_';
 
 // Function to get user-specific storage key
 const getUserSpecificKey = (baseKey: string) => {
-  // For this password-protected version, we use a static "user" ID.
-  // If proper auth were re-added, this would use the actual user UID.
   const pseudoUserId = "localUser"; 
   return `${baseKey}${pseudoUserId}`;
 };
@@ -47,14 +45,17 @@ export const useBudgetCore = () => {
 
       const storedBudgets = localStorage.getItem(budgetKey);
       if (storedBudgets) {
-        const parsedBudgets = JSON.parse(storedBudgets);
-        // Ensure expenses array exists for all categories (data migration for older structures)
-        Object.values(parsedBudgets as Record<string, BudgetMonth>).forEach(month => {
+        const parsedBudgets = JSON.parse(storedBudgets) as Record<string, BudgetMonth>;
+        // Ensure expenses array and isRolledOver flag exist for all categories/months
+        Object.values(parsedBudgets).forEach(month => {
           month.categories.forEach(cat => {
             if (!cat.expenses) {
               cat.expenses = [];
             }
           });
+          if (month.isRolledOver === undefined) {
+            month.isRolledOver = false;
+          }
         });
         setBudgetMonths(parsedBudgets);
       } else {
@@ -119,9 +120,10 @@ export const useBudgetCore = () => {
         ...cat,
         id: uuidv4(),
         budgetedAmount: 0,
-        expenses: [], // Initialize expenses array
+        expenses: [],
       })),
       savingsGoal: 0,
+      isRolledOver: false,
     };
   }, []);
 
@@ -154,10 +156,10 @@ export const useBudgetCore = () => {
           name: cat.name,
           icon: cat.icon,
           budgetedAmount: cat.budgetedAmount === undefined ? 0 : cat.budgetedAmount,
-          // Ensure expenses array exists, preserving existing if not explicitly overwritten
           expenses: cat.expenses || (monthToUpdate.categories.find(c => c.id === cat.id)?.expenses) || [],
         }));
       }
+      // isRolledOver is handled by rolloverUnspentBudget
       return { ...prev, [yearMonthId]: updatedMonth };
     });
   }, [createNewMonthBudget]);
@@ -225,7 +227,12 @@ export const useBudgetCore = () => {
     };
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
-      if (!month) return prev; // Should not happen if ensureMonthExists works
+      if (!month) return prev; 
+      if (month.isRolledOver) {
+        console.warn(`Cannot add expense to ${yearMonthId} as it has been rolled over.`);
+        // Optionally, inform the user via toast or alert here
+        return prev;
+      }
       return {
         ...prev,
         [yearMonthId]: {
@@ -245,6 +252,11 @@ export const useBudgetCore = () => {
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
       if (!month) return prev;
+      if (month.isRolledOver) {
+        console.warn(`Cannot delete expense from ${yearMonthId} as it has been rolled over.`);
+         // Optionally, inform the user
+        return prev;
+      }
       return {
         ...prev,
         [yearMonthId]: {
@@ -268,11 +280,10 @@ export const useBudgetCore = () => {
     }
 
     const [targetYear, targetMonthNum] = targetMonthId.split('-').map(Number);
-    // Duplicate categories with their budgeted amounts, but reset expenses
     const newCategories = sourceBudget.categories.map(cat => ({
       ...cat,
       id: uuidv4(), 
-      expenses: [], // Reset expenses for the new month
+      expenses: [], 
     }));
 
     const newMonthData: BudgetMonth = {
@@ -281,6 +292,7 @@ export const useBudgetCore = () => {
       month: targetMonthNum,
       categories: newCategories,
       savingsGoal: sourceBudget.savingsGoal,
+      isRolledOver: false, // New month is not rolled over
     };
 
     setBudgetMonths(prev => ({ ...prev, [targetMonthId]: newMonthData }));
@@ -305,14 +317,76 @@ export const useBudgetCore = () => {
   
   const setSavingsGoalForMonth = useCallback((yearMonthId: string, goal: number) => {
     ensureMonthExists(yearMonthId);
-    setBudgetMonths(prev => ({
+    setBudgetMonths(prev => {
+      const month = prev[yearMonthId];
+      if (month.isRolledOver) {
+        console.warn(`Cannot set savings goal for ${yearMonthId} as it has been rolled over.`);
+        // Optionally, inform the user
+        return prev;
+      }
+      return {
       ...prev,
       [yearMonthId]: {
-        ...prev[yearMonthId],
+        ...month,
         savingsGoal: goal,
       },
-    }));
+    }});
   }, [ensureMonthExists]);
+
+  const rolloverUnspentBudget = useCallback((yearMonthId: string): { success: boolean; message: string } => {
+    const monthBudget = getBudgetForMonth(yearMonthId);
+    if (!monthBudget) {
+      return { success: false, message: `Budget for ${yearMonthId} not found.` };
+    }
+    if (monthBudget.isRolledOver) {
+      return { success: false, message: `Budget for ${yearMonthId} has already been rolled over.` };
+    }
+
+    const savingsCategory = monthBudget.categories.find(cat => cat.name.toLowerCase() === 'savings');
+    if (!savingsCategory) {
+      return { success: false, message: "Savings category not found. Please create one to enable rollover." };
+    }
+
+    let totalPositiveUnspent = 0;
+    monthBudget.categories.forEach(cat => {
+      if (cat.name.toLowerCase() !== 'savings') {
+        const spentAmount = cat.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const unspentInCategory = cat.budgetedAmount - spentAmount;
+        if (unspentInCategory > 0) {
+          totalPositiveUnspent += unspentInCategory;
+        }
+      }
+    });
+
+    if (totalPositiveUnspent <= 0) {
+      // Mark as rolled over even if no positive unspent, to prevent repeated attempts
+      setBudgetMonths(prev => ({
+        ...prev,
+        [yearMonthId]: { ...prev[yearMonthId], isRolledOver: true },
+      }));
+      return { success: true, message: "No unspent budget to rollover. Month marked as closed." };
+    }
+
+    const rolloverExpense: Expense = {
+      id: uuidv4(),
+      description: `Rolled over unspent budget from ${yearMonthId}`,
+      amount: totalPositiveUnspent,
+      dateAdded: new Date().toISOString(),
+    };
+
+    setBudgetMonths(prev => {
+      const updatedMonth = { ...prev[yearMonthId] };
+      updatedMonth.categories = updatedMonth.categories.map(cat => {
+        if (cat.id === savingsCategory.id) {
+          return { ...cat, expenses: [...cat.expenses, rolloverExpense] };
+        }
+        return cat;
+      });
+      updatedMonth.isRolledOver = true;
+      return { ...prev, [yearMonthId]: updatedMonth };
+    });
+    return { success: true, message: `Successfully rolled over $${totalPositiveUnspent.toFixed(2)} to savings for ${yearMonthId}.` };
+  }, [getBudgetForMonth]);
 
 
   return {
@@ -323,7 +397,7 @@ export const useBudgetCore = () => {
     getBudgetForMonth,
     updateMonthBudget,
     addExpense,
-    deleteExpense, // Added deleteExpense
+    deleteExpense,
     duplicateMonthBudget,
     navigateToPreviousMonth,
     navigateToNextMonth,
@@ -333,5 +407,6 @@ export const useBudgetCore = () => {
     updateCategoryInMonth,
     deleteCategoryFromMonth,
     setSavingsGoalForMonth,
+    rolloverUnspentBudget,
   };
 };

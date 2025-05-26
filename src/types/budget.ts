@@ -21,9 +21,10 @@ export interface BudgetMonth {
   month: number; // 1-12 (1 for January, 12 for December)
   categories: BudgetCategory[];
   savingsGoal: number; // Monthly savings goal
+  isRolledOver?: boolean; // Flag to indicate if unspent budget has been rolled over
 }
 
-export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories'>> & {
+export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver'>> & {
   // When updating categories, we expect the full category structure including expenses
   categories?: Array<Omit<BudgetCategory, 'id'> & { id?: string; spentAmount?: never }>;
 };

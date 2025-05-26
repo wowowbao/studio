@@ -20,9 +20,8 @@ interface BudgetContextType {
   setCurrentDisplayMonthId: (yearMonthId: string) => void;
   ensureMonthExists: (yearMonthId: string) => BudgetMonth;
   addCategoryToMonth: (yearMonthId: string, categoryName: string) => void;
-  updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories' | 'isSystemCategory'>>) => void;
+  updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories' | 'isSystemCategory' | 'id' | 'expenses'>>) => void;
   deleteCategoryFromMonth: (yearMonthId: string, categoryId: string) => void;
-  // setSavingsGoalForMonth: (yearMonthId: string, goal: number) => void; // Removed
   rolloverUnspentBudget: (yearMonthId: string) => { success: boolean; message: string };
   addSubCategory: (monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => void;
   updateSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => void;

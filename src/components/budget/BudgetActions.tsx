@@ -10,9 +10,10 @@ interface BudgetActionsProps {
   onEditBudget: () => void;
   onAddExpense: () => void;
   onAddIncome: () => void;
+  onFinalizeMonth: () => void; // New prop
 }
 
-export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: BudgetActionsProps) {
+export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinalizeMonth }: BudgetActionsProps) {
   const { currentDisplayMonthId, currentBudgetMonth, duplicateMonthBudget, rolloverUnspentBudget } = useBudget();
   const { toast } = useToast();
 
@@ -30,13 +31,30 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
   };
 
   const handleRolloverUnspent = () => {
+    if (!currentBudgetMonth) return;
+
+    if (currentBudgetMonth.isRolledOver) {
+      // If already rolled over, just open the summary.
+      onFinalizeMonth(); 
+      return;
+    }
+
     const result = rolloverUnspentBudget(currentDisplayMonthId);
-    toast({
-      title: result.success ? "Month Closed" : "Month Close Info",
-      description: result.message,
-      variant: result.success ? "default" : "default", 
-      action: result.success ? <CheckCircle className="text-green-500" /> : <AlertTriangle className="text-yellow-500" />,
-    });
+    if (result.success) {
+      toast({
+        title: "Month Finalized",
+        description: result.message,
+        action: <CheckCircle className="text-green-500" />
+      });
+      onFinalizeMonth(); // Open the summary modal
+    } else {
+      toast({
+        title: "Finalize Month Info",
+        description: result.message,
+        variant: "default", 
+        action: <AlertTriangle className="text-yellow-500" />,
+      });
+    }
   };
   
   const isRolledOver = currentBudgetMonth?.isRolledOver;
@@ -62,15 +80,15 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
           onClick={handleRolloverUnspent} 
           variant="secondary" 
           className="w-full sm:col-span-2"
-          disabled={isRolledOver} 
+          // Button is always enabled; if month is closed, it shows the report again.
         >
           <ArchiveRestore className="mr-2 h-4 w-4" /> 
-          {isRolledOver ? "Month Closed" : "Finalize & Close Month"}
+          {isRolledOver ? "View Month Summary" : "Finalize & Close Month"}
         </Button>
       </div>
        {isRolledOver && (
         <p className="text-xs text-muted-foreground mt-3 text-center">
-          This month's budget has been closed. Editing, adding expenses/income, and rollover are disabled.
+          This month's budget has been closed. Editing, adding expenses/income are disabled. You can view the summary.
         </p>
       )}
     </div>

@@ -45,8 +45,8 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   
   let plannedSavings = 0;
   let plannedCCPayments = 0;
-  let operationalCategoriesBudget = 0;
-  let totalOperationalSpending = 0;
+  let operationalCategoriesBudget = 0; // Sum of budgets for non-system categories
+  let totalOperationalSpending = 0; // Sum of expenses in non-system categories
 
   budgetMonth.categories.forEach(cat => {
     const catNameLower = cat.name.toLowerCase();
@@ -56,7 +56,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       plannedSavings += effectiveBudget;
     } else if (cat.isSystemCategory && catNameLower === 'credit card payments') {
       plannedCCPayments += effectiveBudget;
-    } else { 
+    } else if (!cat.isSystemCategory) { 
       operationalCategoriesBudget += effectiveBudget;
       if (cat.subcategories && cat.subcategories.length > 0) {
         cat.subcategories.forEach(sub => {
@@ -68,8 +68,9 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     }
   });
   
-  const fundsAvailableForOperational = totalIncomeReceived - plannedSavings - plannedCCPayments;
-  const operationalBudgetAllocationDifference = fundsAvailableForOperational - operationalCategoriesBudget;
+  const fundsAvailableForOperationsAndSavings = totalIncomeReceived - plannedCCPayments; // After CC payments
+  const totalPlannedAllocations = plannedSavings + operationalCategoriesBudget; // Savings + Op Budget
+  const allocationDifference = fundsAvailableForOperationsAndSavings - totalPlannedAllocations; // How much is over/under allocated
   
   const overallOperationalSpendingRemaining = operationalCategoriesBudget - totalOperationalSpending;
   const isOverSpentOverallOnOperational = overallOperationalSpendingRemaining < 0;
@@ -94,7 +95,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${plannedSavings.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Budgeted for "Savings" category.</p>
+          <p className="text-xs text-muted-foreground">Your savings goal for the month.</p>
         </CardContent>
       </Card>
 
@@ -105,7 +106,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${plannedCCPayments.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Budgeted for "Credit Card Payments".</p>
+          <p className="text-xs text-muted-foreground">Budgeted for debt repayment.</p>
         </CardContent>
       </Card>
 
@@ -116,11 +117,11 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${operationalCategoriesBudget.toFixed(2)}</div>
-           <p className={cn("text-xs", operationalBudgetAllocationDifference < 0 ? "text-destructive/80" : "text-muted-foreground")}>
-            Funds for operations (after savings & CC pay): ${fundsAvailableForOperational.toFixed(2)}.
-            {operationalBudgetAllocationDifference < 0 
-              ? ` Over-budgeted by $${Math.abs(operationalBudgetAllocationDifference).toFixed(2)}.` 
-              : ` $${operationalBudgetAllocationDifference.toFixed(2)} unallocated.`}
+           <p className={cn("text-xs", allocationDifference < 0 ? "text-destructive/80" : "text-muted-foreground")}>
+            Available for Op. & Savings: ${fundsAvailableForOperationsAndSavings.toFixed(2)}.
+            {allocationDifference < 0 
+              ? ` Over-allocated by $${Math.abs(allocationDifference).toFixed(2)}.` 
+              : ` $${allocationDifference.toFixed(2)} unallocated.`}
           </p>
         </CardContent>
       </Card>

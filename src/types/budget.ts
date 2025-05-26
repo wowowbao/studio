@@ -40,9 +40,13 @@ export interface BudgetMonth {
 }
 
 export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver' | 'incomes'>> & {
-  categories?: Array<Omit<BudgetCategory, 'id'> & { id?: string; subcategories?: Array<Omit<SubCategory, 'id'> & { id?: string }> }>;
+  categories?: Array<Omit<BudgetCategory, 'id' | 'expenses' > & { id?: string; subcategories?: Array<Omit<SubCategory, 'id' | 'expenses'> & { id?: string; expenses?: SubCategory['expenses'] }>; expenses?: BudgetCategory['expenses'] }>;
   startingCreditCardDebt?: number;
 };
 
-// User-defined default categories are now empty. System categories will be handled by ensureSystemCategories if present.
-export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount' | 'subcategories' | 'expenses'>[] = [];
+// Default categories are now only system categories that should exist.
+// User categories will be added by the user or AI setup.
+export const DEFAULT_CATEGORIES: Array<Partial<BudgetCategory>> = [
+  { name: "Savings", isSystemCategory: true, budgetedAmount: 0, expenses: [], subcategories: [] },
+  { name: "Credit Card Payments", isSystemCategory: true, budgetedAmount: 0, expenses: [], subcategories: [] },
+];

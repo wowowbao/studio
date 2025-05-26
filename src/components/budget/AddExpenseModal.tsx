@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import Image from 'next/image';
 import { categorizeExpenseFromImage, type CategorizeExpenseInput, type CategorizeExpenseOutput } from '@/ai/flows/categorize-expense-flow';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 interface AddExpenseModalProps {
@@ -125,10 +126,10 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         if (aIsSystem && !bIsSystem) return -1;
         if (!aIsSystem && bIsSystem) return 1;
         if (aIsSystem && bIsSystem) { // Specific order for system categories
-            if (a.label === "Savings") return -1;
-            if (b.label === "Savings") return 1;
-            if (a.label === "Credit Card Payments") return -1; 
-            if (b.label === "Credit Card Payments") return 1;
+            if (a.label.toLowerCase().includes("savings")) return -1;
+            if (b.label.toLowerCase().includes("savings")) return 1;
+            if (a.label.toLowerCase().includes("credit card payments")) return -1; 
+            if (b.label.toLowerCase().includes("credit card payments")) return 1;
         }
         return a.label.localeCompare(b.label);
       });
@@ -408,7 +409,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
-      <DialogContent className="sm:max-w-md w-[90vw] max-w-[500px]">
+      <DialogContent className="sm:max-w-lg w-[90vw] max-w-[576px]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
         </DialogHeader>
@@ -424,205 +425,206 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
             playsInline 
         />
         <canvas ref={canvasRef} className="hidden"></canvas>
-
-        <div className="grid gap-4 py-4">
-           {mode === 'idle' && (
-             <div className="flex flex-col items-center space-y-3 py-4 border rounded-lg p-4 bg-muted/20">
-                <p className="text-base font-medium">Add Receipt Image (Optional)</p>
-                <p className="text-xs text-muted-foreground text-center px-2">
-                    Upload an existing image or take a new picture with your camera for AI-powered suggestions.
-                </p>
-                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 pt-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isAiProcessing}
-                        className="w-full"
-                    >
-                        <UploadCloud className="mr-2 h-4 w-4" />
-                        Upload Image
-                    </Button>
-                    <Input
-                        id="receipt-upload"
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        onChange={handleImageFileChange}
-                        className="hidden"
-                        disabled={isAiProcessing}
-                    />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleEnableCamera}
-                        disabled={isAiProcessing || hasCameraPermission === false}
-                        className="w-full"
-                    >
-                        <Camera className="mr-2 h-4 w-4" />
-                        Take Picture
-                    </Button>
-                </div>
-                {hasCameraPermission === false && (
-                    <Alert variant="destructive" className="mt-2 w-full">
-                        <LocalAlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Camera Access Denied</AlertTitle>
-                        <AlertDescription>
-                            Please enable camera permissions in your browser settings and try again. You might need to refresh the page after changing permissions.
-                        </AlertDescription>
-                    </Alert>
-                )}
-             </div>
-           )}
-
-           {mode === 'cameraView' && (
-             <div className="space-y-3 p-2 border rounded-lg">
-                <Label className="text-base font-medium">Camera View</Label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={handleCapturePhoto} className="flex-1" disabled={isAiProcessing || !cameraStream}>
-                        <Camera className="mr-2 h-4 w-4" /> Capture Photo
-                    </Button>
-                    {availableCameras.length > 1 && (
-                        <Button variant="outline" onClick={handleSwitchCamera} className="flex-1" disabled={isAiProcessing || !cameraStream}>
-                            <RefreshCcw className="mr-2 h-4 w-4" /> Switch Camera
-                        </Button>
-                    )}
-                </div>
-                 <Button variant="outline" onClick={() => {
-                         if (cameraStream) {
-                            cameraStream.getTracks().forEach(track => track.stop());
-                            setCameraStream(null);
-                          }
-                        setMode('idle');
-                    }} className="w-full" disabled={isAiProcessing}>
-                        <XCircle className="mr-2 h-4 w-4" /> Back to Options
-                    </Button>
-             </div>
-           )}
-
-            {mode === 'preview' && imagePreviewUrl && (
-                <div className="space-y-3 p-2 border rounded-lg">
-                    <Label className="text-base font-medium">Image Preview</Label>
-                    <div className="relative w-full aspect-video border rounded-md overflow-hidden bg-muted">
-                        <Image src={imagePreviewUrl} alt="Receipt preview" layout="fill" objectFit="contain" data-ai-hint="receipt payment"/>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                         <Button variant="outline" onClick={handleEnableCamera} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
-                            <Camera className="mr-2 h-4 w-4" /> {selectedImageFile ? "Take New" : "Retake"}
-                        </Button>
-                        <Button variant="outline" onClick={handleClearImage} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
-                            <FileImage className="mr-2 h-4 w-4" />
-                             Upload Different
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {isAiProcessing && (
-              <div className="flex items-center text-sm text-muted-foreground mt-2">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {imageDataUri ? "AI is analyzing your receipt..." : "Accessing camera..."}
+        <ScrollArea className="max-h-[70vh] pr-4"> {/* Added ScrollArea and padding for scrollbar */}
+          <div className="grid gap-4 py-4"> {/* This div is now inside ScrollArea */}
+            {mode === 'idle' && (
+              <div className="flex flex-col items-center space-y-3 py-4 border rounded-lg p-4 bg-muted/20">
+                  <p className="text-base font-medium">Add Receipt Image (Optional)</p>
+                  <p className="text-xs text-muted-foreground text-center px-2">
+                      Upload an existing image or take a new picture with your camera for AI-powered suggestions.
+                  </p>
+                  <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 pt-2">
+                      <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isAiProcessing}
+                          className="w-full"
+                      >
+                          <UploadCloud className="mr-2 h-4 w-4" />
+                          Upload Image
+                      </Button>
+                      <Input
+                          id="receipt-upload"
+                          type="file"
+                          accept="image/*"
+                          ref={fileInputRef}
+                          onChange={handleImageFileChange}
+                          className="hidden"
+                          disabled={isAiProcessing}
+                      />
+                      <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleEnableCamera}
+                          disabled={isAiProcessing || hasCameraPermission === false}
+                          className="w-full"
+                      >
+                          <Camera className="mr-2 h-4 w-4" />
+                          Take Picture
+                      </Button>
+                  </div>
+                  {hasCameraPermission === false && (
+                      <Alert variant="destructive" className="mt-2 w-full">
+                          <LocalAlertTriangle className="h-4 w-4" />
+                          <AlertTitle>Camera Access Denied</AlertTitle>
+                          <AlertDescription>
+                              Please enable camera permissions in your browser settings and try again. You might need to refresh the page after changing permissions.
+                          </AlertDescription>
+                      </Alert>
+                  )}
               </div>
             )}
-            {aiSuggestionError && (
-              <Alert variant="destructive" className="mt-2">
-                <LocalAlertTriangle className="h-4 w-4"/>
-                <AlertTitle>AI Suggestion Error</AlertTitle>
-                <AlertDescription>{aiSuggestionError}</AlertDescription>
-              </Alert>
-            )}
-          
-          {budgetLoading ? (
-            <p>Loading categories...</p>
-          ) : categoryOptions.length === 0 ? (
-            <p className="text-muted-foreground py-4">No categories or subcategories available for this month. Please add them first in 'Manage Budget'.</p>
-          ) : (
-            <div className="space-y-4"> {/* Changed from grid to space-y for stacking */}
-              <div className="space-y-1"> {/* Group for Label + Input */}
-                <Label htmlFor="category">
-                  Category
-                </Label>
-                <Select value={selectedTargetId} onValueChange={handleSelectionChange} disabled={isAiProcessing}>
-                  <SelectTrigger id="category" className="w-full"> {/* Ensure full width */}
-                    <SelectValue placeholder="Select target" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {categoryOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="amount">
-                  Amount
-                </Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full"
-                  disabled={isAiProcessing}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="description">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g., Weekly groceries"
-                  className="w-full"
-                  rows={2}
-                  disabled={isAiProcessing}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="date">
-                  Date
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !date && "text-muted-foreground"
+
+            {mode === 'cameraView' && (
+              <div className="space-y-3 p-2 border rounded-lg">
+                  <Label className="text-base font-medium">Camera View</Label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                      <Button onClick={handleCapturePhoto} className="flex-1" disabled={isAiProcessing || !cameraStream}>
+                          <Camera className="mr-2 h-4 w-4" /> Capture Photo
+                      </Button>
+                      {availableCameras.length > 1 && (
+                          <Button variant="outline" onClick={handleSwitchCamera} className="flex-1" disabled={isAiProcessing || !cameraStream}>
+                              <RefreshCcw className="mr-2 h-4 w-4" /> Switch Camera
+                          </Button>
                       )}
-                      disabled={isAiProcessing}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={setDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                  <Button variant="outline" onClick={() => {
+                          if (cameraStream) {
+                              cameraStream.getTracks().forEach(track => track.stop());
+                              setCameraStream(null);
+                            }
+                          setMode('idle');
+                      }} className="w-full" disabled={isAiProcessing}>
+                          <XCircle className="mr-2 h-4 w-4" /> Back to Options
+                      </Button>
               </div>
-               <Alert variant="default" className="mt-4">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle className="font-semibold">Quick Tip!</AlertTitle>
-                  <AlertDescription className="text-xs">
-                    To record money transferred to savings, select the "Savings" category.
-                    For credit card payments, select "Credit Card Payments". These are treated as expenses to these specific categories.
-                  </AlertDescription>
+            )}
+
+              {mode === 'preview' && imagePreviewUrl && (
+                  <div className="space-y-3 p-2 border rounded-lg">
+                      <Label className="text-base font-medium">Image Preview</Label>
+                      <div className="relative w-full aspect-video border rounded-md overflow-hidden bg-muted">
+                          <Image src={imagePreviewUrl} alt="Receipt preview" layout="fill" objectFit="contain" data-ai-hint="receipt payment"/>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                          <Button variant="outline" onClick={handleEnableCamera} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
+                              <Camera className="mr-2 h-4 w-4" /> {selectedImageFile ? "Take New" : "Retake"}
+                          </Button>
+                          <Button variant="outline" onClick={handleClearImage} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
+                              <FileImage className="mr-2 h-4 w-4" />
+                              Upload Different
+                          </Button>
+                      </div>
+                  </div>
+              )}
+
+              {isAiProcessing && (
+                <div className="flex items-center text-sm text-muted-foreground mt-2">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {imageDataUri ? "AI is analyzing your receipt..." : "Accessing camera..."}
+                </div>
+              )}
+              {aiSuggestionError && (
+                <Alert variant="destructive" className="mt-2">
+                  <LocalAlertTriangle className="h-4 w-4"/>
+                  <AlertTitle>AI Suggestion Error</AlertTitle>
+                  <AlertDescription>{aiSuggestionError}</AlertDescription>
                 </Alert>
-            </div>
-          )}
-        </div>
-        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-0">
+              )}
+            
+            {budgetLoading ? (
+              <p>Loading categories...</p>
+            ) : categoryOptions.length === 0 ? (
+              <p className="text-muted-foreground py-4">No categories or subcategories available for this month. Please add them first in 'Manage Budget'.</p>
+            ) : (
+              <div className="space-y-4"> 
+                <div className="space-y-1"> 
+                  <Label htmlFor="category">
+                    Category
+                  </Label>
+                  <Select value={selectedTargetId} onValueChange={handleSelectionChange} disabled={isAiProcessing}>
+                    <SelectTrigger id="category" className="w-full"> 
+                      <SelectValue placeholder="Select target" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {categoryOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="amount">
+                    Amount
+                  </Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full"
+                    disabled={isAiProcessing}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="description">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="e.g., Weekly groceries"
+                    className="w-full"
+                    rows={2}
+                    disabled={isAiProcessing}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="date">
+                    Date
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !date && "text-muted-foreground"
+                        )}
+                        disabled={isAiProcessing}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date ? format(date, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <Alert variant="default" className="mt-4">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle className="font-semibold">Quick Tip!</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      To record money transferred to savings, select the "Savings" category.
+                      For credit card payments, select "Credit Card Payments". These are treated as expenses to these specific categories.
+                    </AlertDescription>
+                  </Alert>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-0 pt-4 border-t"> {/* Added pt-4 and border-t for separation */}
           <DialogClose asChild>
             <Button variant="outline" onClick={onCloseModal} disabled={isAiProcessing} className="w-full sm:w-auto">
               <XCircle className="mr-2 h-4 w-4" /> Cancel
@@ -642,3 +644,4 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   
 
     
+

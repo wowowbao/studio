@@ -31,7 +31,7 @@ export default function HomePage() {
     currentBudgetMonth, 
     currentDisplayMonthId, 
     isLoading: budgetLoading, 
-    ensureMonthExists,
+    // ensureMonthExists, // Removed as per new strategy
     budgetMonths,
   } = useBudget();
 
@@ -51,18 +51,15 @@ export default function HomePage() {
     }
   }, [authLoading, isUserAuthenticated]);
 
-  // Ensure month exists when not auth loading and budget not loading (works for both guest and authenticated)
-   useEffect(() => {
-    if (!authLoading && !budgetLoading && currentDisplayMonthId) {
-      ensureMonthExists(currentDisplayMonthId);
-    }
-  }, [currentDisplayMonthId, budgetLoading, authLoading, ensureMonthExists]);
+  // The main data loading effect in useBudgetCore.ts, triggered by currentDisplayMonthId changes,
+  // is now responsible for ensuring the month exists.
+  // The useEffect block that previously called ensureMonthExists here has been removed.
 
   const handleSignOut = async () => {
     try {
       await auth.signOut();
       // Data saving/loading will switch to guest mode in useBudgetCore
-      router.push('/'); // Stay on homepage, will show guest view
+      router.push('/'); 
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -76,7 +73,7 @@ export default function HomePage() {
   const isLoading = authLoading || budgetLoading;
 
 
-  if (isLoading && !Object.keys(budgetMonths).length) { // Show full loading screen only if truly loading initially
+  if (isLoading && !Object.keys(budgetMonths).length) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
@@ -149,13 +146,13 @@ export default function HomePage() {
         
         <MonthNavigator />
         
-        {isLoading && Object.keys(budgetMonths).length > 0 ? ( // Skeleton for content reload
+        {isLoading && Object.keys(budgetMonths).length > 0 ? ( 
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
               </div>
-              <Skeleton className="h-32 w-full rounded-lg" /> {/* For CreditCardDebtSummary */}
-              <Skeleton className="h-20 w-full rounded-lg" /> {/* For BudgetActions */}
+              <Skeleton className="h-32 w-full rounded-lg" /> 
+              <Skeleton className="h-20 w-full rounded-lg" /> 
               <h2 className="text-xl font-semibold mt-8 mb-4 text-primary"><Skeleton className="h-6 w-32"/></h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-lg" />)}

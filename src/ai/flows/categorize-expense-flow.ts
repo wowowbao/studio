@@ -16,7 +16,7 @@ const CategoryInfoSchema = z.object({
   name: z.string().describe('The display name of the category or subcategory.'),
 });
 
-export const CategorizeExpenseInputSchema = z.object({
+const CategorizeExpenseInputSchema = z.object({
   imageDataUri: z
     .string()
     .describe(
@@ -28,7 +28,7 @@ export const CategorizeExpenseInputSchema = z.object({
 });
 export type CategorizeExpenseInput = z.infer<typeof CategorizeExpenseInputSchema>;
 
-export const CategorizeExpenseOutputSchema = z.object({
+const CategorizeExpenseOutputSchema = z.object({
   suggestedCategoryId: z.string().optional().describe('The ID of the suggested category or subcategory for the expense.'),
   suggestedAmount: z.number().optional().describe('The suggested monetary amount of the expense.'),
   suggestedDescription: z.string().optional().describe('A suggested description for the expense (e.g., store name or item).'),
@@ -91,3 +91,4 @@ const categorizeExpenseFlow = ai.defineFlow(
     }
   }
 );
+

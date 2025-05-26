@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useBudget } from "@/hooks/useBudget";
 import { getYearMonthFromDate, parseYearMonth } from "@/hooks/useBudgetCore";
-import { Edit3, PlusCircle, Copy, AlertTriangle, CheckCircle, ArchiveRestore, Coins, ArchiveX } from "lucide-react";
+import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2 } from "lucide-react"; // Added Wand2
 import { useToast } from "@/hooks/use-toast";
 
 interface BudgetActionsProps {
@@ -11,46 +11,38 @@ interface BudgetActionsProps {
   onAddExpense: () => void;
   onAddIncome: () => void;
   onFinalizeMonth: () => void;
+  onPrepNextMonth: () => void; // New prop
 }
 
-export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinalizeMonth }: BudgetActionsProps) {
-  const { currentDisplayMonthId, currentBudgetMonth, duplicateMonthBudget, rolloverUnspentBudget } = useBudget();
+export function BudgetActions({ 
+  onEditBudget, 
+  onAddExpense, 
+  onAddIncome, 
+  onFinalizeMonth,
+  onPrepNextMonth // New prop
+}: BudgetActionsProps) {
+  const { currentDisplayMonthId, currentBudgetMonth, rolloverUnspentBudget } = useBudget(); // Removed duplicateMonthBudget
   const { toast } = useToast();
-
-  const handleDuplicateMonth = () => {
-    const currentDate = parseYearMonth(currentDisplayMonthId);
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    const nextMonthId = getYearMonthFromDate(currentDate);
-    
-    duplicateMonthBudget(currentDisplayMonthId, nextMonthId);
-    toast({
-      title: "Budget Duplicated",
-      description: `Budget from ${currentDisplayMonthId} duplicated to ${nextMonthId}.`,
-      action: <CheckCircle className="text-green-500" />
-    });
-  };
 
   const handleFinalizeOrReopenMonth = () => {
     if (!currentBudgetMonth) return;
 
-    const result = rolloverUnspentBudget(currentDisplayMonthId); // This now toggles the state
+    const result = rolloverUnspentBudget(currentDisplayMonthId); 
 
     if (result.success) {
-      if (currentBudgetMonth.isRolledOver) { // This check is on the PREVIOUS state before toggle
-        // It means the month WAS closed, and is NOW open
+      if (currentBudgetMonth.isRolledOver) { 
         toast({
           title: "Month Reopened",
           description: result.message,
           action: <ArchiveX className="text-blue-500" />
         });
       } else {
-        // It means the month WAS open, and is NOW closed
         toast({
           title: "Month Finalized",
           description: result.message,
           action: <CheckCircle className="text-green-500" />
         });
-        onFinalizeMonth(); // Open the summary modal only when closing
+        onFinalizeMonth(); 
       }
     } else {
       toast({
@@ -78,9 +70,11 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinal
         <Button onClick={onAddExpense} className="w-full" disabled={disablePrimaryActions}>
           <PlusCircle className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Expense"}
         </Button>
-        <Button onClick={handleDuplicateMonth} variant="secondary" className="w-full sm:col-span-1">
-          <Copy className="mr-2 h-4 w-4" /> Duplicate Month
+        
+        <Button onClick={onPrepNextMonth} variant="secondary" className="w-full sm:col-span-1">
+          <Wand2 className="mr-2 h-4 w-4" /> AI Budget Prep
         </Button>
+
          <Button 
           onClick={handleFinalizeOrReopenMonth} 
           variant={isMonthClosed ? "destructive" : "secondary"}
@@ -98,3 +92,5 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinal
     </div>
   );
 }
+
+    

@@ -1,6 +1,7 @@
 
 "use client";
 import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload, SubCategory, IncomeEntry } from '@/types/budget';
+import type { PrepareBudgetOutput } from '@/ai/flows/prepare-next-month-budget-flow'; // New import
 import { useContext, createContext } from 'react';
 
 interface BudgetContextType {
@@ -14,7 +15,6 @@ interface BudgetContextType {
   deleteExpense: (yearMonthId: string, categoryOrSubCategoryId: string, expenseId: string, isSubCategory?: boolean) => void;
   addIncome: (yearMonthId: string, description: string, amount: number, dateAdded: string) => void;
   deleteIncome: (yearMonthId: string, incomeId: string) => void;
-  duplicateMonthBudget: (sourceMonthId: string, targetMonthId: string) => void;
   navigateToPreviousMonth: () => void;
   navigateToNextMonth: () => void;
   setCurrentDisplayMonthId: (yearMonthId: string) => void;
@@ -26,6 +26,13 @@ interface BudgetContextType {
   addSubCategory: (monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => void;
   updateSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => void;
   deleteSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string) => void;
+  applyAiGeneratedBudget: (
+    targetMonthId: string, 
+    suggestedBudgetCategories: PrepareBudgetOutput['suggestedCategories'],
+    incomeForTargetMonth: number,
+    startingCCDebtForCurrentMonth: number,
+    ccPaymentsMadeInCurrentMonth: number
+  ) => void; // New function
 }
 
 export const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
@@ -37,3 +44,5 @@ export const useBudget = (): BudgetContextType => {
   }
   return context;
 };
+
+    

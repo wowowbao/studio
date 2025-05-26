@@ -14,6 +14,7 @@ import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
 import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; 
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
+import { PrepNextMonthModal } from "@/components/budget/PrepNextMonthModal"; // New Import
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -39,6 +40,7 @@ export default function HomePage() {
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
   const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
   const [isMonthEndSummaryModalOpen, setIsMonthEndSummaryModalOpen] = useState(false); 
+  const [isPrepNextMonthModalOpen, setIsPrepNextMonthModalOpen] = useState(false); // New state
   const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined); 
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
@@ -55,7 +57,6 @@ export default function HomePage() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      // No router.push needed, AuthContext will trigger re-render
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -68,9 +69,6 @@ export default function HomePage() {
 
   const openMonthEndSummary = () => {
     const data = getBudgetForMonth(currentDisplayMonthId);
-    // This function is now primarily called when a month *is being closed*.
-    // The check for `isRolledOver` here might be redundant if BudgetActions handles it,
-    // but it's safe to keep.
     if (data) { 
       setMonthEndSummaryData(data);
       setIsMonthEndSummaryModalOpen(true);
@@ -107,7 +105,6 @@ export default function HomePage() {
     }
   });
 
-  // Ensure consistent order for system categories
   systemCategories.sort((a, b) => {
     if (a.name.toLowerCase() === 'savings') return -1; 
     if (b.name.toLowerCase() === 'savings') return 1;
@@ -175,7 +172,7 @@ export default function HomePage() {
         
         {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
             <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"> {/* Adjusted for 6 cards */}
                  {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
               </div>
               <Skeleton className="h-32 w-full rounded-lg" /> 
@@ -209,6 +206,7 @@ export default function HomePage() {
               onAddExpense={() => setIsAddExpenseModalOpen(true)}
               onAddIncome={() => setIsAddIncomeModalOpen(true)}
               onFinalizeMonth={() => openMonthEndSummary()}
+              onPrepNextMonth={() => setIsPrepNextMonthModalOpen(true)} // New prop
             />
 
             {systemCategories.length > 0 && (
@@ -264,7 +262,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.9 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.10 (Studio Preview)
           </div>
       </footer>
 
@@ -290,15 +288,21 @@ export default function HomePage() {
               isOpen={isMonthEndSummaryModalOpen}
               onClose={() => {
                 setIsMonthEndSummaryModalOpen(false);
-                // Refresh monthEndSummaryData in case the month was reopened and summary is viewed again
                 const updatedData = getBudgetForMonth(currentDisplayMonthId);
                 if (updatedData && updatedData.isRolledOver) {
                   setMonthEndSummaryData(updatedData);
                 } else {
-                  setMonthEndSummaryData(undefined); // Clear if no longer rolled over
+                  setMonthEndSummaryData(undefined); 
                 }
               }}
               budgetMonth={monthEndSummaryData}
+            />
+          )}
+          {currentBudgetMonth && ( // Ensure currentBudgetMonth exists before rendering PrepNextMonthModal
+            <PrepNextMonthModal
+              isOpen={isPrepNextMonthModalOpen}
+              onClose={() => setIsPrepNextMonthModalOpen(false)}
+              currentMonthData={currentBudgetMonth}
             />
           )}
         </>
@@ -306,3 +310,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

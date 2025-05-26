@@ -81,12 +81,6 @@ const ensureSystemCategoryFlags = (categories: BudgetCategory[] | undefined): { 
   // Check if any logical change occurred that would necessitate a new array reference
   if (JSON.stringify(processedCategories) !== originalCategoriesJSON) {
     wasActuallyChanged = true;
-  } else { // No logical change, return original reference if no structural changes were forced (like initializing arrays)
-     // If original array was strictly equal after mapping (meaning no properties changed that would break reference equality for shallow copy)
-     // AND no structural changes like initializing arrays were needed (which JSON.stringify would catch if different).
-     // This part is tricky. The key is that if `processedCategories` is structurally identical to `categories` via JSON,
-     // but `categories` was returned by map (new ref), we still consider it "changed" for React state.
-     // The JSON.stringify check handles most cases. If it's the same, wasActuallyChanged should remain false.
   }
 
 
@@ -98,7 +92,7 @@ const ensureSystemCategoryFlags = (categories: BudgetCategory[] | undefined): { 
     if (a.isSystemCategory && b.isSystemCategory) {
       if (a.name === "Savings") return -1;
       if (b.name === "Savings") return 1;
-      if (a.name === "Credit Card Payments") return -1; // Corrected: CC before other system cats if Savings isn't one
+      if (a.name === "Credit Card Payments") return -1; 
       if (b.name === "Credit Card Payments") return 1;
     }
     return a.name.localeCompare(b.name);
@@ -109,7 +103,7 @@ const ensureSystemCategoryFlags = (categories: BudgetCategory[] | undefined): { 
     wasActuallyChanged = true;
   }
   
-  return { updatedCategories: wasActuallyChanged ? sortedCategories : categories, wasChanged };
+  return { updatedCategories: wasActuallyChanged ? sortedCategories : categories, wasChanged: wasActuallyChanged };
 };
 
 
@@ -118,9 +112,11 @@ export const useBudgetCore = () => {
   const [budgetMonths, setBudgetMonthsState] = useState<Record<string, BudgetMonth>>({});
   const [currentDisplayMonthId, setCurrentDisplayMonthIdState] = useState<string>(() => {
      if (typeof window !== "undefined") {
-      return getYearMonthFromDate(new Date(2025, 5, 1)); 
+      const key = getDisplayMonthKey(user?.uid); // Use user?.uid here too for initial load consistency
+      const storedMonthId = localStorage.getItem(key);
+      if (storedMonthId) return storedMonthId;
     }
-    return getYearMonthFromDate(new Date(2025, 5, 1)); 
+    return getYearMonthFromDate(new Date(2025, 5, 1)); // June 2025
   });
   const [isLoadingDb, setIsLoadingDb] = useState(true);
   const [isSaving, setIsSaving] = useState(false); 
@@ -130,18 +126,22 @@ export const useBudgetCore = () => {
       const key = getDisplayMonthKey(user?.uid);
       const storedMonthId = localStorage.getItem(key);
       if (storedMonthId) {
-        setCurrentDisplayMonthIdState(storedMonthId);
+         if (storedMonthId !== currentDisplayMonthId) { // Only update if it's different
+            setCurrentDisplayMonthIdState(storedMonthId);
+         }
       } else {
         const defaultMonth = getYearMonthFromDate(new Date(2025, 5, 1));
-        setCurrentDisplayMonthIdState(defaultMonth);
+        if (defaultMonth !== currentDisplayMonthId) { // Only update if it's different
+            setCurrentDisplayMonthIdState(defaultMonth);
+        }
         localStorage.setItem(key, defaultMonth);
       }
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, currentDisplayMonthId]);
 
 
   const saveBudgetMonthsToFirestore = useCallback(async (userId: string, monthsToSave: Record<string, BudgetMonth>) => {
-    if (!userId || isSaving) return; // Prevent concurrent saves
+    if (!userId || isSaving) return; 
     const docRef = getFirestoreUserBudgetDocRef(userId);
     setIsSaving(true);
     try {
@@ -161,15 +161,15 @@ export const useBudgetCore = () => {
             hasMeaningfulData = true;
         }
       }
-      if (hasMeaningfulData || Object.keys(budgetMonths).length > 0) { // Save if new data or if clearing existing data
-          await setDoc(docRef, { months: monthsWithEnsuredCategories }); // Use setDoc without merge to overwrite, ensuring deletions are propagated.
+      if (hasMeaningfulData || Object.keys(budgetMonths).length > 0) { 
+          await setDoc(docRef, { months: monthsWithEnsuredCategories }); 
       }
     } catch (error) {
       console.error("Error saving budget to Firestore:", error);
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, budgetMonths]); // Added budgetMonths
+  }, [isSaving, budgetMonths]); 
 
   const setBudgetMonths = useCallback((updater: React.SetStateAction<Record<string, BudgetMonth>>) => {
     setBudgetMonthsState(prevMonths => {
@@ -182,9 +182,8 @@ export const useBudgetCore = () => {
             } else if (!isUserAuthenticated && typeof window !== "undefined") {
                 localStorage.setItem(GUEST_BUDGET_MONTHS_KEY, JSON.stringify(newMonths));
             }
-        }, 500); // 500ms debounce
+        }, 500); 
 
-        // Clear previous timeout if one exists
         const existingTimeoutId = (window as any)._budgetSaveTimeoutId;
         if (existingTimeoutId) {
             clearTimeout(existingTimeoutId);
@@ -201,7 +200,7 @@ export const useBudgetCore = () => {
     if (!authLoading && typeof window !== "undefined") {
         localStorage.setItem(getDisplayMonthKey(user?.uid), monthId);
     }
-  }, [user?.uid, authLoading]); // user.uid to ensure key changes if user changes
+  }, [user?.uid, authLoading]); 
 
   const createNewMonthBudget = useCallback((yearMonthId: string, existingMonths: Record<string, BudgetMonth>): BudgetMonth => {
     const [year, monthNum] = yearMonthId.split('-').map(Number);
@@ -215,11 +214,11 @@ export const useBudgetCore = () => {
         prevMonthBudget.categories.forEach(prevCat => {
             if (prevCat.isSystemCategory && (prevCat.name === "Savings" || prevCat.name === "Credit Card Payments")) {
                 systemCategoriesToCarry.push({
-                    id: uuidv4(), // New ID for the new month's instance
+                    id: uuidv4(), 
                     name: prevCat.name,
-                    budgetedAmount: prevCat.budgetedAmount, // Carry over budget
+                    budgetedAmount: prevCat.budgetedAmount, 
                     expenses: [],
-                    subcategories: [], // System cats don't have subs
+                    subcategories: [], 
                     isSystemCategory: true,
                 });
             }
@@ -246,7 +245,7 @@ export const useBudgetCore = () => {
       isRolledOver: false,
       startingCreditCardDebt: finalDebt,
     };
-  }, []); // Empty dependency array, this function doesn't depend on component state
+  }, []); 
 
 
  useEffect(() => {
@@ -266,10 +265,9 @@ export const useBudgetCore = () => {
             let wasAnyDataStructurallyModified = false;
 
             Object.keys(processedMonths).forEach(monthId => {
-                const monthData = { ...processedMonths[monthId] }; // Shallow copy
+                const monthData = { ...processedMonths[monthId] }; 
                 let monthModified = false;
 
-                // Ensure incomes array exists
                 if (!Array.isArray(monthData.incomes)) {
                   monthData.incomes = [];
                   monthModified = true;
@@ -277,9 +275,9 @@ export const useBudgetCore = () => {
                 
                 const { updatedCategories: ensuredCategories, wasChanged: catsChanged } = ensureSystemCategoryFlags(monthData.categories);
                 if (catsChanged) {
-                    monthData.categories = ensuredCategories; // This is a new array ref if changed
+                    monthData.categories = ensuredCategories; 
                     monthModified = true;
-                } else if (monthData.categories !== ensuredCategories) { // Handle if only ref changed by sorting
+                } else if (monthData.categories !== ensuredCategories) { 
                     monthData.categories = ensuredCategories;
                     monthModified = true;
                 }
@@ -289,7 +287,7 @@ export const useBudgetCore = () => {
                 if (monthData.startingCreditCardDebt === undefined) { monthData.startingCreditCardDebt = 0; monthModified = true; }
 
                 if (monthModified) {
-                    processedMonths[monthId] = monthData; // Update the entry in processedMonths
+                    processedMonths[monthId] = monthData; 
                     wasAnyDataStructurallyModified = true;
                 }
             });
@@ -299,7 +297,6 @@ export const useBudgetCore = () => {
                 processedMonths = { ...processedMonths, [currentDisplayMonthId]: newCurrentMonthData };
                 wasAnyDataStructurallyModified = true; 
             } else {
-                // Ensure current display month also has its categories processed
                 const currentMonthCopy = { ...processedMonths[currentDisplayMonthId] };
                 const { updatedCategories: ensuredCurrentCategories, wasChanged: currentCatsChanged } = ensureSystemCategoryFlags(currentMonthCopy.categories);
                 if (currentCatsChanged) {
@@ -312,24 +309,16 @@ export const useBudgetCore = () => {
             const finalProcessedMonths = processedMonths;
 
             setBudgetMonthsState(prevMonths => {
-                 // Only update if the new state is actually different to prevent loops
                 if (JSON.stringify(prevMonths) !== JSON.stringify(finalProcessedMonths)) {
-                    if (isUserAuthenticated && user && source === 'firestore' && wasAnyDataStructurallyModified && !isSaving) {
-                        // If data came from Firestore AND we modified it (e.g., schema migration), save it back.
-                        // This could be risky if not handled carefully - potential loop.
-                        // Condition 'source === 'firestore' might need removal if it causes issues.
-                        // saveBudgetMonthsToFirestore(user.uid, finalProcessedMonths); // Be cautious with this call inside snapshot listener.
-                    } else if (!isUserAuthenticated && typeof window !== "undefined" && wasAnyDataStructurallyModified && !isSaving) {
-                       // For guest mode, if data was modified, save it to localStorage.
-                       // localStorage.setItem(GUEST_BUDGET_MONTHS_KEY, JSON.stringify(finalProcessedMonths));
-                    }
-                    return finalProcessedMonths; // Always return the processed months to update state
+                     // Removed automatic save-back to Firestore here to avoid loops with onSnapshot
+                     // Guest mode saving to localStorage is handled by the setBudgetMonths wrapper.
+                    return finalProcessedMonths; 
                 }
-                return prevMonths; // Return previous state if no logical change
+                return prevMonths; 
             });
             
             setIsLoadingDb(false);
-        }, 250); 
+        }, 100); // Slightly reduced debounce for faster perceived load, but still groups rapid changes
     };
 
     if (isUserAuthenticated && user) {
@@ -361,7 +350,7 @@ export const useBudgetCore = () => {
         unsubscribe();
         if (localProcessingTimeout) clearTimeout(localProcessingTimeout);
     };
-  }, [user, isUserAuthenticated, authLoading, currentDisplayMonthId, createNewMonthBudget, isSaving, setBudgetMonths]);
+  }, [user, isUserAuthenticated, authLoading, currentDisplayMonthId, createNewMonthBudget, setBudgetMonths]); // Removed isSaving, added setBudgetMonths
 
 
   const getBudgetForMonth = useCallback((yearMonthId: string): BudgetMonth | undefined => {
@@ -397,8 +386,7 @@ export const useBudgetCore = () => {
     if (needsUpdate) {
       setBudgetMonths(prev => {
         const newState = { ...prev, [yearMonthId]: finalMonthData };
-        // Only return newState if it's actually different to prevent unnecessary re-renders
-        if (JSON.stringify(prev[yearMonthId]) !== JSON.stringify(finalMonthData)) {
+        if (JSON.stringify(prev) !== JSON.stringify(newState)) { // Check entire prev object
           return newState; 
         }
         return prev;
@@ -410,7 +398,7 @@ export const useBudgetCore = () => {
 
   const updateMonthBudget = useCallback((yearMonthId: string, payload: BudgetUpdatePayload) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
-    if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return; // Allow guest mode edits even if "rolled over" (local state)
 
     let updatedMonth = JSON.parse(JSON.stringify(monthToUpdate));
     let changed = false;
@@ -468,7 +456,7 @@ export const useBudgetCore = () => {
         });
       });
       updatedMonth.categories = newCategoriesFromPayload;
-      changed = true; // Assume categories changed if payload.categories was present
+      changed = true; 
     }
     
     const { updatedCategories, wasChanged: sysFlagsChanged } = ensureSystemCategoryFlags(updatedMonth.categories);
@@ -488,12 +476,12 @@ export const useBudgetCore = () => {
     if (changed || JSON.stringify(budgetMonths[yearMonthId]) !== JSON.stringify(updatedMonth)) {
         setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
     }
-  }, [ensureMonthExists, budgetMonths, setBudgetMonths]);
+  }, [ensureMonthExists, budgetMonths, setBudgetMonths, isUserAuthenticated]);
 
 
   const addExpense = useCallback((yearMonthId: string, categoryOrSubCategoryId: string, amount: number, description: string, dateAdded: string, isSubCategory: boolean = false) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
-    if (monthToUpdate.isRolledOver) return; 
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return; 
 
     const newExpense: Expense = { id: uuidv4(), description, amount, dateAdded };
     let changed = false;
@@ -522,11 +510,11 @@ export const useBudgetCore = () => {
         const updatedMonth = { ...monthToUpdate, categories: updatedCategoriesList };
         setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
     }
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
   
   const deleteExpense = useCallback((yearMonthId: string, categoryOrSubCategoryId: string, expenseId: string, isSubCategory: boolean = false) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
-     if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
     let changed = false;
 
     const updatedCategoriesList = monthToUpdate.categories.map(cat => {
@@ -555,35 +543,33 @@ export const useBudgetCore = () => {
         const updatedMonth = { ...monthToUpdate, categories: updatedCategoriesList };
         setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
     }
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
 
   const addIncome = useCallback((yearMonthId: string, description: string, amount: number, dateAdded: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
-    if (monthToUpdate.isRolledOver) return; 
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return; 
     
     const newIncomeEntry: IncomeEntry = { id: uuidv4(), description, amount, dateAdded };
     const updatedMonth = { ...monthToUpdate, incomes: [...(monthToUpdate.incomes || []), newIncomeEntry] };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
 
   const deleteIncome = useCallback((yearMonthId: string, incomeId: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
-     if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
 
     const updatedMonth = { ...monthToUpdate, incomes: (monthToUpdate.incomes || []).filter(inc => inc.id !== incomeId) };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
 
   const navigateToPreviousMonth = useCallback(() => {
-    const prevMonthId = getPreviousMonthId(currentDisplayMonthId);
-    setCurrentDisplayMonthId(prevMonthId);
+    setCurrentDisplayMonthId(getPreviousMonthId(currentDisplayMonthId));
   }, [currentDisplayMonthId, setCurrentDisplayMonthId]);
 
   const navigateToNextMonth = useCallback(() => {
     const currentDate = parseYearMonth(currentDisplayMonthId);
     currentDate.setMonth(currentDate.getMonth() + 1);
-    const nextMonthId = getYearMonthFromDate(currentDate);
-    setCurrentDisplayMonthId(nextMonthId);
+    setCurrentDisplayMonthId(getYearMonthFromDate(currentDate));
   }, [currentDisplayMonthId, setCurrentDisplayMonthId]);
 
   const rolloverUnspentBudget = useCallback((yearMonthId: string): { success: boolean; message: string } => {
@@ -605,7 +591,7 @@ export const useBudgetCore = () => {
 
   const addCategoryToMonth = useCallback((yearMonthId: string, categoryName: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId); 
-    if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
 
     const existingCat = monthToUpdate.categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
     if (existingCat) {
@@ -629,11 +615,11 @@ export const useBudgetCore = () => {
     
     const updatedMonth = { ...monthToUpdate, categories: tempCatsWithNew };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
 
   const updateCategoryInMonth = useCallback((yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories' | 'isSystemCategory' | 'id' | 'expenses'>>) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
-    if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
 
     let categoryUpdated = false;
     let newCategories = monthToUpdate.categories.map(cat => {
@@ -644,18 +630,16 @@ export const useBudgetCore = () => {
         
         const isSavingsByName = newName.toLowerCase() === "savings";
         const isCCPaymentsByName = newName.toLowerCase() === "credit card payments";
-        let newIsSystem = cat.isSystemCategory; // Preserve existing system flag by default
+        let newIsSystem = cat.isSystemCategory; 
 
         if (isSavingsByName) { newName = "Savings"; newIsSystem = true; }
         else if (isCCPaymentsByName) { newName = "Credit Card Payments"; newIsSystem = true; }
-        else if (newIsSystem && !isSavingsByName && !isCCPaymentsByName) { // Trying to rename a system cat to non-system
-            newName = cat.name; // Prevent rename
+        else if (newIsSystem && !isSavingsByName && !isCCPaymentsByName) { 
+            newName = cat.name; 
         }
 
-
         if (newIsSystem) { 
-           // Budget is editable directly for system categories
-        } else if (cat.subcategories && cat.subcategories.length > 0) { // Non-system with subs
+        } else if (cat.subcategories && cat.subcategories.length > 0) { 
             newBudget = cat.subcategories.reduce((sum, sub) => sum + (Number(sub.budgetedAmount) || 0), 0);
         }
         
@@ -666,17 +650,16 @@ export const useBudgetCore = () => {
     
     if (categoryUpdated) {
       const { updatedCategories: finalCategories } = ensureSystemCategoryFlags(newCategories);
-      
       const updatedMonth = { ...monthToUpdate, categories: finalCategories };
        if (JSON.stringify(budgetMonths[yearMonthId]?.categories) !== JSON.stringify(updatedMonth.categories)) {
             setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
        }
     }
-  }, [ensureMonthExists, budgetMonths, setBudgetMonths]);
+  }, [ensureMonthExists, budgetMonths, setBudgetMonths, isUserAuthenticated]);
   
   const deleteCategoryFromMonth = useCallback((yearMonthId: string, categoryId: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
-    if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
 
     const categoryToDelete = monthToUpdate.categories.find(cat => cat.id === categoryId);
       
@@ -687,11 +670,11 @@ export const useBudgetCore = () => {
     const updatedMonth = { ...monthToUpdate, categories: finalCategories };
 
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
 
   const addSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => {
     const monthToUpdate = ensureMonthExists(monthId);
-    if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
 
     let parentCat = monthToUpdate.categories.find(cat => cat.id === parentCategoryId);
     if (!parentCat || parentCat.isSystemCategory) return; 
@@ -714,11 +697,11 @@ export const useBudgetCore = () => {
         const updatedMonth = { ...monthToUpdate, categories: finalCategories };
         setBudgetMonths(prev => ({ ...prev, [monthId]: updatedMonth }));
     }
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
 
   const updateSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => {
     const monthToUpdate = ensureMonthExists(monthId);
-    if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
 
     const parentCat = monthToUpdate.categories.find(cat => cat.id === parentCategoryId);
     if (!parentCat || parentCat.isSystemCategory) return;
@@ -740,11 +723,11 @@ export const useBudgetCore = () => {
         const updatedMonth = { ...monthToUpdate, categories: finalCategories };
         setBudgetMonths(prev => ({ ...prev, [monthId]: updatedMonth }));
     }
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
 
   const deleteSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryId: string) => {
     const monthToUpdate = ensureMonthExists(monthId);
-    if (monthToUpdate.isRolledOver) return;
+    if (monthToUpdate.isRolledOver && isUserAuthenticated) return;
 
     const parentCat = monthToUpdate.categories.find(cat => cat.id === parentCategoryId);
     if (!parentCat || parentCat.isSystemCategory) return;
@@ -764,7 +747,7 @@ export const useBudgetCore = () => {
         const updatedMonth = { ...monthToUpdate, categories: finalCategories };
         setBudgetMonths(prev => ({ ...prev, [monthId]: updatedMonth }));
     }
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists, setBudgetMonths, isUserAuthenticated]);
   
   const applyAiGeneratedBudget = useCallback(
     (
@@ -851,7 +834,7 @@ export const useBudgetCore = () => {
     addSubCategory,
     updateSubCategory,
     deleteSubCategory,
-    applyAiGeneratedBudget, // New export
+    applyAiGeneratedBudget, 
   };
 };
 

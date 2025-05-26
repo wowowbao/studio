@@ -3,14 +3,14 @@
 import { Button } from "@/components/ui/button";
 import { useBudget } from "@/hooks/useBudget";
 import { getYearMonthFromDate, parseYearMonth } from "@/hooks/useBudgetCore";
-import { Edit3, PlusCircle, Copy, AlertTriangle, CheckCircle, ArchiveRestore, Coins } from "lucide-react";
+import { Edit3, PlusCircle, Copy, AlertTriangle, CheckCircle, ArchiveRestore, Coins, ArchiveX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BudgetActionsProps {
   onEditBudget: () => void;
   onAddExpense: () => void;
   onAddIncome: () => void;
-  onFinalizeMonth: () => void; // New prop
+  onFinalizeMonth: () => void;
 }
 
 export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinalizeMonth }: BudgetActionsProps) {
@@ -30,26 +30,31 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinal
     });
   };
 
-  const handleRolloverUnspent = () => {
+  const handleFinalizeOrReopenMonth = () => {
     if (!currentBudgetMonth) return;
 
-    if (currentBudgetMonth.isRolledOver) {
-      // If already rolled over, just open the summary.
-      onFinalizeMonth(); 
-      return;
-    }
+    const result = rolloverUnspentBudget(currentDisplayMonthId); // This now toggles the state
 
-    const result = rolloverUnspentBudget(currentDisplayMonthId);
     if (result.success) {
-      toast({
-        title: "Month Finalized",
-        description: result.message,
-        action: <CheckCircle className="text-green-500" />
-      });
-      onFinalizeMonth(); // Open the summary modal
+      if (currentBudgetMonth.isRolledOver) { // This check is on the PREVIOUS state before toggle
+        // It means the month WAS closed, and is NOW open
+        toast({
+          title: "Month Reopened",
+          description: result.message,
+          action: <ArchiveX className="text-blue-500" />
+        });
+      } else {
+        // It means the month WAS open, and is NOW closed
+        toast({
+          title: "Month Finalized",
+          description: result.message,
+          action: <CheckCircle className="text-green-500" />
+        });
+        onFinalizeMonth(); // Open the summary modal only when closing
+      }
     } else {
       toast({
-        title: "Finalize Month Info",
+        title: "Action Info",
         description: result.message,
         variant: "default", 
         action: <AlertTriangle className="text-yellow-500" />,
@@ -57,8 +62,8 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinal
     }
   };
   
-  const isRolledOver = currentBudgetMonth?.isRolledOver;
-  const disablePrimaryActions = isRolledOver;
+  const isMonthClosed = currentBudgetMonth?.isRolledOver;
+  const disablePrimaryActions = isMonthClosed;
 
 
   return (
@@ -77,18 +82,17 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinal
           <Copy className="mr-2 h-4 w-4" /> Duplicate Month
         </Button>
          <Button 
-          onClick={handleRolloverUnspent} 
-          variant="secondary" 
+          onClick={handleFinalizeOrReopenMonth} 
+          variant={isMonthClosed ? "destructive" : "secondary"}
           className="w-full sm:col-span-2"
-          // Button is always enabled; if month is closed, it shows the report again.
         >
-          <ArchiveRestore className="mr-2 h-4 w-4" /> 
-          {isRolledOver ? "View Month Summary" : "Finalize & Close Month"}
+          {isMonthClosed ? <ArchiveX className="mr-2 h-4 w-4" /> : <ArchiveRestore className="mr-2 h-4 w-4" />}
+          {isMonthClosed ? "Reopen Month" : "Finalize & Close Month"}
         </Button>
       </div>
-       {isRolledOver && (
+       {isMonthClosed && (
         <p className="text-xs text-muted-foreground mt-3 text-center">
-          This month's budget has been closed. Editing, adding expenses/income are disabled. You can view the summary.
+          This month's budget has been closed. Editing, adding expenses/income are disabled. You can reopen the month to make changes.
         </p>
       )}
     </div>

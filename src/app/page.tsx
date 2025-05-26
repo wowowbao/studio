@@ -68,11 +68,12 @@ export default function HomePage() {
 
   const openMonthEndSummary = () => {
     const data = getBudgetForMonth(currentDisplayMonthId);
-    if (data && data.isRolledOver) { 
+    // This function is now primarily called when a month *is being closed*.
+    // The check for `isRolledOver` here might be redundant if BudgetActions handles it,
+    // but it's safe to keep.
+    if (data) { 
       setMonthEndSummaryData(data);
       setIsMonthEndSummaryModalOpen(true);
-    } else if (data && !data.isRolledOver) {
-        // This case is handled by BudgetActions button logic
     }
   };
 
@@ -263,7 +264,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.8 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.9 (Studio Preview)
           </div>
       </footer>
 
@@ -287,7 +288,16 @@ export default function HomePage() {
           {monthEndSummaryData && (
             <MonthEndSummaryModal
               isOpen={isMonthEndSummaryModalOpen}
-              onClose={() => setIsMonthEndSummaryModalOpen(false)}
+              onClose={() => {
+                setIsMonthEndSummaryModalOpen(false);
+                // Refresh monthEndSummaryData in case the month was reopened and summary is viewed again
+                const updatedData = getBudgetForMonth(currentDisplayMonthId);
+                if (updatedData && updatedData.isRolledOver) {
+                  setMonthEndSummaryData(updatedData);
+                } else {
+                  setMonthEndSummaryData(undefined); // Clear if no longer rolled over
+                }
+              }}
               budgetMonth={monthEndSummaryData}
             />
           )}

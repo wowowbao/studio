@@ -106,6 +106,7 @@ export default function HomePage() {
     }
   });
 
+  // Ensure consistent order for system categories
   systemCategories.sort((a, b) => {
     if (a.name.toLowerCase() === 'savings') return -1; 
     if (b.name.toLowerCase() === 'savings') return 1;
@@ -262,7 +263,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.6 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.7 (Studio Preview)
           </div>
       </footer>
 

@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from "@/hooks/useAuth"; // Firebase Auth
 import { useBudget } from "@/hooks/useBudget";
 import { MonthNavigator } from "@/components/budget/MonthNavigator";
 import { CategoryCard } from "@/components/budget/CategoryCard";
@@ -13,28 +14,25 @@ import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
 import { AddIncomeModal } from "@/components/budget/AddIncomeModal";
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { Button } from "@/components/ui/button";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, KeyRound, Lock } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle } from 'lucide-react';
 import { useTheme } from "next-themes";
+import { auth } from '@/lib/firebase'; // Firebase Auth
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-const APP_PASSWORD = "2007"; // Your password
-const AUTH_FLAG_KEY = "budgetFlowAppUnlocked";
 
 export default function HomePage() {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [appLoading, setAppLoading] = useState(true);
-
+  const { user, loading: authLoading, isUserAuthenticated } = useAuth();
+  
   const { 
     currentBudgetMonth, 
     currentDisplayMonthId, 
     isLoading: budgetLoading, 
     ensureMonthExists,
+    setCurrentDisplayMonthId, // Added to re-initialize budget for user
+    budgetMonths, // To check if budget data exists for current user
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -42,36 +40,32 @@ export default function HomePage() {
   const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
+  // Redirect to signin if not authenticated and not loading
   useEffect(() => {
-    const unlocked = localStorage.getItem(AUTH_FLAG_KEY) === "true";
-    setIsAuthenticated(unlocked);
-    setAppLoading(false); // App loading is just checking localStorage now
-  }, []);
+    if (!authLoading && !isUserAuthenticated) {
+      router.push('/signin');
+    }
+  }, [authLoading, isUserAuthenticated, router]);
 
-  useEffect(() => {
-    if (isAuthenticated && !budgetLoading && currentDisplayMonthId) {
+  // Ensure month exists when authenticated and budget not loading
+   useEffect(() => {
+    if (isUserAuthenticated && !budgetLoading && currentDisplayMonthId) {
       ensureMonthExists(currentDisplayMonthId);
     }
-  }, [isAuthenticated, currentDisplayMonthId, budgetLoading, ensureMonthExists]);
+  }, [isUserAuthenticated, currentDisplayMonthId, budgetLoading, ensureMonthExists]);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordInput === APP_PASSWORD) {
-      localStorage.setItem(AUTH_FLAG_KEY, "true");
-      setIsAuthenticated(true);
-      setAuthError(null);
-      setPasswordInput('');
-    } else {
-      setAuthError("Incorrect password.");
+  const handleSignOut = async () => {
+    try {
+      await auth.signOut();
+      // setCurrentDisplayMonthId(""); // Optionally reset month, or let it be picked up on next load
+      router.push('/signin'); // Redirect to signin page after sign out
+    } catch (error) {
+      console.error("Error signing out: ", error);
+      // Handle error (e.g., show toast)
     }
   };
 
-  const handleLockApp = () => {
-    localStorage.removeItem(AUTH_FLAG_KEY);
-    setIsAuthenticated(false);
-  };
-
-  const isLoading = appLoading || (isAuthenticated && budgetLoading);
+  const isLoading = authLoading || (isUserAuthenticated && budgetLoading);
 
   if (isLoading) {
     return (
@@ -88,35 +82,14 @@ export default function HomePage() {
     );
   }
   
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background p-4">
-        <Card className="w-full max-w-sm shadow-xl">
-          <CardHeader className="text-center">
-            <KeyRound className="mx-auto h-10 w-10 text-primary mb-3" />
-            <CardTitle className="text-2xl">BudgetFlow Access</CardTitle>
-            <CardDescription>Enter the password to access the app.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  value={passwordInput} 
-                  onChange={(e) => setPasswordInput(e.target.value)} 
-                  placeholder="Enter password" 
-                  required 
-                />
-              </div>
-              {authError && <p className="text-sm text-destructive flex items-center"><AlertTriangle className="w-4 h-4 mr-1" /> {authError}</p>}
-              <Button type="submit" className="w-full">
-                Unlock App
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+  // If authenticated but still loading budget or no user, show loading (already handled by isLoading)
+  // If not authenticated (and not loading auth), user will be redirected by useEffect. 
+  // This ensures we don't flash the "not authenticated" UI briefly.
+  if (!isUserAuthenticated) {
+     return ( // Fallback loading screen while redirecting
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+        <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-pulse" />
+        <p className="text-muted-foreground">Redirecting...</p>
       </div>
     );
   }
@@ -132,9 +105,22 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold text-primary">BudgetFlow</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleLockApp} aria-label="Lock App">
-              <Lock className="h-5 w-5" />
-            </Button>
+            {isUserAuthenticated && user ? (
+              <>
+                <span className="text-sm text-muted-foreground hidden sm:inline truncate max-w-[150px]">{user.email}</span>
+                <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sign Out">
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </>
+            ) : (
+              <Link href="/signin" legacyBehavior passHref>
+                <Button variant="outline" asChild>
+                  <a>
+                    <UserCircle className="mr-2 h-5 w-5" /> Sign In
+                  </a>
+                </Button>
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="icon"

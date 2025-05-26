@@ -5,6 +5,7 @@ import './globals.css';
 import { BudgetProvider } from '@/components/providers/BudgetProvider';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
+import { AuthProvider } from '@/context/AuthContext'; // New import
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -19,7 +20,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'BudgetFlow',
   description: 'Manage your monthly budget with ease.',
-  manifest: '/manifest.json',
+  manifest: '/manifest.json', // You might need to create this if you want PWA features
   appleWebAppCapable: 'yes',
   appleWebAppStatusBarStyle: 'default',
 };
@@ -38,12 +39,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <BudgetProvider>
-            <div className="flex flex-col min-h-screen">
-              {children}
-            </div>
-            <Toaster />
-          </BudgetProvider>
+          <AuthProvider> {/* Added AuthProvider */}
+            <BudgetProvider>
+              <div className="flex flex-col min-h-screen">
+                {children}
+              </div>
+              <Toaster />
+            </BudgetProvider>
+          </AuthProvider> {/* Added AuthProvider */}
         </ThemeProvider>
       </body>
     </html>

@@ -3,6 +3,7 @@
 import type { BudgetMonth } from "@/types/budget";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Landmark } from "lucide-react";
+import { parseYearMonth } from "@/hooks/useBudgetCore"; // Helper to parse "YYYY-MM"
 
 interface CreditCardDebtSummaryProps {
   budgetMonth: BudgetMonth | undefined;
@@ -22,7 +23,7 @@ export function CreditCardDebtSummary({ budgetMonth }: CreditCardDebtSummaryProp
     );
   }
 
-  const { startingCreditCardDebt = 0, categories } = budgetMonth;
+  const { startingCreditCardDebt = 0, categories, id: monthId } = budgetMonth;
 
   const creditCardPaymentsCategory = categories.find(
     cat => cat.name.toLowerCase() === "credit card payments"
@@ -34,6 +35,9 @@ export function CreditCardDebtSummary({ budgetMonth }: CreditCardDebtSummaryProp
 
   const estimatedDebtAtEndOfMonth = startingCreditCardDebt - paymentsMadeThisMonth;
 
+  const displayDate = parseYearMonth(monthId);
+  const formattedMonthYear = displayDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
   return (
     <Card className="mt-6 shadow-md">
       <CardHeader className="pb-3">
@@ -41,7 +45,7 @@ export function CreditCardDebtSummary({ budgetMonth }: CreditCardDebtSummaryProp
           <Landmark className="mr-2 h-5 w-5 text-primary" />
           Credit Card Debt
         </CardTitle>
-        <CardDescription>Status for {budgetMonth.id}</CardDescription>
+        <CardDescription>Status for {formattedMonthYear}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
         <div className="flex justify-between items-center py-2">

@@ -2,7 +2,8 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from "@/hooks/useAuth"; // Firebase Auth
+import Link from 'next/link';
+import { useAuth } from "@/hooks/useAuth"; 
 import { useBudget } from "@/hooks/useBudget";
 import { MonthNavigator } from "@/components/budget/MonthNavigator";
 import { CategoryCard } from "@/components/budget/CategoryCard";
@@ -11,15 +12,15 @@ import { BudgetActions } from "@/components/budget/BudgetActions";
 import { BudgetChart } from "@/components/budget/BudgetChart";
 import { EditBudgetModal } from "@/components/budget/EditBudgetModal";
 import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
-import { AddIncomeModal } from "@/components/budget/AddIncomeModal";
+import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; 
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX } from 'lucide-react';
 import { useTheme } from "next-themes";
-import { auth } from '@/lib/firebase'; // Firebase Auth
-import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { auth } from '@/lib/firebase'; 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 
 export default function HomePage() {
@@ -31,43 +32,51 @@ export default function HomePage() {
     currentDisplayMonthId, 
     isLoading: budgetLoading, 
     ensureMonthExists,
-    setCurrentDisplayMonthId, // Added to re-initialize budget for user
-    budgetMonths, // To check if budget data exists for current user
+    budgetMonths,
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
   const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const [showGuestAlert, setShowGuestAlert] = useState(false);
 
-  // Redirect to signin if not authenticated and not loading
+  // Show guest alert only once per session after initial load if not authenticated
   useEffect(() => {
     if (!authLoading && !isUserAuthenticated) {
-      router.push('/signin');
+      const guestAlertDismissed = sessionStorage.getItem('guestAlertDismissed');
+      if (!guestAlertDismissed) {
+        setShowGuestAlert(true);
+      }
     }
-  }, [authLoading, isUserAuthenticated, router]);
+  }, [authLoading, isUserAuthenticated]);
 
-  // Ensure month exists when authenticated and budget not loading
+  // Ensure month exists when not auth loading and budget not loading (works for both guest and authenticated)
    useEffect(() => {
-    if (isUserAuthenticated && !budgetLoading && currentDisplayMonthId) {
+    if (!authLoading && !budgetLoading && currentDisplayMonthId) {
       ensureMonthExists(currentDisplayMonthId);
     }
-  }, [isUserAuthenticated, currentDisplayMonthId, budgetLoading, ensureMonthExists]);
+  }, [currentDisplayMonthId, budgetLoading, authLoading, ensureMonthExists]);
 
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      // setCurrentDisplayMonthId(""); // Optionally reset month, or let it be picked up on next load
-      router.push('/signin'); // Redirect to signin page after sign out
+      // Data saving/loading will switch to guest mode in useBudgetCore
+      router.push('/'); // Stay on homepage, will show guest view
     } catch (error) {
       console.error("Error signing out: ", error);
-      // Handle error (e.g., show toast)
     }
   };
 
-  const isLoading = authLoading || (isUserAuthenticated && budgetLoading);
+  const dismissGuestAlert = () => {
+    setShowGuestAlert(false);
+    sessionStorage.setItem('guestAlertDismissed', 'true');
+  };
 
-  if (isLoading) {
+  const isLoading = authLoading || budgetLoading;
+
+
+  if (isLoading && !Object.keys(budgetMonths).length) { // Show full loading screen only if truly loading initially
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-pulse" />
@@ -78,18 +87,6 @@ export default function HomePage() {
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
         </div>
-      </div>
-    );
-  }
-  
-  // If authenticated but still loading budget or no user, show loading (already handled by isLoading)
-  // If not authenticated (and not loading auth), user will be redirected by useEffect. 
-  // This ensures we don't flash the "not authenticated" UI briefly.
-  if (!isUserAuthenticated) {
-     return ( // Fallback loading screen while redirecting
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
-        <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-pulse" />
-        <p className="text-muted-foreground">Redirecting...</p>
       </div>
     );
   }
@@ -116,7 +113,7 @@ export default function HomePage() {
               <Link href="/signin" legacyBehavior passHref>
                 <Button variant="outline" asChild>
                   <a>
-                    <UserCircle className="mr-2 h-5 w-5" /> Sign In
+                    <UserCircle className="mr-2 h-5 w-5" /> Sign In / Sign Up
                   </a>
                 </Button>
               </Link>
@@ -135,9 +132,36 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1 container max-w-5xl mx-auto p-4 sm:p-6 md:p-8">
+        {!isUserAuthenticated && showGuestAlert && (
+          <Alert className="mb-6 shadow-md">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Guest Mode</AlertTitle>
+            <AlertDescription className="flex justify-between items-center">
+              <div>
+                Your data is saved locally in this browser. Sign up or sign in to save your budget to the cloud and access it on any device.
+              </div>
+              <Button variant="ghost" size="sm" onClick={dismissGuestAlert} className="ml-4">
+                <ShieldX className="mr-1 h-4 w-4"/> Dismiss
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <MonthNavigator />
         
-        {!currentBudgetMonth ? (
+        {isLoading && Object.keys(budgetMonths).length > 0 ? ( // Skeleton for content reload
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
+              </div>
+              <Skeleton className="h-32 w-full rounded-lg" /> {/* For CreditCardDebtSummary */}
+              <Skeleton className="h-20 w-full rounded-lg" /> {/* For BudgetActions */}
+              <h2 className="text-xl font-semibold mt-8 mb-4 text-primary"><Skeleton className="h-6 w-32"/></h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                 {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-lg" />)}
+              </div>
+            </div>
+        ) : !currentBudgetMonth ? (
           <Card className="text-center p-8 shadow-lg">
             <CardHeader>
               <AlertTriangle className="mx-auto h-12 w-12 text-accent mb-4" />

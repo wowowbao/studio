@@ -14,11 +14,11 @@ import { EditBudgetModal } from "@/components/budget/EditBudgetModal";
 import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
 import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; 
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
-import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal"; // New import
+import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Landmark, PiggyBank, DollarSign } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Landmark, PiggyBank, Coins } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,14 +34,14 @@ export default function HomePage() {
     currentDisplayMonthId, 
     isLoading: budgetLoading, 
     budgetMonths,
-    getBudgetForMonth, // Added for MonthEndSummaryModal
+    getBudgetForMonth, 
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
   const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
-  const [isMonthEndSummaryModalOpen, setIsMonthEndSummaryModalOpen] = useState(false); // New state
-  const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined); // New state
+  const [isMonthEndSummaryModalOpen, setIsMonthEndSummaryModalOpen] = useState(false); 
+  const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined); 
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
 
@@ -70,9 +70,14 @@ export default function HomePage() {
 
   const openMonthEndSummary = () => {
     const data = getBudgetForMonth(currentDisplayMonthId);
-    if (data && data.isRolledOver) { // Only show if already rolled over
+    if (data && data.isRolledOver) { 
       setMonthEndSummaryData(data);
       setIsMonthEndSummaryModalOpen(true);
+    } else if (data && !data.isRolledOver) {
+        // If trying to open summary for a non-rolled-over month,
+        // delegate to BudgetActions to handle the rollover first.
+        // This scenario should be handled by the BudgetActions button logic.
+        // Here, we just ensure we only open if it's already rolled.
     }
   };
 
@@ -206,13 +211,13 @@ export default function HomePage() {
               onEditBudget={() => setIsEditBudgetModalOpen(true)}
               onAddExpense={() => setIsAddExpenseModalOpen(true)}
               onAddIncome={() => setIsAddIncomeModalOpen(true)}
-              onFinalizeMonth={() => openMonthEndSummary()} // Updated prop
+              onFinalizeMonth={() => openMonthEndSummary()}
             />
 
             {systemCategories.length > 0 && (
               <>
                 <h2 className="text-xl font-semibold mt-8 mb-4 text-primary flex items-center">
-                  <DollarSign className="mr-2 h-6 w-6 text-primary/80" /> Financial Goals & Obligations
+                  <PiggyBank className="mr-2 h-6 w-6 text-primary/80" /> Financial Goals & Obligations
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                   {systemCategories.map(cat => (
@@ -224,7 +229,9 @@ export default function HomePage() {
 
             {operationalCategories.length > 0 && (
               <>
-                <h2 className="text-xl font-semibold mt-6 mb-4 text-primary">Operational Categories</h2>
+                <h2 className="text-xl font-semibold mt-6 mb-4 text-primary flex items-center">
+                 <Coins className="mr-2 h-6 w-6 text-primary/80" /> Operational Categories
+                </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {operationalCategories.map(cat => (
                     <CategoryCard key={cat.id} category={cat} />
@@ -233,12 +240,12 @@ export default function HomePage() {
               </>
             )}
             
-            {(systemCategories.length > 0 || operationalCategories.length > 0) && (
+            {(operationalCategories.length > 0) && ( // Only show chart if there are operational categories
                 <BudgetChart budgetMonth={currentBudgetMonth} />
             )}
 
 
-            {allCategories.length === 0 && ( // Should ideally show system categories if they exist by default
+            {allCategories.length === 0 && ( 
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
                   <AlertTriangle className="mx-auto h-10 w-10 text-accent mb-3" />
@@ -246,7 +253,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">
-                    You haven't added any categories to your budget for {currentDisplayMonthId} yet.
+                    You haven't added any categories to your budget for {currentDisplayMonthId} yet. Use "Manage Budget" to add them.
                   </p>
                   <Button variant="outline" onClick={() => setIsEditBudgetModalOpen(true)}>
                     Add Categories
@@ -260,7 +267,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.0 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.1 (Studio Preview)
           </div>
       </footer>
 

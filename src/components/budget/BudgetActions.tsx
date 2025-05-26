@@ -68,7 +68,7 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome, onFinal
           <Edit3 className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Manage Budget"}
         </Button>
         <Button onClick={onAddIncome} variant="outline" className="w-full" disabled={disablePrimaryActions}>
-            <Coins className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Income"}
+            <Coins className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Manage Income"}
         </Button>
         <Button onClick={onAddExpense} className="w-full" disabled={disablePrimaryActions}>
           <PlusCircle className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Expense"}

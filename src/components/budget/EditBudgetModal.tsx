@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, PlusCircle, Edit3, CheckCircle, XCircle } from "lucide-react";
-import * as LucideIcons from "lucide-react";
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Select no longer needed for icons
+import { Trash2, PlusCircle, CheckCircle, XCircle } from "lucide-react";
+// import * as LucideIcons from "lucide-react"; // LucideIcons no longer needed directly here
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,24 +21,9 @@ interface EditBudgetModalProps {
   monthId: string;
 }
 
-// Filtered list of Lucide icons that are actual components
-const ALL_ICONS = Object.keys(LucideIcons)
-  .filter(key => {
-    const ExportedItem = (LucideIcons as any)[key];
-    // Check if it's a function (React components are functions) and not 'createLucideIcon' or other helpers
-    return typeof ExportedItem === 'function' && 
-           ExportedItem.displayName && // Most Lucide icons will have a displayName
-           key !== 'createLucideIcon' && // Exclude the helper
-           key !== 'IconNode' && // Exclude type
-           key !== 'LucideIcon' && // Exclude type
-           key !== 'LucideProps'; // Exclude type
-  })
-  .sort(); // Sort alphabetically for easier browsing
-
-
 export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalProps) {
-  const { getBudgetForMonth, updateMonthBudget, isLoading } = useBudget(); // Removed setSavingsGoalForMonth as it's part of updateMonthBudget
-  const [editableCategories, setEditableCategories] = useState<Array<Omit<BudgetCategory, 'spentAmount'>>>([].map(c => ({...c, expenses: c.expenses || [] })));
+  const { getBudgetForMonth, updateMonthBudget, isLoading } = useBudget();
+  const [editableCategories, setEditableCategories] = useState<Array<Omit<BudgetCategory, 'spentAmount' | 'icon'>>>([].map(c => ({...c, expenses: c.expenses || [] })));
   const [monthSavingsGoal, setMonthSavingsGoal] = useState<number>(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const { toast } = useToast();
@@ -47,13 +32,11 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     if (!isLoading && monthId) {
       const budgetData = getBudgetForMonth(monthId);
       if (budgetData) {
-        // Map to ensure 'expenses' array exists and is part of the editable state
         setEditableCategories([...budgetData.categories.map(c => ({
             id: c.id,
             name: c.name,
-            icon: c.icon,
             budgetedAmount: c.budgetedAmount,
-            expenses: c.expenses || [] 
+            expenses: c.expenses || []
         }))]);
         setMonthSavingsGoal(budgetData.savingsGoal || 0);
       } else {
@@ -61,7 +44,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
             ...cat,
             id: uuidv4(),
             budgetedAmount: 0,
-            expenses: [], // Ensure expenses is initialized
+            expenses: [],
         }));
         setEditableCategories(defaultCatsForModal);
         setMonthSavingsGoal(0);
@@ -72,22 +55,22 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
 
   useEffect(() => {
     if (isOpen) {
-      setIsDataLoaded(false); 
+      setIsDataLoaded(false);
       loadBudgetData();
     }
   }, [isOpen, loadBudgetData]);
 
 
-  const handleCategoryChange = (id: string, field: keyof (Omit<BudgetCategory, 'spentAmount'>) , value: string | number) => {
+  const handleCategoryChange = (id: string, field: keyof (Omit<BudgetCategory, 'spentAmount' | 'icon'>) , value: string | number) => {
     setEditableCategories(prev =>
-      prev.map(cat => (cat.id === id ? { ...cat, [field]: typeof value === 'string' && field !== 'name' && field !== 'icon' ? parseFloat(value) || 0 : value } : cat))
+      prev.map(cat => (cat.id === id ? { ...cat, [field]: typeof value === 'string' && field !== 'name' ? parseFloat(value) || 0 : value } : cat))
     );
   };
 
   const handleAddCategory = () => {
     setEditableCategories(prev => [
       ...prev,
-      { id: uuidv4(), name: "New Category", icon: "Package", budgetedAmount: 0, expenses: [] },
+      { id: uuidv4(), name: "New Category", budgetedAmount: 0, expenses: [] },
     ]);
   };
 
@@ -102,12 +85,11 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     }
     const validCategories = editableCategories
         .filter(cat => cat.name.trim() !== "")
-        .map(cat => ({ // Ensure structure matches BudgetCategory for saving
+        .map(cat => ({
             id: cat.id,
             name: cat.name,
-            icon: cat.icon,
             budgetedAmount: cat.budgetedAmount,
-            expenses: cat.expenses || [] // Ensure expenses array is present
+            expenses: cat.expenses || []
         }));
 
     updateMonthBudget(monthId, { categories: validCategories, savingsGoal: monthSavingsGoal });
@@ -120,7 +102,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   };
 
   if (!isOpen || !isDataLoaded) {
-    return null; 
+    return null;
   }
 
   return (
@@ -142,11 +124,11 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                 placeholder="e.g., 500"
               />
             </div>
-            
+
             <h3 className="text-lg font-medium border-b pb-2">Categories</h3>
             {editableCategories.map(cat => (
               <div key={cat.id} className="p-4 border rounded-lg shadow-sm space-y-3 bg-card/50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div className="grid grid-cols-1 gap-3 items-end">
                   <div>
                     <Label htmlFor={`categoryName-${cat.id}`}>Name</Label>
                     <Input
@@ -157,6 +139,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                       className="mt-1"
                     />
                   </div>
+                  {/* Icon Selection Removed
                   <div>
                     <Label htmlFor={`categoryIcon-${cat.id}`}>Icon</Label>
                     <Select
@@ -166,17 +149,15 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                       <SelectTrigger id={`categoryIcon-${cat.id}`} className="mt-1">
                         <SelectValue placeholder="Select icon" />
                       </SelectTrigger>
-                      <SelectContent> {/* This component applies text-popover-foreground */}
-                        <ScrollArea className="h-[25rem]"> 
+                      <SelectContent>
+                        <ScrollArea className="h-[20rem]">
                           {ALL_ICONS.map(iconName => {
                             const CurrentIcon = (LucideIcons as any)[iconName];
-                            if (!CurrentIcon || typeof CurrentIcon !== 'function') return null; 
+                            if (!CurrentIcon || typeof CurrentIcon !== 'function') return null;
                             return (
                               <SelectItem key={iconName} value={iconName}>
-                                {/* This div inherits text-popover-foreground from SelectContent and applies it to children */}
-                                <div className="flex items-center text-popover-foreground"> 
-                                  {/* Icon should inherit color via currentColor from the parent div */}
-                                  <CurrentIcon className="mr-2 h-4 w-4" /> 
+                                <div className="flex items-center text-popover-foreground">
+                                  <CurrentIcon className="mr-2 h-4 w-4 text-current" />
                                   {iconName}
                                 </div>
                               </SelectItem>
@@ -186,6 +167,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                       </SelectContent>
                     </Select>
                   </div>
+                  */}
                 </div>
                 <div>
                   <Label htmlFor={`categoryBudget-${cat.id}`}>Budgeted Amount</Label>

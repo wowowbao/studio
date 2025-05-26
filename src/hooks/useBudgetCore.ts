@@ -24,12 +24,12 @@ export const parseYearMonth = (yearMonth: string): Date => {
   return new Date(year, month - 1, 1);
 };
 
-const BUDGET_DATA_KEY_PREFIX = 'budgetFlowData_'; 
+const BUDGET_DATA_KEY_PREFIX = 'budgetFlowData_';
 const DISPLAY_MONTH_KEY_PREFIX = 'budgetFlowDisplayMonth_';
 
 // Function to get user-specific storage key
 const getUserSpecificKey = (baseKey: string) => {
-  const pseudoUserId = "localUser"; 
+  const pseudoUserId = "localUser";
   return `${baseKey}${pseudoUserId}`;
 };
 
@@ -38,7 +38,7 @@ export const useBudgetCore = () => {
   const [budgetMonths, setBudgetMonths] = useState<Record<string, BudgetMonth>>({});
   const [currentDisplayMonthId, setCurrentDisplayMonthId] = useState<string>(DEFAULT_START_MONTH);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useEffect(() => {
     setIsLoading(true);
     try {
@@ -65,7 +65,7 @@ export const useBudgetCore = () => {
         const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
         setBudgetMonths({ [DEFAULT_START_MONTH]: newMonth });
       }
-      
+
       const storedDisplayMonth = localStorage.getItem(displayMonthKey);
       const currentBudgetsData = storedBudgets ? JSON.parse(storedBudgets) : {};
 
@@ -92,10 +92,10 @@ export const useBudgetCore = () => {
       setCurrentDisplayMonthId(DEFAULT_START_MONTH);
     }
     setIsLoading(false);
-  }, []); 
+  }, []);
 
   useEffect(() => {
-    if (!isLoading) { 
+    if (!isLoading) {
       try {
         const budgetKey = getUserSpecificKey(BUDGET_DATA_KEY_PREFIX);
         localStorage.setItem(budgetKey, JSON.stringify(budgetMonths));
@@ -133,7 +133,7 @@ export const useBudgetCore = () => {
   const getBudgetForMonth = useCallback((yearMonthId: string): BudgetMonth | undefined => {
     return budgetMonths[yearMonthId];
   }, [budgetMonths]);
-  
+
   const currentBudgetMonth = getBudgetForMonth(currentDisplayMonthId);
 
   const ensureMonthExists = useCallback((yearMonthId: string): BudgetMonth => {
@@ -157,7 +157,6 @@ export const useBudgetCore = () => {
         updatedMonth.categories = payload.categories.map(cat => ({
           id: cat.id || uuidv4(),
           name: cat.name,
-          icon: cat.icon,
           budgetedAmount: cat.budgetedAmount === undefined ? 0 : cat.budgetedAmount,
           expenses: cat.expenses || (monthToUpdate.categories.find(c => c.id === cat.id)?.expenses) || [],
         }));
@@ -168,12 +167,11 @@ export const useBudgetCore = () => {
   }, [createNewMonthBudget]);
 
 
-  const addCategoryToMonth = useCallback((yearMonthId: string, categoryName: string, icon: string) => {
+  const addCategoryToMonth = useCallback((yearMonthId: string, categoryName: string) => {
     ensureMonthExists(yearMonthId);
     const newCategory: BudgetCategory = {
       id: uuidv4(),
       name: categoryName,
-      icon,
       budgetedAmount: 0,
       expenses: [],
     };
@@ -188,8 +186,8 @@ export const useBudgetCore = () => {
       };
     });
   }, [ensureMonthExists]);
-  
-  const updateCategoryInMonth = useCallback((yearMonthId: string, categoryId: string, updatedCategoryData: Partial<BudgetCategory>) => {
+
+  const updateCategoryInMonth = useCallback((yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'icon'>>) => {
     ensureMonthExists(yearMonthId);
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
@@ -230,7 +228,7 @@ export const useBudgetCore = () => {
     };
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
-      if (!month) return prev; 
+      if (!month) return prev;
       if (month.isRolledOver) {
         console.warn(`Cannot add expense to ${yearMonthId} as it has been rolled over.`);
         // Optionally, inform the user via toast or alert here
@@ -241,8 +239,8 @@ export const useBudgetCore = () => {
         [yearMonthId]: {
           ...month,
           categories: month.categories.map(cat =>
-            cat.id === categoryId 
-            ? { ...cat, expenses: [...cat.expenses, newExpense] } 
+            cat.id === categoryId
+            ? { ...cat, expenses: [...cat.expenses, newExpense] }
             : cat
           ),
         },
@@ -284,9 +282,10 @@ export const useBudgetCore = () => {
 
     const [targetYear, targetMonthNum] = targetMonthId.split('-').map(Number);
     const newCategories = sourceBudget.categories.map(cat => ({
-      ...cat,
-      id: uuidv4(), 
-      expenses: [], 
+      id: uuidv4(),
+      name: cat.name,
+      budgetedAmount: cat.budgetedAmount,
+      expenses: [],
     }));
 
     const newMonthData: BudgetMonth = {
@@ -299,14 +298,14 @@ export const useBudgetCore = () => {
     };
 
     setBudgetMonths(prev => ({ ...prev, [targetMonthId]: newMonthData }));
-    setCurrentDisplayMonthId(targetMonthId); 
+    setCurrentDisplayMonthId(targetMonthId);
   }, [getBudgetForMonth]);
 
   const navigateToPreviousMonth = useCallback(() => {
     const currentDate = parseYearMonth(currentDisplayMonthId);
     currentDate.setMonth(currentDate.getMonth() - 1);
     const prevMonthId = getYearMonthFromDate(currentDate);
-    ensureMonthExists(prevMonthId); 
+    ensureMonthExists(prevMonthId);
     setCurrentDisplayMonthId(prevMonthId);
   }, [currentDisplayMonthId, ensureMonthExists]);
 
@@ -314,10 +313,10 @@ export const useBudgetCore = () => {
     const currentDate = parseYearMonth(currentDisplayMonthId);
     currentDate.setMonth(currentDate.getMonth() + 1);
     const nextMonthId = getYearMonthFromDate(currentDate);
-    ensureMonthExists(nextMonthId); 
+    ensureMonthExists(nextMonthId);
     setCurrentDisplayMonthId(nextMonthId);
   }, [currentDisplayMonthId, ensureMonthExists]);
-  
+
   const setSavingsGoalForMonth = useCallback((yearMonthId: string, goal: number) => {
     ensureMonthExists(yearMonthId);
     setBudgetMonths(prev => {

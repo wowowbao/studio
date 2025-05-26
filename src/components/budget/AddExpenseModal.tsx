@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import * as LucideIcons from "lucide-react";
+// import * as LucideIcons from "lucide-react"; // No longer needed for category icons
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +40,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         setAvailableCategories([]);
         setSelectedCategoryId("");
       }
-      setAmount(""); 
+      setAmount("");
       setDescription("");
     }
   }, [isOpen, monthId, getBudgetForMonth, isLoading, selectedCategoryId]);
@@ -68,7 +68,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     });
     onClose();
   };
-  
+
   if (!isOpen) return null;
 
   return (
@@ -93,11 +93,11 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                 </SelectTrigger>
                 <SelectContent>
                   {availableCategories.map(cat => {
-                    const IconComponent = (LucideIcons as any)[cat.icon] || LucideIcons.HelpCircle;
+                    // const IconComponent = (LucideIcons as any)[cat.icon] || LucideIcons.HelpCircle; // Icon removed
                     return (
                       <SelectItem key={cat.id} value={cat.id}>
                         <div className="flex items-center">
-                          <IconComponent className="mr-2 h-4 w-4 text-current" />
+                          {/* <IconComponent className="mr-2 h-4 w-4 text-current" /> // Icon removed */}
                           {cat.name}
                         </div>
                       </SelectItem>

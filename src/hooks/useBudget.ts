@@ -17,8 +17,8 @@ interface BudgetContextType {
   navigateToNextMonth: () => void;
   setCurrentDisplayMonthId: (yearMonthId: string) => void;
   ensureMonthExists: (yearMonthId: string) => BudgetMonth;
-  addCategoryToMonth: (yearMonthId: string, categoryName: string, icon: string) => void;
-  updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<BudgetCategory>) => void;
+  addCategoryToMonth: (yearMonthId: string, categoryName: string) => void; // Removed icon
+  updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'icon'>>) => void; // Removed icon
   deleteCategoryFromMonth: (yearMonthId: string, categoryId: string) => void;
   setSavingsGoalForMonth: (yearMonthId: string, goal: number) => void;
   rolloverUnspentBudget: (yearMonthId: string) => { success: boolean; message: string };

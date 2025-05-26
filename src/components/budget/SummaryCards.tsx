@@ -36,28 +36,42 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   const totalIncomeReceived = (budgetMonth.incomes || []).reduce((sum, income) => sum + income.amount, 0);
   
   let totalBudgetedForAllCategories = 0; 
-  let totalSpentExcludingSavingsCategory = 0; 
+  let totalOperationalSpending = 0; // Renamed from totalSpentExcludingSavingsCategory
   let amountActuallySaved = 0; 
   let savingsCategoryBudgetedAmount = 0; 
+  let creditCardPaymentsCategoryBudgetedAmount = 0; // New variable
 
   budgetMonth.categories.forEach(cat => {
-    const isSavingsCat = cat.isSystemCategory && cat.name.toLowerCase() === 'savings';
+    const catNameLower = cat.name.toLowerCase();
+    const isSavingsCat = cat.isSystemCategory && catNameLower === 'savings';
+    const isCCPaymentsCat = cat.isSystemCategory && catNameLower === 'credit card payments';
     
+    // Calculate effective budget for this category (parent if no subs, sum of subs if subs)
+    let effectiveCategoryBudget = 0;
+    if (cat.subcategories && cat.subcategories.length > 0 && !cat.isSystemCategory) {
+      cat.subcategories.forEach(sub => effectiveCategoryBudget += sub.budgetedAmount);
+    } else {
+      effectiveCategoryBudget = cat.budgetedAmount;
+    }
+    totalBudgetedForAllCategories += effectiveCategoryBudget;
+
     if (isSavingsCat) {
       amountActuallySaved += getCategorySpentAmount(cat);
-      savingsCategoryBudgetedAmount += cat.budgetedAmount; 
-      totalBudgetedForAllCategories += cat.budgetedAmount; 
-    } else {
+      savingsCategoryBudgetedAmount += effectiveCategoryBudget; // Use effective budget
+    } else if (isCCPaymentsCat) {
+      creditCardPaymentsCategoryBudgetedAmount += effectiveCategoryBudget; // Use effective budget
+      // Spending for CC Payments is not part of totalOperationalSpending
+    } else { // Operational categories
       if (cat.subcategories && cat.subcategories.length > 0) {
         cat.subcategories.forEach(sub => {
-          totalBudgetedForAllCategories += sub.budgetedAmount;
-          const spentInSub = getCategorySpentAmount(sub);
-          totalSpentExcludingSavingsCategory += spentInSub;
+          totalOperationalSpending += getCategorySpentAmount(sub);
         });
+        // Add parent's direct expenses if any. CategoryCard displays these separately.
+        // For summary, we assume expenses are logged in subs if subs exist.
+        // If parent can also have direct expenses, this part might need adjustment based on exact spending model.
+        // However, AddExpenseModal directs to subs if they exist.
       } else { 
-        totalBudgetedForAllCategories += cat.budgetedAmount;
-        const spentInCat = getCategorySpentAmount(cat);
-        totalSpentExcludingSavingsCategory += spentInCat;
+        totalOperationalSpending += getCategorySpentAmount(cat);
       }
     }
   });
@@ -65,8 +79,10 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   const fundsToAllocate = totalIncomeReceived - totalBudgetedForAllCategories;
   const isOverAllocated = fundsToAllocate < 0;
 
-  const overallSpendingRemaining = totalBudgetedForAllCategories - savingsCategoryBudgetedAmount - totalSpentExcludingSavingsCategory;
-  const isOverSpentOverallOnNonSavings = overallSpendingRemaining < 0;
+  // Budget for operational categories = Total Budget - Savings Budget - CC Payments Budget
+  const operationalCategoriesBudget = totalBudgetedForAllCategories - savingsCategoryBudgetedAmount - creditCardPaymentsCategoryBudgetedAmount;
+  const overallOperationalSpendingRemaining = operationalCategoriesBudget - totalOperationalSpending;
+  const isOverSpentOverallOnOperational = overallOperationalSpendingRemaining < 0;
 
 
   return (
@@ -99,17 +115,17 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Spent (Non-Savings)</CardTitle>
-          { isOverSpentOverallOnNonSavings ? <TrendingDown className="h-4 w-4 text-destructive" /> : <TrendingUp className="h-4 w-4 text-muted-foreground" /> }
+          <CardTitle className="text-sm font-medium">Total Spent (Non-Savings/Debt)</CardTitle>
+          { isOverSpentOverallOnOperational ? <TrendingDown className="h-4 w-4 text-destructive" /> : <TrendingUp className="h-4 w-4 text-muted-foreground" /> }
         </CardHeader>
         <CardContent>
-          <div className={cn("text-2xl font-bold", isOverSpentOverallOnNonSavings && "text-destructive")}>
-            ${totalSpentExcludingSavingsCategory.toFixed(2)} 
+          <div className={cn("text-2xl font-bold", isOverSpentOverallOnOperational && "text-destructive")}>
+            ${totalOperationalSpending.toFixed(2)} 
           </div>
-          <p className={cn("text-xs", isOverSpentOverallOnNonSavings ? "text-destructive/80" : "text-muted-foreground")}>
-            {isOverSpentOverallOnNonSavings ? 
-              `Overspent by $${Math.abs(overallSpendingRemaining).toFixed(2)}` : 
-              `$${overallSpendingRemaining.toFixed(2)} remaining in spending categories`}
+          <p className={cn("text-xs", isOverSpentOverallOnOperational ? "text-destructive/80" : "text-muted-foreground")}>
+            {isOverSpentOverallOnOperational ? 
+              `Overspent by $${Math.abs(overallOperationalSpendingRemaining).toFixed(2)}` : 
+              `$${overallOperationalSpendingRemaining.toFixed(2)} remaining in spending categories`}
           </p>
         </CardContent>
       </Card>

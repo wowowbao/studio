@@ -2,7 +2,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useBudget } from "@/hooks/useBudget";
-import { getCurrentYearMonth } from "@/hooks/useBudgetCore";
 import { MonthNavigator } from "@/components/budget/MonthNavigator";
 import { CategoryCard } from "@/components/budget/CategoryCard";
 import { SummaryCards } from "@/components/budget/SummaryCards";
@@ -13,12 +12,14 @@ import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, LayoutDashboard } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun } from 'lucide-react';
+import { useTheme } from "next-themes";
 
 export default function HomePage() {
   const { currentBudgetMonth, currentDisplayMonthId, isLoading, ensureMonthExists } = useBudget();
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   // Ensure current month exists on initial load or when monthId changes
   useEffect(() => {
@@ -52,7 +53,18 @@ export default function HomePage() {
             <LayoutDashboard className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold text-primary">BudgetFlow</h1>
           </div>
-          {/* Future: User profile / settings icon could go here */}
+          <div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label="Toggle theme"
+            >
+              <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">Toggle theme</span>
+            </Button>
+          </div>
         </div>
       </header>
 

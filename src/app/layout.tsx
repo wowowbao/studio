@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { BudgetProvider } from '@/components/providers/BudgetProvider';
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "next-themes";
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -29,14 +30,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning> {/* Added suppressHydrationWarning for next-themes */}
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <BudgetProvider>
-          <div className="flex flex-col min-h-screen">
-            {children}
-          </div>
-          <Toaster />
-        </BudgetProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <BudgetProvider>
+            <div className="flex flex-col min-h-screen">
+              {children}
+            </div>
+            <Toaster />
+          </BudgetProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

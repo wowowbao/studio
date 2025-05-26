@@ -1,12 +1,3 @@
-
-"use client";
-import { useContext } from 'react';
-import { AuthContext } from '@/context/AuthContext'; // Ensure this path is correct
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+// This file is not needed as Firebase Authentication has been removed.
+// It can be deleted from the project.
+// Responding with empty content for the 'change' command to effectively remove it.

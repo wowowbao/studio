@@ -3,7 +3,6 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { BudgetProvider } from '@/components/providers/BudgetProvider';
-import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
 
@@ -39,14 +38,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider> {/* Wrap BudgetProvider with AuthProvider */}
-            <BudgetProvider>
-              <div className="flex flex-col min-h-screen">
-                {children}
-              </div>
-              <Toaster />
-            </BudgetProvider>
-          </AuthProvider>
+          <BudgetProvider>
+            <div className="flex flex-col min-h-screen">
+              {children}
+            </div>
+            <Toaster />
+          </BudgetProvider>
         </ThemeProvider>
       </body>
     </html>

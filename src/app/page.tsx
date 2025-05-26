@@ -2,9 +2,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { auth } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
 import { useBudget } from "@/hooks/useBudget";
 import { MonthNavigator } from "@/components/budget/MonthNavigator";
 import { CategoryCard } from "@/components/budget/CategoryCard";
@@ -16,17 +13,22 @@ import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
 import { AddIncomeModal } from "@/components/budget/AddIncomeModal";
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { Button } from "@/components/ui/button";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, KeyRound, Lock } from 'lucide-react';
 import { useTheme } from "next-themes";
-import Link from 'next/link';
 
+const APP_PASSWORD = "2007"; // Your password
+const AUTH_FLAG_KEY = "budgetFlowAppUnlocked";
 
 export default function HomePage() {
-  const { user, isLoading: authLoading, userId } = useAuth();
   const router = useRouter();
-  const [appLoading, setAppLoading] = useState(true); // Separate loading for app initialization
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [appLoading, setAppLoading] = useState(true);
 
   const { 
     currentBudgetMonth, 
@@ -41,32 +43,37 @@ export default function HomePage() {
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    setAppLoading(authLoading); // App loading depends on auth loading initially
-    if (!authLoading && !user) {
-      router.push('/signin');
-    }
-  }, [user, authLoading, router]);
+    const unlocked = localStorage.getItem(AUTH_FLAG_KEY) === "true";
+    setIsAuthenticated(unlocked);
+    setAppLoading(false); // App loading is just checking localStorage now
+  }, []);
 
   useEffect(() => {
-    if (!budgetLoading && currentDisplayMonthId && user) { // Ensure user exists before ensuring month
+    if (isAuthenticated && !budgetLoading && currentDisplayMonthId) {
       ensureMonthExists(currentDisplayMonthId);
     }
-  }, [currentDisplayMonthId, budgetLoading, ensureMonthExists, user]);
+  }, [isAuthenticated, currentDisplayMonthId, budgetLoading, ensureMonthExists]);
 
-
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-      router.push('/signin'); // Redirect to sign-in page after successful sign-out
-    } catch (error) {
-      console.error("Error signing out: ", error);
-      // Optionally show a toast message for sign-out error
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === APP_PASSWORD) {
+      localStorage.setItem(AUTH_FLAG_KEY, "true");
+      setIsAuthenticated(true);
+      setAuthError(null);
+      setPasswordInput('');
+    } else {
+      setAuthError("Incorrect password.");
     }
   };
 
-  const isLoading = appLoading || (user && budgetLoading);
+  const handleLockApp = () => {
+    localStorage.removeItem(AUTH_FLAG_KEY);
+    setIsAuthenticated(false);
+  };
 
-  if (isLoading || (!user && !authLoading)) { // Show loading if app/auth/budget is loading, or if no user and auth isn't done
+  const isLoading = appLoading || (isAuthenticated && budgetLoading);
+
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-pulse" />
@@ -81,12 +88,35 @@ export default function HomePage() {
     );
   }
   
-  // If explicitly no user and auth is done, this case should be handled by redirection
-  // but as a fallback or for clarity:
-  if (!user) {
-     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
-        <p className="text-muted-foreground">Redirecting to sign-in...</p>
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background p-4">
+        <Card className="w-full max-w-sm shadow-xl">
+          <CardHeader className="text-center">
+            <KeyRound className="mx-auto h-10 w-10 text-primary mb-3" />
+            <CardTitle className="text-2xl">BudgetFlow Access</CardTitle>
+            <CardDescription>Enter the password to access the app.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input 
+                  id="password" 
+                  type="password" 
+                  value={passwordInput} 
+                  onChange={(e) => setPasswordInput(e.target.value)} 
+                  placeholder="Enter password" 
+                  required 
+                />
+              </div>
+              {authError && <p className="text-sm text-destructive flex items-center"><AlertTriangle className="w-4 h-4 mr-1" /> {authError}</p>}
+              <Button type="submit" className="w-full">
+                Unlock App
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -102,14 +132,9 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold text-primary">BudgetFlow</h1>
           </div>
           <div className="flex items-center gap-2">
-            {user && (
-              <>
-                <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>
-                <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sign Out">
-                  <LogOut className="h-5 w-5" />
-                </Button>
-              </>
-            )}
+            <Button variant="ghost" size="icon" onClick={handleLockApp} aria-label="Lock App">
+              <Lock className="h-5 w-5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -187,7 +212,7 @@ export default function HomePage() {
           </div>
       </footer>
 
-      {currentDisplayMonthId && user && ( // Ensure user exists for modals that might write data
+      {currentDisplayMonthId && ( 
         <>
           <EditBudgetModal 
             isOpen={isEditBudgetModalOpen} 

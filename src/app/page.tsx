@@ -18,7 +18,7 @@ import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Landmark, PiggyBank, Coins } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -253,7 +253,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">
-                    You haven't added any categories to your budget for {currentDisplayMonthId} yet. Use "Manage Budget" to add them.
+                    You haven't added any categories to your budget for {currentDisplayMonthId} yet. Use "Manage Budget" to add them or try the AI setup.
                   </p>
                   <Button variant="outline" onClick={() => setIsEditBudgetModalOpen(true)}>
                     Add Categories
@@ -267,7 +267,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.1 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.2 (Studio Preview)
           </div>
       </footer>
 
@@ -300,3 +300,4 @@ export default function HomePage() {
     </div>
   );
 }
+

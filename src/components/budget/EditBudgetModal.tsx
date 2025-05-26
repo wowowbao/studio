@@ -21,7 +21,12 @@ interface EditBudgetModalProps {
   monthId: string;
 }
 
-const ALL_ICONS = Object.keys(LucideIcons).filter(key => /^[A-Z]/.test(key) && key !== 'createReactComponent' && key !== 'icons');
+const ALL_ICONS = Object.keys(LucideIcons)
+  .filter(key =>
+    typeof (LucideIcons as any)[key] === 'function' && // Must be a function (React component)
+    /^[A-Z]/.test(key) &&                               // Standard component naming convention
+    key !== 'createReactComponent'                      // Exclude the helper function
+  );
 
 
 export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalProps) {
@@ -144,6 +149,8 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         <ScrollArea className="h-48">
                           {ALL_ICONS.map(iconName => {
                             const CurrentIcon = (LucideIcons as any)[iconName];
+                            // This check was added implicitly by correcting ALL_ICONS definition
+                            // No need for: if (typeof CurrentIcon !== 'function') return null;
                             return (
                               <SelectItem key={iconName} value={iconName}>
                                 <div className="flex items-center">

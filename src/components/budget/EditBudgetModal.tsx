@@ -35,7 +35,6 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   } = useBudget();
   
   const [editableCategories, setEditableCategories] = useState<EditableCategory[]>([]);
-  // const [monthSavingsGoal, setMonthSavingsGoal] = useState<number>(0); // Removed
   const [startingDebt, setStartingDebt] = useState<number>(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const { toast } = useToast();
@@ -50,15 +49,13 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
             ...c,
             id: c.id, 
             budgetedAmount: c.budgetedAmount,
-            subcategories: (c.isSystemCategory) ? [] : (c.subcategories || []).map(sc => ({ ...sc, id: sc.id, expenses: sc.expenses || [] })),
+            subcategories: (c.subcategories || []).map(sc => ({ ...sc, id: sc.id, expenses: sc.expenses || [] })),
             expenses: c.expenses || [],
             isSystemCategory: c.isSystemCategory || false,
         })));
-        // setMonthSavingsGoal(budgetData.savingsGoal || 0); // Removed
         setStartingDebt(currentStartingDebt);
       } else {
         setEditableCategories([]);
-        // setMonthSavingsGoal(0); // Removed
         setStartingDebt(0);
          toast({ title: "Loading Error", description: "Could not load budget data. Please try again.", variant: "destructive" });
       }
@@ -80,6 +77,10 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         if (cat.id === id) {
           if (cat.isSystemCategory && field === 'name') {
             return cat; 
+          }
+          // Do not update budgetedAmount for parent if it has subcategories, it's derived
+          if (field === 'budgetedAmount' && cat.subcategories && cat.subcategories.length > 0 && !cat.isSystemCategory) {
+            return cat;
           }
           return { ...cat, [field]: typeof value === 'string' && field !== 'name' ? parseFloat(value) || 0 : value };
         }
@@ -156,25 +157,38 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     
     const finalCategoriesToSave = editableCategories
         .filter(cat => cat.name.trim() !== "")
-        .map(cat => ({
-            id: cat.id,
-            name: cat.name,
-            budgetedAmount: cat.budgetedAmount,
-            expenses: cat.expenses || [],
-            isSystemCategory: cat.isSystemCategory || false,
-            subcategories: (cat.isSystemCategory) ? [] : (cat.subcategories || [])
-                .filter(sub => sub.name.trim() !== "")
-                .map(sub => ({
-                    id: sub.id,
-                    name: sub.name,
-                    budgetedAmount: sub.budgetedAmount,
-                    expenses: sub.expenses || [],
-                })),
-        }));
+        .map(cat => {
+            let parentBudgetedAmount = cat.budgetedAmount;
+            // If it's not a system category and has subcategories, its budget is the sum of subcategories
+            // We still save the original parentBudgetedAmount if it was editable (no subs),
+            // or it's derived if it had subs (though we don't strictly need to save the derived sum in the parent if it's always calculated on load).
+            // For simplicity of data storage, we can just store what was input or what parent had. 
+            // The display/calculation logic will handle the derivation.
+            if (!cat.isSystemCategory && cat.subcategories && cat.subcategories.length > 0) {
+                 // parentBudgetedAmount = cat.subcategories.reduce((sum, sub) => sum + (parseFloat(String(sub.budgetedAmount)) || 0), 0);
+                 // No, we don't store the sum in the parent. The parent.budgetedAmount is its own distinct value if it has no subs.
+                 // If it has subs, its "effective" budget is the sum of subs, but its own stored 'budgetedAmount' might be 0 or an old value.
+            }
+
+            return {
+                id: cat.id,
+                name: cat.name,
+                budgetedAmount: parentBudgetedAmount, // Store the parent's direct budgeted amount
+                expenses: cat.expenses || [],
+                isSystemCategory: cat.isSystemCategory || false,
+                subcategories: (cat.isSystemCategory) ? [] : (cat.subcategories || [])
+                    .filter(sub => sub.name.trim() !== "")
+                    .map(sub => ({
+                        id: sub.id,
+                        name: sub.name,
+                        budgetedAmount: sub.budgetedAmount,
+                        expenses: sub.expenses || [],
+                    })),
+            };
+        });
 
     updateMonthBudget(monthId, { 
       categories: finalCategoriesToSave, 
-      // savingsGoal: monthSavingsGoal, // Removed
       startingCreditCardDebt: startingDebt,
     });
     toast({
@@ -208,12 +222,18 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                 placeholder="e.g., 1000"
               />
             </div>
-            {/* Overall Savings Goal input removed */}
-
+            
             <h3 className="text-lg font-medium border-b pb-2">Categories</h3>
             {editableCategories.map(cat => {
               const isSavings = cat.isSystemCategory && cat.name.toLowerCase() === 'savings';
               const isCCPayments = cat.isSystemCategory && cat.name.toLowerCase() === 'credit card payments';
+              const hasSubcategories = !cat.isSystemCategory && cat.subcategories && cat.subcategories.length > 0;
+              
+              let parentDisplayBudget = cat.budgetedAmount;
+              if (hasSubcategories) {
+                parentDisplayBudget = cat.subcategories.reduce((sum, sub) => sum + (Number(sub.budgetedAmount) || 0), 0);
+              }
+
               return (
                 <div key={cat.id} className="p-4 border rounded-lg shadow-sm space-y-3 bg-card/50">
                   <div className="grid grid-cols-1 gap-3 items-end">
@@ -238,16 +258,25 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                     </div>
                     <div>
                       <Label htmlFor={`categoryBudget-${cat.id}`}>
-                        {isSavings ? "Planned Contribution to Savings" : (isCCPayments ? "Planned Payment" : "Category Budgeted Amount")}
+                        {isSavings ? "Planned Contribution to Savings" : 
+                         isCCPayments ? "Planned Payment" : 
+                         hasSubcategories ? "Total Subcategory Budget (Read-only)" :
+                         "Category Budgeted Amount"}
                       </Label>
                       <Input
                         id={`categoryBudget-${cat.id}`}
                         type="number"
-                        value={cat.budgetedAmount}
-                        onChange={(e) => handleCategoryChange(cat.id, "budgetedAmount", e.target.value)}
-                        placeholder={cat.budgetedAmount === 0 ? "0.00" : String(cat.budgetedAmount)}
-                        className="mt-1 text-sm"
+                        value={parentDisplayBudget}
+                        onChange={(e) => {
+                          if (!hasSubcategories) { // Only allow direct edit if no subcategories
+                            handleCategoryChange(cat.id, "budgetedAmount", e.target.value);
+                          }
+                        }}
+                        readOnly={hasSubcategories && !cat.isSystemCategory} // Parent budget is read-only if it has subs (and not system)
+                        placeholder={parentDisplayBudget === 0 ? "0.00" : String(parentDisplayBudget)}
+                        className={`mt-1 text-sm ${hasSubcategories && !cat.isSystemCategory ? "bg-muted/50 cursor-default" : ""}`}
                       />
+                       {hasSubcategories && <p className="text-xs text-muted-foreground mt-1">Parent budget is sum of subcategories.</p>}
                     </div>
                   </div>
                   
@@ -322,3 +351,5 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     </Dialog>
   );
 }
+
+    

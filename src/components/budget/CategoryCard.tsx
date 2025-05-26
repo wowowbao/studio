@@ -17,6 +17,17 @@ interface CategoryCardProps {
 
 const MAX_TRANSACTIONS_VISIBLE_DEFAULT = 5;
 
+const getSubCategoryTotalBudget = (subcategories: SubCategory[] | undefined): number => {
+  return (subcategories || []).reduce((sum, sub) => sum + (Number(sub.budgetedAmount) || 0), 0);
+};
+const getSubCategoryTotalSpent = (subcategories: SubCategory[] | undefined): number => {
+  return (subcategories || []).reduce((sum, sub) => {
+    const subSpent = (sub.expenses || []).reduce((expSum, exp) => expSum + exp.amount, 0);
+    return sum + subSpent;
+  }, 0);
+};
+
+
 export function CategoryCard({ category }: CategoryCardProps) {
   const { deleteExpense, currentDisplayMonthId } = useBudget();
   const { toast } = useToast();
@@ -26,20 +37,33 @@ export function CategoryCard({ category }: CategoryCardProps) {
     setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
 
-  const mainCategorySpentAmount = (category.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
   const isSavingsCategory = category.isSystemCategory && category.name.toLowerCase() === 'savings';
   const isCCPaymentsCategory = category.isSystemCategory && category.name.toLowerCase() === 'credit card payments';
+  const hasSubcategories = !category.isSystemCategory && category.subcategories && category.subcategories.length > 0;
+
+  let mainCategoryBudgetedAmount: number;
+  let mainCategorySpentAmount: number;
+
+  if (hasSubcategories) {
+    mainCategoryBudgetedAmount = getSubCategoryTotalBudget(category.subcategories);
+    mainCategorySpentAmount = getSubCategoryTotalSpent(category.subcategories);
+  } else {
+    mainCategoryBudgetedAmount = category.budgetedAmount;
+    mainCategorySpentAmount = (category.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+  }
+
 
   let mainCategoryProgress = 0;
-  if (category.budgetedAmount > 0) {
-    mainCategoryProgress = (mainCategorySpentAmount / category.budgetedAmount) * 100;
+  if (mainCategoryBudgetedAmount > 0) {
+    mainCategoryProgress = (mainCategorySpentAmount / mainCategoryBudgetedAmount) * 100;
   } else if ((isSavingsCategory || isCCPaymentsCategory) && mainCategorySpentAmount > 0) {
+    // For system categories with 0 budget but some spending/saving, show as 100% if any activity
     mainCategoryProgress = 100; 
   }
 
-  const mainCategoryRemaining = category.budgetedAmount - mainCategorySpentAmount;
+  const mainCategoryRemaining = mainCategoryBudgetedAmount - mainCategorySpentAmount;
   const mainCategoryIsOverBudget = !isSavingsCategory && !isCCPaymentsCategory && mainCategoryRemaining < 0;
-  const mainGoalMet = (isSavingsCategory || isCCPaymentsCategory) && category.budgetedAmount > 0 && mainCategorySpentAmount >= category.budgetedAmount;
+  const mainGoalMet = (isSavingsCategory || isCCPaymentsCategory) && mainCategoryBudgetedAmount > 0 && mainCategorySpentAmount >= mainCategoryBudgetedAmount;
 
   const spentAmountSpanClassName = cn(
     "font-semibold",
@@ -71,21 +95,27 @@ export function CategoryCard({ category }: CategoryCardProps) {
     if (mainGoalMet) {
         mainRemainingTextClass = "text-green-600 dark:text-green-500";
         mainRemainingIsBold = true;
+    } else if (mainCategoryBudgetedAmount > 0 && mainCategorySpentAmount === 0) {
+        // Goal set, but nothing contributed/paid yet, keep it neutral or slightly positive
+        mainRemainingTextClass = "text-muted-foreground"; 
+    } else if (mainCategoryBudgetedAmount === 0 && mainCategorySpentAmount > 0) {
+        // No specific goal, but some saved/paid
+        mainRemainingTextClass = "text-green-600 dark:text-green-500";
     }
   } else if (mainCategoryIsOverBudget) {
     mainRemainingTextClass = "text-destructive";
     mainRemainingIsBold = true;
   } else { 
-    if (category.budgetedAmount > 0 && mainCategorySpentAmount > 0) { 
-        const spentRatio = mainCategorySpentAmount / category.budgetedAmount;
+    if (mainCategoryBudgetedAmount > 0 && mainCategorySpentAmount > 0) { 
+        const spentRatio = mainCategorySpentAmount / mainCategoryBudgetedAmount;
         if (spentRatio < 0.8) { 
             mainRemainingTextClass = "text-green-600 dark:text-green-500";
         } else if (spentRatio <= 1) { 
             mainRemainingTextClass = "text-amber-600 dark:text-amber-500";
         }
-    } else if (category.budgetedAmount === 0 && mainCategorySpentAmount === 0) {
+    } else if (mainCategoryBudgetedAmount === 0 && mainCategorySpentAmount === 0) {
         // Keep default color if budget and spent are both 0
-    } else if (category.budgetedAmount > 0 && mainCategorySpentAmount === 0) {
+    } else if (mainCategoryBudgetedAmount > 0 && mainCategorySpentAmount === 0) {
         mainRemainingTextClass = "text-green-600 dark:text-green-500"; 
     }
   }
@@ -109,14 +139,13 @@ export function CategoryCard({ category }: CategoryCardProps) {
     const remaining = subCategory.budgetedAmount - spent;
     const isOverBudget = remaining < 0;
     
-    // Apply robust sorting directly here
     const sortedExpenses = [...(subCategory.expenses || [])].sort((a, b) => {
       const dateA = new Date(a.dateAdded);
       const dateB = new Date(b.dateAdded);
-      if (!isValid(dateA) && !isValid(dateB)) return 0; // both invalid, treat as equal
-      if (!isValid(dateA)) return 1; // invalid A comes after valid B (sorts invalid to the end)
-      if (!isValid(dateB)) return -1; // invalid B comes after valid A (sorts invalid to the end)
-      return dateB.getTime() - dateA.getTime(); // newest first
+      if (!isValid(dateA) && !isValid(dateB)) return 0; 
+      if (!isValid(dateA)) return 1; 
+      if (!isValid(dateB)) return -1;
+      return dateB.getTime() - dateA.getTime(); 
     });
     return { spent, progress, remaining, isOverBudget, expenses: sortedExpenses, subCategory };
   };
@@ -167,12 +196,18 @@ export function CategoryCard({ category }: CategoryCardProps) {
         <div>
           {/* Main Category Info */}
           <div className="text-sm mb-1">
-            {isSavingsCategory ? "Main Goal" : isCCPaymentsCategory ? "Payment Goal" : "Main Budgeted"}: <span className="font-semibold">${category.budgetedAmount.toFixed(2)}</span>
+            {isSavingsCategory ? "Main Goal" : 
+             isCCPaymentsCategory ? "Payment Goal" : 
+             hasSubcategories ? "Total Sub-Budget" : "Main Budgeted"}: 
+            <span className="font-semibold">${mainCategoryBudgetedAmount.toFixed(2)}</span>
           </div>
           <div className="text-sm mb-2">
-            {isSavingsCategory ? "Main Saved" : isCCPaymentsCategory ? "Paid This Month" : "Main Spent"}: <span className={spentAmountSpanClassName}>${mainCategorySpentAmount.toFixed(2)}</span>
+            {isSavingsCategory ? "Main Saved" : 
+             isCCPaymentsCategory ? "Paid This Month" :
+             hasSubcategories ? "Total Sub-Spent" : "Main Spent"}: 
+            <span className={spentAmountSpanClassName}>${mainCategorySpentAmount.toFixed(2)}</span>
           </div>
-          {(category.budgetedAmount > 0 || ((isSavingsCategory || isCCPaymentsCategory) && mainCategorySpentAmount > 0)) && (
+          {(mainCategoryBudgetedAmount > 0 || ((isSavingsCategory || isCCPaymentsCategory) && mainCategorySpentAmount > 0)) && (
             <Progress
               value={Math.min(mainCategoryProgress, 100)}
               className={cn("h-3 mb-2", (mainCategoryIsOverBudget && !(isSavingsCategory || isCCPaymentsCategory)) ? "bg-destructive/30" : "")}
@@ -181,22 +216,22 @@ export function CategoryCard({ category }: CategoryCardProps) {
           )}
           <CardDescription className={cn(mainRemainingTextClass, { "font-semibold": mainRemainingIsBold })}>
             {isSavingsCategory ? (
-              category.budgetedAmount > 0 ?
-                (mainCategorySpentAmount >= category.budgetedAmount ? `Main Goal of $${category.budgetedAmount.toFixed(2)} met! Saved $${mainCategorySpentAmount.toFixed(2)}.` : `$${(category.budgetedAmount - mainCategorySpentAmount).toFixed(2)} to reach main goal`)
+              mainCategoryBudgetedAmount > 0 ?
+                (mainCategorySpentAmount >= mainCategoryBudgetedAmount ? `Main Goal of $${mainCategoryBudgetedAmount.toFixed(2)} met! Saved $${mainCategorySpentAmount.toFixed(2)}.` : `$${(mainCategoryBudgetedAmount - mainCategorySpentAmount).toFixed(2)} to reach main goal`)
                 : `Total Saved in Main: $${mainCategorySpentAmount.toFixed(2)}`
             ) : isCCPaymentsCategory ? (
-                 category.budgetedAmount > 0 ?
-                (mainCategorySpentAmount >= category.budgetedAmount ? `Payment Goal of $${category.budgetedAmount.toFixed(2)} met! Paid $${mainCategorySpentAmount.toFixed(2)}.` : `$${(category.budgetedAmount - mainCategorySpentAmount).toFixed(2)} remaining for payment goal.`)
+                 mainCategoryBudgetedAmount > 0 ?
+                (mainCategorySpentAmount >= mainCategoryBudgetedAmount ? `Payment Goal of $${mainCategoryBudgetedAmount.toFixed(2)} met! Paid $${mainCategorySpentAmount.toFixed(2)}.` : `$${(mainCategoryBudgetedAmount - mainCategorySpentAmount).toFixed(2)} remaining for payment goal.`)
                 : `Total Paid This Month: $${mainCategorySpentAmount.toFixed(2)}`
             ) : mainCategoryIsOverBudget ? (
-              `Main Overspent by $${Math.abs(mainCategoryRemaining).toFixed(2)}`
+              `${hasSubcategories ? 'Total Sub-Overspent' : 'Main Overspent'} by $${Math.abs(mainCategoryRemaining).toFixed(2)}`
             ) : (
-              `Main Remaining: $${mainCategoryRemaining.toFixed(2)}`
+              `${hasSubcategories ? 'Total Sub-Remaining' : 'Main Remaining'}: $${mainCategoryRemaining.toFixed(2)}`
             )}
           </CardDescription>
 
-          {/* Main Category Expenses List */}
-          {(!category.subcategories || category.subcategories.length === 0) && sortedMainCategoryExpenses.length > 0 && (
+          {/* Main Category Expenses List (only if no subcategories) */}
+          {!hasSubcategories && sortedMainCategoryExpenses.length > 0 && (
             <div className="mt-3 pt-2 border-t border-border/50">
               <div className="flex justify-between items-center mb-1">
                 <h5 className="text-xs font-semibold uppercase text-muted-foreground">Transactions</h5>
@@ -212,13 +247,13 @@ export function CategoryCard({ category }: CategoryCardProps) {
               </ul>
             </div>
           )}
-          {(!category.subcategories || category.subcategories.length === 0) && sortedMainCategoryExpenses.length === 0 && !isSavingsCategory && !isCCPaymentsCategory && (
+          {!hasSubcategories && sortedMainCategoryExpenses.length === 0 && !isSavingsCategory && !isCCPaymentsCategory && (
              <p className="text-xs text-muted-foreground mt-2 italic">No transactions for this category yet.</p>
           )}
 
 
           {/* Subcategories Info */}
-          {category.subcategories && category.subcategories.length > 0 && (
+          {hasSubcategories && category.subcategories && category.subcategories.length > 0 && (
             <div className="mt-4 pt-3 border-t">
               <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Subcategories</h4>
               <ul className="space-y-3">

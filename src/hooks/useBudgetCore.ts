@@ -1,6 +1,6 @@
 
 "use client";
-import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload } from '@/types/budget';
+import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload, Expense } from '@/types/budget';
 import { DEFAULT_CATEGORIES } from '@/types/budget';
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,28 +22,48 @@ export const parseYearMonth = (yearMonth: string): Date => {
   return new Date(year, month - 1, 1);
 };
 
-const BUDGET_DATA_KEY = 'budgetFlowData'; // Simplified key
-const DISPLAY_MONTH_KEY = 'budgetFlowDisplayMonth'; // Simplified key
+const BUDGET_DATA_KEY_PREFIX = 'budgetFlowData_'; 
+const DISPLAY_MONTH_KEY_PREFIX = 'budgetFlowDisplayMonth_';
+
+// Function to get user-specific storage key
+const getUserSpecificKey = (baseKey: string) => {
+  // For this password-protected version, we use a static "user" ID.
+  // If proper auth were re-added, this would use the actual user UID.
+  const pseudoUserId = "localUser"; 
+  return `${baseKey}${pseudoUserId}`;
+};
+
 
 export const useBudgetCore = () => {
   const [budgetMonths, setBudgetMonths] = useState<Record<string, BudgetMonth>>({});
   const [currentDisplayMonthId, setCurrentDisplayMonthId] = useState<string>(getCurrentYearMonth());
   const [isLoading, setIsLoading] = useState(true);
   
-  // Load data from localStorage when component mounts
   useEffect(() => {
     setIsLoading(true);
     try {
-      const storedBudgets = localStorage.getItem(BUDGET_DATA_KEY);
+      const budgetKey = getUserSpecificKey(BUDGET_DATA_KEY_PREFIX);
+      const displayMonthKey = getUserSpecificKey(DISPLAY_MONTH_KEY_PREFIX);
+
+      const storedBudgets = localStorage.getItem(budgetKey);
       if (storedBudgets) {
-        setBudgetMonths(JSON.parse(storedBudgets));
+        const parsedBudgets = JSON.parse(storedBudgets);
+        // Ensure expenses array exists for all categories (data migration for older structures)
+        Object.values(parsedBudgets as Record<string, BudgetMonth>).forEach(month => {
+          month.categories.forEach(cat => {
+            if (!cat.expenses) {
+              cat.expenses = [];
+            }
+          });
+        });
+        setBudgetMonths(parsedBudgets);
       } else {
         const initialMonthId = getCurrentYearMonth();
         const newMonth = createNewMonthBudget(initialMonthId);
         setBudgetMonths({ [initialMonthId]: newMonth });
       }
       
-      const storedDisplayMonth = localStorage.getItem(DISPLAY_MONTH_KEY);
+      const storedDisplayMonth = localStorage.getItem(displayMonthKey);
       const currentBudgetsData = storedBudgets ? JSON.parse(storedBudgets) : {};
 
       if (storedDisplayMonth && Object.keys(currentBudgetsData).includes(storedDisplayMonth)) {
@@ -51,10 +71,13 @@ export const useBudgetCore = () => {
       } else {
         const currentMonthDefault = getCurrentYearMonth();
         setCurrentDisplayMonthId(currentMonthDefault);
-        if (!currentBudgetsData[currentMonthDefault]) {
+        setBudgetMonths(prev => {
+          if (!prev[currentMonthDefault]) {
             const newMonth = createNewMonthBudget(currentMonthDefault);
-            setBudgetMonths(prev => ({ ...prev, [currentMonthDefault]: newMonth }));
-        }
+            return { ...prev, [currentMonthDefault]: newMonth };
+          }
+          return prev;
+        });
       }
 
     } catch (error) {
@@ -67,21 +90,21 @@ export const useBudgetCore = () => {
     setIsLoading(false);
   }, []); 
 
-  // Save data to localStorage when budgetMonths changes
   useEffect(() => {
     if (!isLoading) { 
       try {
-        localStorage.setItem(BUDGET_DATA_KEY, JSON.stringify(budgetMonths));
+        const budgetKey = getUserSpecificKey(BUDGET_DATA_KEY_PREFIX);
+        localStorage.setItem(budgetKey, JSON.stringify(budgetMonths));
       } catch (error) {
         console.error("Failed to save budgets to localStorage:", error);
       }
     }
   }, [budgetMonths, isLoading]);
 
-  // Save display month to localStorage when it changes
   useEffect(() => {
     if(!isLoading) {
-      localStorage.setItem(DISPLAY_MONTH_KEY, currentDisplayMonthId);
+      const displayMonthKey = getUserSpecificKey(DISPLAY_MONTH_KEY_PREFIX);
+      localStorage.setItem(displayMonthKey, currentDisplayMonthId);
     }
   }, [currentDisplayMonthId, isLoading]);
 
@@ -96,7 +119,7 @@ export const useBudgetCore = () => {
         ...cat,
         id: uuidv4(),
         budgetedAmount: 0,
-        spentAmount: 0,
+        expenses: [], // Initialize expenses array
       })),
       savingsGoal: 0,
     };
@@ -131,7 +154,8 @@ export const useBudgetCore = () => {
           name: cat.name,
           icon: cat.icon,
           budgetedAmount: cat.budgetedAmount === undefined ? 0 : cat.budgetedAmount,
-          spentAmount: cat.spentAmount === undefined ? 0 : cat.spentAmount,
+          // Ensure expenses array exists, preserving existing if not explicitly overwritten
+          expenses: cat.expenses || (monthToUpdate.categories.find(c => c.id === cat.id)?.expenses) || [],
         }));
       }
       return { ...prev, [yearMonthId]: updatedMonth };
@@ -146,7 +170,7 @@ export const useBudgetCore = () => {
       name: categoryName,
       icon,
       budgetedAmount: 0,
-      spentAmount: 0,
+      expenses: [],
     };
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
@@ -191,21 +215,50 @@ export const useBudgetCore = () => {
   }, [ensureMonthExists]);
 
 
-  const addExpense = useCallback((yearMonthId: string, categoryId: string, amount: number) => {
+  const addExpense = useCallback((yearMonthId: string, categoryId: string, amount: number, description: string) => {
     ensureMonthExists(yearMonthId);
+    const newExpense: Expense = {
+      id: uuidv4(),
+      description,
+      amount,
+      dateAdded: new Date().toISOString(),
+    };
     setBudgetMonths(prev => {
       const month = prev[yearMonthId];
+      if (!month) return prev; // Should not happen if ensureMonthExists works
       return {
         ...prev,
         [yearMonthId]: {
           ...month,
           categories: month.categories.map(cat =>
-            cat.id === categoryId ? { ...cat, spentAmount: cat.spentAmount + amount } : cat
+            cat.id === categoryId 
+            ? { ...cat, expenses: [...cat.expenses, newExpense] } 
+            : cat
           ),
         },
       };
     });
   }, [ensureMonthExists]);
+
+  const deleteExpense = useCallback((yearMonthId: string, categoryId: string, expenseId: string) => {
+    ensureMonthExists(yearMonthId);
+    setBudgetMonths(prev => {
+      const month = prev[yearMonthId];
+      if (!month) return prev;
+      return {
+        ...prev,
+        [yearMonthId]: {
+          ...month,
+          categories: month.categories.map(cat =>
+            cat.id === categoryId
+            ? { ...cat, expenses: cat.expenses.filter(exp => exp.id !== expenseId) }
+            : cat
+          ),
+        },
+      };
+    });
+  }, [ensureMonthExists]);
+
 
   const duplicateMonthBudget = useCallback((sourceMonthId: string, targetMonthId: string) => {
     const sourceBudget = getBudgetForMonth(sourceMonthId);
@@ -215,10 +268,11 @@ export const useBudgetCore = () => {
     }
 
     const [targetYear, targetMonthNum] = targetMonthId.split('-').map(Number);
+    // Duplicate categories with their budgeted amounts, but reset expenses
     const newCategories = sourceBudget.categories.map(cat => ({
       ...cat,
       id: uuidv4(), 
-      spentAmount: 0, 
+      expenses: [], // Reset expenses for the new month
     }));
 
     const newMonthData: BudgetMonth = {
@@ -269,6 +323,7 @@ export const useBudgetCore = () => {
     getBudgetForMonth,
     updateMonthBudget,
     addExpense,
+    deleteExpense, // Added deleteExpense
     duplicateMonthBudget,
     navigateToPreviousMonth,
     navigateToNextMonth,

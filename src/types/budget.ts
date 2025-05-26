@@ -1,10 +1,18 @@
 
+export interface Expense {
+  id: string; // uuid
+  description: string;
+  amount: number;
+  dateAdded: string; // ISO string date
+}
+
 export interface BudgetCategory {
   id: string; // uuid
   name: string;
   icon: string; // Lucide icon name
   budgetedAmount: number;
-  spentAmount: number;
+  expenses: Expense[]; // Changed from spentAmount
+  // spentAmount is now a derived property
 }
 
 export interface BudgetMonth {
@@ -16,16 +24,17 @@ export interface BudgetMonth {
 }
 
 export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories'>> & {
-  categories?: BudgetCategory[];
+  // When updating categories, we expect the full category structure including expenses
+  categories?: Array<Omit<BudgetCategory, 'id'> & { id?: string; spentAmount?: never }>;
 };
 
-export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount' | 'spentAmount'>[] = [
-  { name: "Groceries", icon: "ShoppingCart" },
-  { name: "Rent/Mortgage", icon: "Home" },
-  { name: "Utilities", icon: "Zap" },
-  { name: "Transport", icon: "Car" },
-  { name: "Entertainment", icon: "Gamepad2" },
-  { name: "Health", icon: "HeartPulse" }, // Changed from Heart to HeartPulse
-  { name: "Savings", icon: "PiggyBank" },
-  { name: "Other", icon: "MoreHorizontal" },
+export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount'>[] = [
+  { name: "Groceries", icon: "ShoppingCart", expenses: [] },
+  { name: "Rent/Mortgage", icon: "Home", expenses: [] },
+  { name: "Utilities", icon: "Zap", expenses: [] },
+  { name: "Transport", icon: "Car", expenses: [] },
+  { name: "Entertainment", icon: "Gamepad2", expenses: [] },
+  { name: "Health", icon: "HeartPulse", expenses: [] },
+  { name: "Savings", icon: "PiggyBank", expenses: [] },
+  { name: "Other", icon: "MoreHorizontal", expenses: [] },
 ];

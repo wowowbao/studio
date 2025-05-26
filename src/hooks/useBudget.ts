@@ -10,7 +10,8 @@ interface BudgetContextType {
   isLoading: boolean;
   getBudgetForMonth: (yearMonthId: string) => BudgetMonth | undefined;
   updateMonthBudget: (yearMonthId: string, payload: BudgetUpdatePayload) => void;
-  addExpense: (yearMonthId: string, categoryId: string, amount: number) => void;
+  addExpense: (yearMonthId: string, categoryId: string, amount: number, description: string) => void;
+  deleteExpense: (yearMonthId: string, categoryId: string, expenseId: string) => void; // Added deleteExpense
   duplicateMonthBudget: (sourceMonthId: string, targetMonthId: string) => void;
   navigateToPreviousMonth: () => void;
   navigateToNextMonth: () => void;

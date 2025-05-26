@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useEffect } from "react";
-import type { BudgetCategory, BudgetMonth } from "@/types/budget";
+import type { BudgetCategory } from "@/types/budget";
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import * as LucideIcons from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 
 
 interface AddExpenseModalProps {
@@ -23,6 +24,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   const { getBudgetForMonth, addExpense, isLoading } = useBudget();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
   const [availableCategories, setAvailableCategories] = useState<BudgetCategory[]>([]);
   const { toast } = useToast();
 
@@ -31,14 +33,17 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       const budgetData = getBudgetForMonth(monthId);
       if (budgetData && budgetData.categories.length > 0) {
         setAvailableCategories(budgetData.categories);
-        setSelectedCategoryId(budgetData.categories[0].id); // Default to first category
+        if (budgetData.categories.length > 0 && (!selectedCategoryId || !budgetData.categories.find(c => c.id === selectedCategoryId))) {
+          setSelectedCategoryId(budgetData.categories[0].id); // Default to first category if current selection is invalid or empty
+        }
       } else {
         setAvailableCategories([]);
         setSelectedCategoryId("");
       }
-      setAmount(""); // Reset amount
+      setAmount(""); 
+      setDescription("");
     }
-  }, [isOpen, monthId, getBudgetForMonth, isLoading]);
+  }, [isOpen, monthId, getBudgetForMonth, isLoading, selectedCategoryId]);
 
   const handleSubmit = () => {
     const numericAmount = parseFloat(amount);
@@ -50,11 +55,15 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       toast({ title: "Error", description: "Please enter a valid positive amount.", variant: "destructive" });
       return;
     }
+    if (description.trim() === "") {
+      toast({ title: "Error", description: "Please enter a description for the expense.", variant: "destructive" });
+      return;
+    }
 
-    addExpense(monthId, selectedCategoryId, numericAmount);
+    addExpense(monthId, selectedCategoryId, numericAmount, description);
     toast({
       title: "Expense Added",
-      description: `$${numericAmount.toFixed(2)} added to your budget.`,
+      description: `${description}: $${numericAmount.toFixed(2)} added.`,
       action: <CheckCircle className="text-green-500" />,
     });
     onClose();
@@ -88,7 +97,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                     return (
                       <SelectItem key={cat.id} value={cat.id}>
                         <div className="flex items-center">
-                          <IconComponent className="mr-2 h-4 w-4" />
+                          <IconComponent className="mr-2 h-4 w-4 text-current" />
                           {cat.name}
                         </div>
                       </SelectItem>
@@ -108,6 +117,19 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
                 className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right col-span-1">
+                Description
+              </Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g., Weekly groceries"
+                className="col-span-3"
+                rows={2}
               />
             </div>
           </div>

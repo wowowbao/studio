@@ -21,17 +21,24 @@ interface EditBudgetModalProps {
   monthId: string;
 }
 
+// Filtered list of Lucide icons that are actual components
 const ALL_ICONS = Object.keys(LucideIcons)
-  .filter(key =>
-    typeof (LucideIcons as any)[key] === 'function' && // Must be a function (React component)
-    /^[A-Z]/.test(key) &&                               // Standard component naming convention
-    key !== 'createReactComponent'                      // Exclude the helper function
-  );
+  .filter(key => {
+    const ExportedItem = (LucideIcons as any)[key];
+    // Check if it's a function (React components are functions) and not 'createLucideIcon' or other helpers
+    return typeof ExportedItem === 'function' && 
+           ExportedItem.displayName && // Most Lucide icons will have a displayName
+           key !== 'createLucideIcon' && // Exclude the helper
+           key !== 'IconNode' && // Exclude type
+           key !== 'LucideIcon' && // Exclude type
+           key !== 'LucideProps'; // Exclude type
+  })
+  .sort(); // Sort alphabetically for easier browsing
 
 
 export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalProps) {
-  const { getBudgetForMonth, updateMonthBudget, setSavingsGoalForMonth, isLoading } = useBudget();
-  const [editableCategories, setEditableCategories] = useState<BudgetCategory[]>([]);
+  const { getBudgetForMonth, updateMonthBudget, isLoading } = useBudget(); // Removed setSavingsGoalForMonth as it's part of updateMonthBudget
+  const [editableCategories, setEditableCategories] = useState<Array<Omit<BudgetCategory, 'spentAmount'>>>([].map(c => ({...c, expenses: c.expenses || [] })));
   const [monthSavingsGoal, setMonthSavingsGoal] = useState<number>(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const { toast } = useToast();
@@ -40,15 +47,21 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     if (!isLoading && monthId) {
       const budgetData = getBudgetForMonth(monthId);
       if (budgetData) {
-        setEditableCategories([...budgetData.categories.map(c => ({...c}))]); // Deep copy
+        // Map to ensure 'expenses' array exists and is part of the editable state
+        setEditableCategories([...budgetData.categories.map(c => ({
+            id: c.id,
+            name: c.name,
+            icon: c.icon,
+            budgetedAmount: c.budgetedAmount,
+            expenses: c.expenses || [] 
+        }))]);
         setMonthSavingsGoal(budgetData.savingsGoal || 0);
       } else {
-         // If no budget data, initialize with defaults
         const defaultCatsForModal = DEFAULT_CATEGORIES.map(cat => ({
             ...cat,
             id: uuidv4(),
             budgetedAmount: 0,
-            spentAmount: 0,
+            expenses: [], // Ensure expenses is initialized
         }));
         setEditableCategories(defaultCatsForModal);
         setMonthSavingsGoal(0);
@@ -59,13 +72,13 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
 
   useEffect(() => {
     if (isOpen) {
-      setIsDataLoaded(false); // Reset loading state on open
+      setIsDataLoaded(false); 
       loadBudgetData();
     }
   }, [isOpen, loadBudgetData]);
 
 
-  const handleCategoryChange = (id: string, field: keyof BudgetCategory, value: string | number) => {
+  const handleCategoryChange = (id: string, field: keyof (Omit<BudgetCategory, 'spentAmount'>) , value: string | number) => {
     setEditableCategories(prev =>
       prev.map(cat => (cat.id === id ? { ...cat, [field]: typeof value === 'string' && field !== 'name' && field !== 'icon' ? parseFloat(value) || 0 : value } : cat))
     );
@@ -74,7 +87,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   const handleAddCategory = () => {
     setEditableCategories(prev => [
       ...prev,
-      { id: uuidv4(), name: "New Category", icon: "Package", budgetedAmount: 0, spentAmount: 0 },
+      { id: uuidv4(), name: "New Category", icon: "Package", budgetedAmount: 0, expenses: [] },
     ]);
   };
 
@@ -87,8 +100,16 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         toast({ title: "Error", description: "Month ID is missing.", variant: "destructive" });
         return;
     }
-    // Filter out categories with empty names before saving
-    const validCategories = editableCategories.filter(cat => cat.name.trim() !== "");
+    const validCategories = editableCategories
+        .filter(cat => cat.name.trim() !== "")
+        .map(cat => ({ // Ensure structure matches BudgetCategory for saving
+            id: cat.id,
+            name: cat.name,
+            icon: cat.icon,
+            budgetedAmount: cat.budgetedAmount,
+            expenses: cat.expenses || [] // Ensure expenses array is present
+        }));
+
     updateMonthBudget(monthId, { categories: validCategories, savingsGoal: monthSavingsGoal });
     toast({
       title: "Budget Updated",
@@ -99,7 +120,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   };
 
   if (!isOpen || !isDataLoaded) {
-    return null; // Or a loading spinner inside the dialog if preferred
+    return null; 
   }
 
   return (
@@ -146,13 +167,14 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         <SelectValue placeholder="Select icon" />
                       </SelectTrigger>
                       <SelectContent>
-                        <ScrollArea className="h-72"> {/* Increased height from h-48 */}
+                        <ScrollArea className="h-72"> {/* Increased height */}
                           {ALL_ICONS.map(iconName => {
                             const CurrentIcon = (LucideIcons as any)[iconName];
+                            if (!CurrentIcon || typeof CurrentIcon !== 'function') return null; // Extra safety
                             return (
                               <SelectItem key={iconName} value={iconName}>
-                                <div className="flex items-center">
-                                  <CurrentIcon className="mr-2 h-4 w-4" />
+                                <div className="flex items-center text-popover-foreground"> {/* Ensure text color is applied */}
+                                  <CurrentIcon className="mr-2 h-4 w-4" /> {/* text-current should inherit from parent */}
                                   {iconName}
                                 </div>
                               </SelectItem>

@@ -17,7 +17,7 @@ import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,12 +79,12 @@ export default function HomePage() {
   if (isLoading && !Object.keys(budgetMonths).length) { // Show full loading screen only if truly loading initially
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
-        <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-pulse" />
+        <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
         <h1 className="text-3xl font-bold text-primary mb-2">BudgetFlow</h1>
-        <p className="text-muted-foreground">Loading your budget...</p>
+        <p className="text-muted-foreground">Getting your budget ready...</p>
         <div className="w-full max-w-md mt-8 space-y-4">
           <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-32 w-full" />
           <Skeleton className="h-24 w-full" />
         </div>
       </div>
@@ -162,16 +162,16 @@ export default function HomePage() {
               </div>
             </div>
         ) : !currentBudgetMonth ? (
-          <Card className="text-center p-8 shadow-lg">
+          <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
-              <AlertTriangle className="mx-auto h-12 w-12 text-accent mb-4" />
-              <CardTitle className="text-2xl">No Budget Data</CardTitle>
+              <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
+              <CardTitle className="text-2xl">Welcome to BudgetFlow!</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-6">
-                It looks like there's no budget set up for {currentDisplayMonthId}.
+                Let's set up your first budget for {currentDisplayMonthId}.
               </p>
-              <Button onClick={() => setIsEditBudgetModalOpen(true)}>
+              <Button onClick={() => setIsEditBudgetModalOpen(true)} size="lg">
                 Create Budget for {currentDisplayMonthId}
               </Button>
             </CardContent>
@@ -197,14 +197,14 @@ export default function HomePage() {
                 <BudgetChart budgetMonth={currentBudgetMonth} />
               </>
             ) : (
-              <Card className="text-center p-8 mt-8 shadow-md">
+              <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
                   <AlertTriangle className="mx-auto h-10 w-10 text-accent mb-3" />
                   <CardTitle className="text-xl">No Categories Found</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">
-                    You haven't added any categories to your budget for {currentDisplayMonthId}.
+                    You haven't added any categories to your budget for {currentDisplayMonthId} yet.
                   </p>
                   <Button variant="outline" onClick={() => setIsEditBudgetModalOpen(true)}>
                     Add Categories

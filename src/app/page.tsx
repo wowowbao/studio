@@ -1,6 +1,10 @@
 
 "use client";
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import { useBudget } from "@/hooks/useBudget";
 import { MonthNavigator } from "@/components/budget/MonthNavigator";
 import { CategoryCard } from "@/components/budget/CategoryCard";
@@ -9,23 +13,20 @@ import { BudgetActions } from "@/components/budget/BudgetActions";
 import { BudgetChart } from "@/components/budget/BudgetChart";
 import { EditBudgetModal } from "@/components/budget/EditBudgetModal";
 import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
-import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; // New Import
+import { AddIncomeModal } from "@/components/budget/AddIncomeModal";
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, KeyRound, Lock } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle } from 'lucide-react';
 import { useTheme } from "next-themes";
+import Link from 'next/link';
 
-const APP_PASSWORD = "2007"; 
 
 export default function HomePage() {
-  const [isPseudoAuthenticated, setIsPseudoAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [appLoading, setAppLoading] = useState(true);
+  const { user, isLoading: authLoading, userId } = useAuth();
+  const router = useRouter();
+  const [appLoading, setAppLoading] = useState(true); // Separate loading for app initialization
 
   const { 
     currentBudgetMonth, 
@@ -33,50 +34,44 @@ export default function HomePage() {
     isLoading: budgetLoading, 
     ensureMonthExists,
   } = useBudget();
+
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
-  const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false); // New State
+  const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    const storedAuth = localStorage.getItem('budgetFlowPseudoAuth');
-    if (storedAuth === 'true') {
-      setIsPseudoAuthenticated(true);
+    setAppLoading(authLoading); // App loading depends on auth loading initially
+    if (!authLoading && !user) {
+      router.push('/signin');
     }
-    setAppLoading(false);
-  }, []);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (!budgetLoading && currentDisplayMonthId && isPseudoAuthenticated) {
+    if (!budgetLoading && currentDisplayMonthId && user) { // Ensure user exists before ensuring month
       ensureMonthExists(currentDisplayMonthId);
     }
-  }, [currentDisplayMonthId, budgetLoading, ensureMonthExists, isPseudoAuthenticated]);
+  }, [currentDisplayMonthId, budgetLoading, ensureMonthExists, user]);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordInput === APP_PASSWORD) {
-      localStorage.setItem('budgetFlowPseudoAuth', 'true');
-      setIsPseudoAuthenticated(true);
-      setLoginError(null);
-      setPasswordInput('');
-    } else {
-      setLoginError("Incorrect password. Please try again.");
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push('/signin'); // Redirect to sign-in page after successful sign-out
+    } catch (error) {
+      console.error("Error signing out: ", error);
+      // Optionally show a toast message for sign-out error
     }
   };
 
-  const handleLockApp = () => {
-    localStorage.removeItem('budgetFlowPseudoAuth');
-    setIsPseudoAuthenticated(false);
-  };
+  const isLoading = appLoading || (user && budgetLoading);
 
-  const isLoading = appLoading || (isPseudoAuthenticated && budgetLoading);
-
-  if (isLoading) {
+  if (isLoading || (!user && !authLoading)) { // Show loading if app/auth/budget is loading, or if no user and auth isn't done
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-pulse" />
         <h1 className="text-3xl font-bold text-primary mb-2">BudgetFlow</h1>
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">Loading your budget...</p>
         <div className="w-full max-w-md mt-8 space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-24 w-full" />
@@ -86,36 +81,12 @@ export default function HomePage() {
     );
   }
   
-  if (!isPseudoAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background p-4">
-        <Card className="w-full max-w-sm shadow-xl">
-          <CardHeader className="text-center">
-            <KeyRound className="mx-auto h-12 w-12 text-primary mb-3" />
-            <CardTitle className="text-2xl">Enter Password</CardTitle>
-            <CardDescription>This app is for private use.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Enter password" 
-                  required
-                  className="mt-1"
-                />
-              </div>
-              {loginError && <p className="text-sm text-destructive flex items-center"><AlertTriangle className="w-4 h-4 mr-1" /> {loginError}</p>}
-              <Button type="submit" className="w-full">
-                Unlock
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+  // If explicitly no user and auth is done, this case should be handled by redirection
+  // but as a fallback or for clarity:
+  if (!user) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+        <p className="text-muted-foreground">Redirecting to sign-in...</p>
       </div>
     );
   }
@@ -131,9 +102,14 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold text-primary">BudgetFlow</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleLockApp} aria-label="Lock app">
-              <Lock className="h-5 w-5" />
-            </Button>
+            {user && (
+              <>
+                <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>
+                <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sign Out">
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -172,7 +148,7 @@ export default function HomePage() {
             <BudgetActions 
               onEditBudget={() => setIsEditBudgetModalOpen(true)}
               onAddExpense={() => setIsAddExpenseModalOpen(true)}
-              onAddIncome={() => setIsAddIncomeModalOpen(true)} // New Prop
+              onAddIncome={() => setIsAddIncomeModalOpen(true)}
             />
 
             {categories.length > 0 ? (
@@ -211,7 +187,7 @@ export default function HomePage() {
           </div>
       </footer>
 
-      {currentDisplayMonthId && (
+      {currentDisplayMonthId && user && ( // Ensure user exists for modals that might write data
         <>
           <EditBudgetModal 
             isOpen={isEditBudgetModalOpen} 

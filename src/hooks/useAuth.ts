@@ -1,7 +1,7 @@
 
 "use client";
 import { useContext } from 'react';
-import { AuthContext } from '@/context/AuthContext';
+import { AuthContext } from '@/context/AuthContext'; // Ensure this path is correct
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

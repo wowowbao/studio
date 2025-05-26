@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, Calendar as CalendarIcon, UploadCloud, FileImage, Trash2, Loader2, Camera, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, Calendar as CalendarIcon, UploadCloud, FileImage, Trash2, Loader2, Camera, AlertCircle, RefreshCcw } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -33,7 +33,6 @@ interface CategoryOption {
   parentCategoryId?: string;
 }
 
-// Using a local definition for AlertTriangle as it's specific to this modal's error states for now.
 const LocalAlertTriangle = ({ className }: { className?: string }) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -64,7 +63,6 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const { toast } = useToast();
 
-  // Image and AI state
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [imageDataUri, setImageDataUri] = useState<string | null>(null);
@@ -72,12 +70,13 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   const [aiSuggestionError, setAiSuggestionError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Camera state
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null); // For capturing frame
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null); // null: not checked, true: granted, false: denied
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
-  const [mode, setMode] = useState<'idle' | 'cameraView' | 'preview'>('idle'); // 'idle', 'cameraView', 'preview'
+  const [mode, setMode] = useState<'idle' | 'cameraView' | 'preview'>('idle');
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>(undefined);
 
 
   const resetFormFields = () => {
@@ -96,34 +95,35 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
-    // setHasCameraPermission(null); // Don't reset this, so the alert persists if denied
+    // setAvailableCameras([]); // Don't reset this, it's discovered on permission
+    // setSelectedCameraId(undefined); // Reset selected camera
   };
   
   useEffect(() => {
     if (isOpen && monthId && !budgetLoading) {
-      // Keep essential parts of reset, but don't fully reset camera permission status
-      // so the 'denied' alert persists if that was the case.
       setSelectedTargetId("");
       setIsTargetSubcategory(false);
       setAmount("");
       setDescription("");
       setDate(new Date());
       setSelectedImageFile(null);
-      setImagePreviewUrl(null); // Clear preview on open
-      setImageDataUri(null);    // Clear data URI on open
+      setImagePreviewUrl(null);
+      setImageDataUri(null);
       setAiSuggestionError(null);
       setIsAiProcessing(false);
-      setMode('idle');        // Start in idle mode
+      setMode('idle');
 
       const budgetData = getBudgetForMonth(monthId);
       const options: CategoryOption[] = [];
       if (budgetData) {
         budgetData.categories.forEach(cat => {
-          if (!cat.subcategories || cat.subcategories.length === 0) {
+          if (!cat.isSystemCategory && (!cat.subcategories || cat.subcategories.length === 0)) {
             options.push({ value: cat.id, label: cat.name, isSubcategory: false });
           }
           (cat.subcategories || []).forEach(sub => {
-            options.push({ value: sub.id, label: `${cat.name} > ${sub.name}`, isSubcategory: true, parentCategoryId: cat.id });
+             if (!cat.isSystemCategory) { // Ensure parent is not system category for subcategories
+                options.push({ value: sub.id, label: `${cat.name} > ${sub.name}`, isSubcategory: true, parentCategoryId: cat.id });
+             }
           });
         });
       }
@@ -133,7 +133,126 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       setCameraStream(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, monthId, getBudgetForMonth, budgetLoading]); // Removed cameraStream from deps to avoid re-triggering stream stop on unrelated changes
+  }, [isOpen, monthId, getBudgetForMonth, budgetLoading]);
+
+
+  const getCameraPermissionAndStream = async (deviceId?: string): Promise<MediaStream | null> => {
+    if (cameraStream && videoRef.current && videoRef.current.srcObject) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    }
+    setCameraStream(null);
+
+    try {
+      const constraints: MediaStreamConstraints = { video: {} };
+      if (deviceId) {
+        (constraints.video as MediaTrackConstraints).deviceId = { exact: deviceId };
+      } else {
+        (constraints.video as MediaTrackConstraints).facingMode = { ideal: "environment" };
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setHasCameraPermission(true);
+      setCameraStream(stream);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(e => console.error("Video play failed:", e));
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      setAvailableCameras(videoDevices);
+
+      const currentStreamDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+
+      if (!deviceId && videoDevices.length > 0) { // Initial call, no specific deviceId
+        const rearCamera = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
+        if (rearCamera && currentStreamDeviceId !== rearCamera.deviceId) {
+          // We got a stream, but it's not the preferred rear camera. Attempt to switch.
+          stream.getTracks().forEach(track => track.stop()); // Stop current non-preferred stream
+          setSelectedCameraId(rearCamera.deviceId); // Set preferred ID
+          return getCameraPermissionAndStream(rearCamera.deviceId); // Recursive call for preferred
+        } else if (currentStreamDeviceId) {
+          setSelectedCameraId(currentStreamDeviceId);
+        } else { // Fallback if no currentStreamDeviceId
+          setSelectedCameraId(videoDevices[0]?.deviceId);
+        }
+      } else if (deviceId) { // Specific deviceId was requested
+        setSelectedCameraId(deviceId);
+      }
+      
+      return stream;
+
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setHasCameraPermission(false);
+      setCameraStream(null);
+      return null; // Indicate failure
+    }
+  };
+
+  const handleEnableCamera = async () => {
+    setIsAiProcessing(true);
+    const stream = await getCameraPermissionAndStream(selectedCameraId); // Pass current selected or undefined
+    setIsAiProcessing(false);
+    if (stream) {
+      setMode('cameraView');
+    } else {
+      setMode('idle');
+      toast({
+        variant: 'destructive',
+        title: 'Camera Access Failed',
+        description: 'Could not access camera. Please check permissions and ensure no other app is using it.',
+      });
+    }
+  };
+
+  const handleSwitchCamera = async () => {
+    if (availableCameras.length > 1 && selectedCameraId) {
+      const currentIndex = availableCameras.findIndex(cam => cam.deviceId === selectedCameraId);
+      const nextIndex = (currentIndex + 1) % availableCameras.length;
+      const nextCameraId = availableCameras[nextIndex].deviceId;
+      
+      setIsAiProcessing(true);
+      const stream = await getCameraPermissionAndStream(nextCameraId);
+      setIsAiProcessing(false);
+
+      if (stream) {
+        setSelectedCameraId(nextCameraId); // Update selected ID *after* successfully getting stream
+        setMode('cameraView');
+      } else {
+        toast({ variant: "destructive", title: "Camera Switch Failed", description: "Could not switch to the selected camera."});
+        // Revert to previous camera or idle? For now, let it stay on current if switch failed
+        // or handleEnableCamera again if necessary to reset to a working camera.
+      }
+    }
+  };
+  
+  useEffect(() => {
+    // This effect ensures that if permission is granted *after* an initial denial,
+    // we try to enumerate devices and set a default camera.
+    const enumerateAndSetCameras = async () => {
+      if (hasCameraPermission === true && availableCameras.length === 0) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          setAvailableCameras(videoDevices);
+          if (videoDevices.length > 0 && !selectedCameraId) {
+            const rearCamera = videoDevices.find(d => 
+              d.label.toLowerCase().includes('back') || 
+              d.label.toLowerCase().includes('environment')
+            );
+            const initialCameraId = rearCamera ? rearCamera.deviceId : videoDevices[0].deviceId;
+            setSelectedCameraId(initialCameraId);
+          }
+        } catch (err) {
+          console.error("Error enumerating devices after permission grant:", err);
+        }
+      }
+    };
+    enumerateAndSetCameras();
+  }, [hasCameraPermission, availableCameras.length, selectedCameraId]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,56 +281,25 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     }
     setMode('idle'); 
   };
-
-  const getCameraPermissionAndStream = async () => {
-    if (cameraStream) { // If a stream already exists, ensure video element uses it
-      if (videoRef.current && videoRef.current.srcObject !== cameraStream) {
-         videoRef.current.srcObject = cameraStream;
-      }
-      return true;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      setHasCameraPermission(true);
-      setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      return true;
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      setHasCameraPermission(false);
-      setCameraStream(null); // Ensure stream is cleared on error
-      toast({
-        variant: 'destructive',
-        title: 'Camera Access Denied',
-        description: 'Please enable camera permissions in your browser settings.',
-      });
-      return false;
-    }
-  };
-
-  const handleEnableCamera = async () => {
-    setIsAiProcessing(true); 
-    const permissionGranted = await getCameraPermissionAndStream();
-    setIsAiProcessing(false);
-    if (permissionGranted) {
-      setMode('cameraView');
-    } else {
-      setMode('idle'); 
-    }
-  };
   
   const handleCapturePhoto = () => {
     if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
+      // Ensure canvas dimensions match video to avoid stretching
+      const aspectRatio = video.videoWidth / video.videoHeight;
+      const displayWidth = video.clientWidth;
+      const displayHeight = video.clientHeight;
+
+      // Set canvas size to match video's intrinsic size for best quality
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      
       const context = canvas.getContext('2d');
       if (context) {
+        // Draw the video frame onto the canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg'); 
+        const dataUri = canvas.toDataURL('image/jpeg', 0.9); // Use JPEG for smaller size, quality 0.9
         setImagePreviewUrl(dataUri);
         setImageDataUri(dataUri);
         setSelectedImageFile(null); 
@@ -331,9 +419,8 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
         </DialogHeader>
         
-        {/* Video element always rendered for ref stability, visibility controlled by CSS */}
         <video ref={videoRef} className={cn("w-full h-auto object-cover aspect-video rounded-md bg-muted", mode !== 'cameraView' && 'hidden')} autoPlay muted playsInline />
-        <canvas ref={canvasRef} className="hidden"></canvas> {/* Hidden canvas for capture */}
+        <canvas ref={canvasRef} className="hidden"></canvas>
 
         <div className="grid gap-4 py-4">
            {mode === 'idle' && (
@@ -366,7 +453,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                         type="button"
                         variant="outline"
                         onClick={handleEnableCamera}
-                        disabled={isAiProcessing}
+                        disabled={isAiProcessing || hasCameraPermission === false}
                         className="w-full"
                     >
                         <Camera className="mr-2 h-4 w-4" />
@@ -378,7 +465,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                         <LocalAlertTriangle className="h-4 w-4" />
                         <AlertTitle>Camera Access Denied</AlertTitle>
                         <AlertDescription>
-                            Please enable camera permissions in your browser settings and try again.
+                            Please enable camera permissions in your browser settings and try again. You might need to refresh the page after changing permissions.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -388,22 +475,25 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
            {mode === 'cameraView' && (
              <div className="space-y-3 p-2 border rounded-lg">
                 <Label className="text-base font-medium">Camera View</Label>
-                {/* Video element is now outside this block, controlled by its own className */}
                 <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={handleCapturePhoto} className="flex-1" disabled={isAiProcessing}>
+                    <Button onClick={handleCapturePhoto} className="flex-1" disabled={isAiProcessing || !cameraStream}>
                         <Camera className="mr-2 h-4 w-4" /> Capture Photo
                     </Button>
-                    <Button variant="outline" onClick={() => {
+                    {availableCameras.length > 1 && (
+                        <Button variant="outline" onClick={handleSwitchCamera} className="flex-1" disabled={isAiProcessing || !cameraStream}>
+                            <RefreshCcw className="mr-2 h-4 w-4" /> Switch Camera
+                        </Button>
+                    )}
+                </div>
+                 <Button variant="outline" onClick={() => {
                          if (cameraStream) {
                             cameraStream.getTracks().forEach(track => track.stop());
                             setCameraStream(null);
                           }
                         setMode('idle');
-                        // setHasCameraPermission(null); // Keep permission status for potential immediate re-attempt
-                    }} className="flex-1" disabled={isAiProcessing}>
+                    }} className="w-full" disabled={isAiProcessing}>
                         <XCircle className="mr-2 h-4 w-4" /> Back to Options
                     </Button>
-                </div>
              </div>
            )}
 
@@ -415,11 +505,11 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
                          <Button variant="outline" onClick={handleEnableCamera} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
-                            <Camera className="mr-2 h-4 w-4" /> Retake
+                            <Camera className="mr-2 h-4 w-4" /> {selectedImageFile ? "Take New" : "Retake"}
                         </Button>
                         <Button variant="outline" onClick={handleClearImage} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
                             <FileImage className="mr-2 h-4 w-4" />
-                            Upload Different
+                             Upload Different
                         </Button>
                     </div>
                 </div>
@@ -428,7 +518,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
             {isAiProcessing && (
               <div className="flex items-center text-sm text-muted-foreground mt-2">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                AI is analyzing your receipt...
+                {imageDataUri ? "AI is analyzing your receipt..." : "Accessing camera..."}
               </div>
             )}
             {aiSuggestionError && (
@@ -528,13 +618,14 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
             </Button>
           </DialogClose>
           <Button onClick={handleSubmit} disabled={budgetLoading || categoryOptions.length === 0 || isAiProcessing}>
-            {isAiProcessing && !imageDataUri ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-            {isAiProcessing && !imageDataUri ? "Processing..." : (isAiProcessing ? "Processing..." : "Add Expense")}
+            {isAiProcessing && !imageDataUri && mode !== 'cameraView' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+            {isAiProcessing && !imageDataUri && mode !== 'cameraView' ? "Processing..." : (isAiProcessing ? "Processing..." : "Add Expense")}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
     
+
+  

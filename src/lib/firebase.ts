@@ -3,17 +3,15 @@ import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// !!! IMPORTANT: REPLACE WITH YOUR FIREBASE PROJECT CONFIGURATION !!!
-// You can find this in your Firebase project settings:
-// Project settings > General > Your apps > Web app > SDK setup and configuration
+// User-provided Firebase project configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY", // Replace
-  authDomain: "YOUR_AUTH_DOMAIN", // Replace
-  projectId: "YOUR_PROJECT_ID", // Replace
-  storageBucket: "YOUR_STORAGE_BUCKET", // Replace
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace
-  appId: "YOUR_APP_ID", // Replace
-  measurementId: "YOUR_MEASUREMENT_ID" // Optional, replace if you use Analytics
+  apiKey: "AIzaSyCKFWuXosSE7gdrYqDcQiKhjOTOWIPbqks",
+  authDomain: "budgetflow-kbfhn.firebaseapp.com",
+  projectId: "budgetflow-kbfhn",
+  storageBucket: "budgetflow-kbfhn.appspot.com", // Corrected common typo: firebasestorage.app -> appspot.com
+  messagingSenderId: "36215483696",
+  appId: "1:36215483696:web:9989ffc1495f8f1a1d2cf5"
+  // measurementId is optional, can be added if needed
 };
 
 let app: FirebaseApp;

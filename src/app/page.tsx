@@ -1,7 +1,6 @@
 
 "use client";
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth"; 
 import { useBudget } from "@/hooks/useBudget";
@@ -26,7 +25,6 @@ import type { BudgetCategory, BudgetMonth } from '@/types/budget';
 
 
 export default function HomePage() {
-  const router = useRouter();
   const { user, loading: authLoading, isUserAuthenticated } = useAuth();
   
   const { 
@@ -57,7 +55,7 @@ export default function HomePage() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      router.push('/'); 
+      // No router.push needed, AuthContext will trigger re-render
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -74,17 +72,14 @@ export default function HomePage() {
       setMonthEndSummaryData(data);
       setIsMonthEndSummaryModalOpen(true);
     } else if (data && !data.isRolledOver) {
-        // If trying to open summary for a non-rolled-over month,
-        // delegate to BudgetActions to handle the rollover first.
-        // This scenario should be handled by the BudgetActions button logic.
-        // Here, we just ensure we only open if it's already rolled.
+        // This case is handled by BudgetActions button logic
     }
   };
 
   const isLoading = authLoading || budgetLoading;
 
 
-  if (isLoading && !Object.keys(budgetMonths).length) { 
+  if (isLoading && !Object.keys(budgetMonths).length && !currentBudgetMonth) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
@@ -176,10 +171,10 @@ export default function HomePage() {
         
         <MonthNavigator />
         
-        {isLoading && Object.keys(budgetMonths).length > 0 ? ( 
+        {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
+                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
               </div>
               <Skeleton className="h-32 w-full rounded-lg" /> 
               <Skeleton className="h-20 w-full rounded-lg" /> 
@@ -240,7 +235,7 @@ export default function HomePage() {
               </>
             )}
             
-            {(operationalCategories.length > 0) && ( // Only show chart if there are operational categories
+            {(operationalCategories.length > 0) && ( 
                 <BudgetChart budgetMonth={currentBudgetMonth} />
             )}
 
@@ -267,7 +262,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.3 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.4 (Studio Preview)
           </div>
       </footer>
 
@@ -300,4 +295,3 @@ export default function HomePage() {
     </div>
   );
 }
-

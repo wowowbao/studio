@@ -1,7 +1,7 @@
 
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, Coins, PiggyBank, Landmark, AlertTriangle, CreditCard, Banknote, Target } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Coins, PiggyBank, Landmark, Banknote, Target, AlertTriangle, CreditCard } from "lucide-react";
 import type { BudgetMonth, BudgetCategory, SubCategory } from "@/types/budget";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +49,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
 
   const ccPaymentsCategory = budgetMonth.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
   const plannedCCPayments = ccPaymentsCategory ? getEffectiveCategoryBudget(ccPaymentsCategory) : 0;
-  // const actualCCPayments = ccPaymentsCategory ? getCategorySpentAmount(ccPaymentsCategory) : 0; // Not used in main summary directly
+  const actualCCPayments = ccPaymentsCategory ? getCategorySpentAmount(ccPaymentsCategory) : 0;
 
   const startingCreditCardDebtForMonth = budgetMonth.startingCreditCardDebt || 0;
 
@@ -79,10 +79,10 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       savingsStatusText = "Goal Met!";
       savingsStatusColor = "text-green-600 dark:text-green-500 font-medium";
     } else if (actualSavings > 0) {
-      savingsStatusText = `Saved $${actualSavings.toFixed(2)} of $${plannedSavings.toFixed(2)}. Keep going!`;
+      savingsStatusText = `Progress: $${actualSavings.toFixed(2)} of $${plannedSavings.toFixed(2)}.`;
       savingsStatusColor = "text-amber-600 dark:text-amber-500";
     } else {
-      savingsStatusText = `Planned $${plannedSavings.toFixed(2)}. Start saving!`;
+      savingsStatusText = `Goal: $${plannedSavings.toFixed(2)}. Start saving!`;
       savingsStatusColor = "text-muted-foreground";
     }
   } else if (actualSavings > 0) {
@@ -90,19 +90,38 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       savingsStatusColor = "text-green-600 dark:text-green-500";
   }
 
+  let ccPaymentStatusText = "No specific CC payment goal set this month.";
+  let ccPaymentStatusColor = "text-muted-foreground";
+  if (plannedCCPayments > 0) {
+    if (actualCCPayments >= plannedCCPayments) {
+      ccPaymentStatusText = "Payment goal met!";
+      ccPaymentStatusColor = "text-green-600 dark:text-green-500 font-medium";
+    } else if (actualCCPayments > 0) {
+      ccPaymentStatusText = `Progress: $${actualCCPayments.toFixed(2)} of $${plannedCCPayments.toFixed(2)}.`;
+      ccPaymentStatusColor = "text-amber-600 dark:text-amber-500";
+    } else {
+      ccPaymentStatusText = `Goal: $${plannedCCPayments.toFixed(2)}. Log payments.`;
+      ccPaymentStatusColor = "text-muted-foreground";
+    }
+  } else if (actualCCPayments > 0) {
+      ccPaymentStatusText = `Paid $${actualCCPayments.toFixed(2)} without a specific plan.`;
+      ccPaymentStatusColor = "text-green-600 dark:text-green-500";
+  }
+
+
   let operationalSpendingStatusText = `$${overallOperationalSpendingRemaining.toFixed(2)} remaining`;
   let operationalSpendingStatusColor = "text-muted-foreground";
-  if (totalOperationalBudget > 0 || totalOperationalSpending > 0) { // Only apply colors if there's activity or budget
+  if (totalOperationalBudget > 0 || totalOperationalSpending > 0) { 
     if (isOverSpentOnOperational) {
       operationalSpendingStatusText = `Overspent by $${Math.abs(overallOperationalSpendingRemaining).toFixed(2)}`;
       operationalSpendingStatusColor = "text-destructive font-medium";
     } else {
       const spentRatio = totalOperationalBudget > 0 ? totalOperationalSpending / totalOperationalBudget : 0;
-      if (spentRatio < 0.8 && totalOperationalSpending > 0) { // Well under and some spending
+      if (spentRatio < 0.8 && totalOperationalSpending > 0) { 
         operationalSpendingStatusColor = "text-green-600 dark:text-green-500";
-      } else if (spentRatio <= 1 && totalOperationalSpending > 0) { // Close to budget or on budget
+      } else if (spentRatio <= 1 && totalOperationalSpending > 0) { 
         operationalSpendingStatusColor = "text-amber-600 dark:text-amber-500";
-      } else if (totalOperationalSpending === 0 && totalOperationalBudget > 0){ // Budgeted but not spent
+      } else if (totalOperationalSpending === 0 && totalOperationalBudget > 0){ 
          operationalSpendingStatusColor = "text-green-600 dark:text-green-500";
       } else if (totalOperationalBudget === 0 && totalOperationalSpending === 0) {
          operationalSpendingStatusText = "No operational budget or spending.";
@@ -121,9 +140,11 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   } else if (monthlyBudgetBalance < 0) {
     balanceStatusText = `Budget shortfall: $${Math.abs(monthlyBudgetBalance).toFixed(2)}`;
     balanceStatusColor = "text-destructive font-medium";
-  } else {
+  } else if (totalIncomeReceived > 0 || plannedSavings > 0 || plannedCCPayments > 0 || totalOperationalBudget > 0) { // only show if there was *any* budget activity
     balanceStatusText = "Budget is perfectly allocated!";
     balanceStatusColor = "text-green-600 dark:text-green-500 font-medium";
+  } else {
+    balanceStatusText = "Set income & budget to see balance.";
   }
 
 
@@ -147,7 +168,9 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${actualSavings.toFixed(2)}</div>
-          <p className={cn("text-xs mt-1", savingsStatusColor)}>{savingsStatusText}</p>
+          <p className={cn("text-xs mt-1", savingsStatusColor)}>
+            {savingsStatusText} <span className="text-muted-foreground/80">(Planned: ${plannedSavings.toFixed(2)})</span>
+          </p>
         </CardContent>
       </Card>
 
@@ -164,12 +187,14 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Planned CC Repayment</CardTitle>
+          <CardTitle className="text-sm font-medium">CC Repayment Performance</CardTitle>
           <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${plannedCCPayments.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Your planned debt repayment this month.</p>
+          <div className="text-2xl font-bold">${actualCCPayments.toFixed(2)}</div>
+          <p className={cn("text-xs mt-1", ccPaymentStatusColor)}>
+            {ccPaymentStatusText} <span className="text-muted-foreground/80">(Planned: ${plannedCCPayments.toFixed(2)})</span>
+          </p>
         </CardContent>
       </Card>
       
@@ -204,4 +229,3 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     </div>
   );
 }
-    

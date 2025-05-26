@@ -6,6 +6,13 @@ export interface Expense {
   dateAdded: string; // ISO string date
 }
 
+export interface IncomeEntry {
+  id: string; // uuid
+  description: string;
+  amount: number;
+  dateAdded: string; // ISO string date
+}
+
 export interface SubCategory {
   id: string; // uuid
   name: string;
@@ -16,7 +23,7 @@ export interface SubCategory {
 export interface BudgetCategory {
   id: string; // uuid
   name: string;
-  budgetedAmount: number; // Budget for the main category itself, if it doesn't have subcategories or if it's a "parent-level" budget
+  budgetedAmount: number;
   expenses: Expense[];
   subcategories?: SubCategory[];
   isSystemCategory?: boolean; // To identify special categories like "Savings"
@@ -26,19 +33,21 @@ export interface BudgetMonth {
   id: string; // "YYYY-MM" format, e.g., "2024-07"
   year: number;
   month: number; // 1-12 (1 for January, 12 for December)
-  monthlyIncome: number; // Total income for the month
+  incomes: IncomeEntry[]; // Replaces monthlyIncome
   categories: BudgetCategory[];
   savingsGoal: number; // Overall monthly savings goal target
   isRolledOver?: boolean; // Flag to indicate if unspent budget has been rolled over
+  startingCreditCardDebt?: number; // Debt at the start of the month
 }
 
-export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver'>> & {
+export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver' | 'incomes'>> & {
   categories?: Array<Omit<BudgetCategory, 'id' | 'isSystemCategory'> & { id?: string; subcategories?: Array<Omit<SubCategory, 'id'> & { id?: string }> }>;
-  monthlyIncome?: number;
+  startingCreditCardDebt?: number;
 };
 
 export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount' | 'subcategories' | 'expenses'>[] = [
-  { name: "Savings", isSystemCategory: true }, // Mark Savings as a system category
+  { name: "Savings", isSystemCategory: true },
+  { name: "Credit Card Payments", isSystemCategory: false }, // Ensure this exists for debt tracking
   { name: "Groceries" },
   { name: "Rent/Mortgage" },
   { name: "Utilities" },

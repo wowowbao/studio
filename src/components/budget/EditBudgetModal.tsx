@@ -32,12 +32,11 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     getBudgetForMonth, 
     updateMonthBudget, 
     isLoading,
-    setMonthlyIncomeForMonth, // Get this from useBudget
   } = useBudget();
   
   const [editableCategories, setEditableCategories] = useState<EditableCategory[]>([]);
   const [monthSavingsGoal, setMonthSavingsGoal] = useState<number>(0);
-  const [monthlyIncome, setMonthlyIncomeState] = useState<number>(0); // State for monthly income input
+  const [startingDebt, setStartingDebt] = useState<number>(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const { toast } = useToast();
 
@@ -53,9 +52,8 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
             isSystemCategory: c.isSystemCategory || (c.name?.toLowerCase() === 'savings'),
         })));
         setMonthSavingsGoal(budgetData.savingsGoal || 0);
-        setMonthlyIncomeState(budgetData.monthlyIncome || 0); // Load monthly income
+        setStartingDebt(budgetData.startingCreditCardDebt || 0);
       } else {
-        // This case might not be hit often if ensureMonthExists works well
         const defaultCatsForModal: EditableCategory[] = DEFAULT_CATEGORIES.map(cat => ({
             name: cat.name,
             isSystemCategory: cat.name.toLowerCase() === 'savings',
@@ -66,7 +64,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         }));
         setEditableCategories(defaultCatsForModal);
         setMonthSavingsGoal(0);
-        setMonthlyIncomeState(0);
+        setStartingDebt(0);
       }
       setIsDataLoaded(true);
     }
@@ -84,7 +82,6 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     setEditableCategories(prev =>
       prev.map(cat => {
         if (cat.id === id) {
-          // Prevent renaming "Savings" category
           if (cat.isSystemCategory && cat.name.toLowerCase() === 'savings' && field === 'name') {
             return cat; 
           }
@@ -177,7 +174,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     updateMonthBudget(monthId, { 
       categories: finalCategoriesToSave, 
       savingsGoal: monthSavingsGoal,
-      monthlyIncome: monthlyIncome, // Save monthly income
+      startingCreditCardDebt: startingDebt,
     });
     toast({
       title: "Budget Updated",
@@ -200,15 +197,15 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         <ScrollArea className="max-h-[65vh] p-1">
           <div className="space-y-6 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="monthlyIncome" className="text-lg font-medium">Monthly Income</Label>
+               <div>
+                <Label htmlFor="startingDebt" className="text-lg font-medium">Credit Card Debt at Start of Month</Label>
                 <Input
-                  id="monthlyIncome"
+                  id="startingDebt"
                   type="number"
-                  value={monthlyIncome}
-                  onChange={(e) => setMonthlyIncomeState(parseFloat(e.target.value) || 0)}
+                  value={startingDebt}
+                  onChange={(e) => setStartingDebt(parseFloat(e.target.value) || 0)}
                   className="mt-2 text-base"
-                  placeholder="e.g., 3000"
+                  placeholder="e.g., 1000"
                 />
               </div>
               <div>
@@ -236,7 +233,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         <Input
                           id={`categoryName-${cat.id}`}
                           value={cat.name}
-                          readOnly // Make Savings category name read-only
+                          readOnly 
                           className="mt-1 bg-muted/50 cursor-not-allowed"
                         />
                       ) : (
@@ -256,13 +253,12 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         type="number"
                         value={cat.budgetedAmount}
                         onChange={(e) => handleCategoryChange(cat.id, "budgetedAmount", e.target.value)}
-                        placeholder="0.00"
+                        placeholder={isSavingsCategory && cat.budgetedAmount === 0 ? "0.00" : String(cat.budgetedAmount)}
                         className="mt-1"
                       />
                     </div>
                   </div>
                   
-                  {/* Subcategories Section (Not for Savings category) */}
                   {!isSavingsCategory && (
                     <div className="ml-4 mt-3 space-y-3 border-l pl-4 pt-2">
                         <div className="flex justify-between items-center">

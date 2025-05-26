@@ -9,8 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Calendar as CalendarIcon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -22,15 +26,16 @@ interface CategoryOption {
   value: string;
   label: string;
   isSubcategory: boolean;
-  parentCategoryId?: string; // Only for subcategories
+  parentCategoryId?: string;
 }
 
 export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalProps) {
   const { getBudgetForMonth, addExpense, isLoading } = useBudget();
-  const [selectedTargetId, setSelectedTargetId] = useState<string>(""); // Can be categoryId or subCategoryId
+  const [selectedTargetId, setSelectedTargetId] = useState<string>("");
   const [isTargetSubcategory, setIsTargetSubcategory] = useState<boolean>(false);
   const [amount, setAmount] = useState<string>("");
   const [description, setDescription] = useState<string>("");
+  const [date, setDate] = useState<Date | undefined>(new Date());
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const { toast } = useToast();
 
@@ -40,7 +45,6 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       const options: CategoryOption[] = [];
       if (budgetData) {
         budgetData.categories.forEach(cat => {
-          // Only add parent category as an option if it has NO subcategories
           if (!cat.subcategories || cat.subcategories.length === 0) {
             options.push({ value: cat.id, label: cat.name, isSubcategory: false });
           }
@@ -57,7 +61,6 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           setSelectedTargetId(options[0].value);
           setIsTargetSubcategory(options[0].isSubcategory);
         } else {
-          // refresh isTargetSubcategory based on current selection
           const currentOpt = options.find(opt => opt.value === selectedTargetId);
           if (currentOpt) setIsTargetSubcategory(currentOpt.isSubcategory);
         }
@@ -67,6 +70,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       }
       setAmount("");
       setDescription("");
+      setDate(new Date()); // Reset date on open
     }
   }, [isOpen, monthId, getBudgetForMonth, isLoading, selectedTargetId]);
 
@@ -84,11 +88,15 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       toast({ title: "Error", description: "Please enter a description for the expense.", variant: "destructive" });
       return;
     }
+    if (!date) {
+      toast({ title: "Error", description: "Please select a date for the expense.", variant: "destructive" });
+      return;
+    }
 
-    addExpense(monthId, selectedTargetId, numericAmount, description, isTargetSubcategory);
+    addExpense(monthId, selectedTargetId, numericAmount, description, date.toISOString(), isTargetSubcategory);
     toast({
       title: "Expense Added",
-      description: `${description}: $${numericAmount.toFixed(2)} added.`,
+      description: `${description}: $${numericAmount.toFixed(2)} added on ${format(date, "PPP")}.`,
       action: <CheckCircle className="text-green-500" />,
     });
     onClose();
@@ -159,6 +167,33 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                 className="col-span-3"
                 rows={2}
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right col-span-1">
+                Date
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "col-span-3 justify-start text-left font-normal",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         )}

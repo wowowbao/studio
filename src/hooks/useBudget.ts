@@ -1,6 +1,6 @@
 
 "use client";
-import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload, SubCategory } from '@/types/budget';
+import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload, SubCategory, IncomeEntry } from '@/types/budget';
 import { useContext, createContext } from 'react';
 
 interface BudgetContextType {
@@ -10,8 +10,10 @@ interface BudgetContextType {
   isLoading: boolean;
   getBudgetForMonth: (yearMonthId: string) => BudgetMonth | undefined;
   updateMonthBudget: (yearMonthId: string, payload: BudgetUpdatePayload) => void;
-  addExpense: (yearMonthId: string, categoryOrSubCategoryId: string, amount: number, description: string, isSubCategory?: boolean) => void;
+  addExpense: (yearMonthId: string, categoryOrSubCategoryId: string, amount: number, description: string, dateAdded: string, isSubCategory?: boolean) => void;
   deleteExpense: (yearMonthId: string, categoryOrSubCategoryId: string, expenseId: string, isSubCategory?: boolean) => void;
+  addIncome: (yearMonthId: string, description: string, amount: number, dateAdded: string) => void;
+  deleteIncome: (yearMonthId: string, incomeId: string) => void;
   duplicateMonthBudget: (sourceMonthId: string, targetMonthId: string) => void;
   navigateToPreviousMonth: () => void;
   navigateToNextMonth: () => void;
@@ -25,7 +27,7 @@ interface BudgetContextType {
   addSubCategory: (monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => void;
   updateSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => void;
   deleteSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string) => void;
-  setMonthlyIncomeForMonth: (yearMonthId: string, income: number) => void;
+  // setMonthlyIncomeForMonth: (yearMonthId: string, income: number) => void; // Removed as income is now tracked via entries
 }
 
 export const BudgetContext = createContext<BudgetContextType | undefined>(undefined);

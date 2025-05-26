@@ -1,7 +1,7 @@
 
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, PiggyBank, Target, Wallet, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Target, Wallet, AlertCircle, Coins } from "lucide-react";
 import type { BudgetMonth, BudgetCategory, SubCategory } from "@/types/budget";
 import { cn } from "@/lib/utils";
 
@@ -33,28 +33,28 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     );
   }
 
-  const monthlyIncome = budgetMonth.monthlyIncome || 0;
-  let totalBudgetedForAllCategories = 0; // Includes amounts budgeted for savings category
-  let totalSpentExcludingSavingsCategory = 0; // Spending from non-savings categories
-  let amountActuallySaved = 0; // Actual expenses logged under "Savings" category
-  let savingsCategoryBudgetedAmount = 0; // Amount budgeted for the "Savings" category
+  const totalIncomeReceived = (budgetMonth.incomes || []).reduce((sum, income) => sum + income.amount, 0);
+  
+  let totalBudgetedForAllCategories = 0; 
+  let totalSpentExcludingSavingsCategory = 0; 
+  let amountActuallySaved = 0; 
+  let savingsCategoryBudgetedAmount = 0; 
 
   budgetMonth.categories.forEach(cat => {
     const isSavingsCat = cat.isSystemCategory && cat.name.toLowerCase() === 'savings';
     
     if (isSavingsCat) {
       amountActuallySaved += getCategorySpentAmount(cat);
-      savingsCategoryBudgetedAmount += cat.budgetedAmount; // How much is planned to be moved to savings
-      totalBudgetedForAllCategories += cat.budgetedAmount; // Savings budget is part of total budget
+      savingsCategoryBudgetedAmount += cat.budgetedAmount; 
+      totalBudgetedForAllCategories += cat.budgetedAmount; 
     } else {
-      // If category has subcategories, sum their budgets and spending
       if (cat.subcategories && cat.subcategories.length > 0) {
         cat.subcategories.forEach(sub => {
           totalBudgetedForAllCategories += sub.budgetedAmount;
           const spentInSub = getCategorySpentAmount(sub);
           totalSpentExcludingSavingsCategory += spentInSub;
         });
-      } else { // Otherwise, use the parent category's budget and spending
+      } else { 
         totalBudgetedForAllCategories += cat.budgetedAmount;
         const spentInCat = getCategorySpentAmount(cat);
         totalSpentExcludingSavingsCategory += spentInCat;
@@ -62,7 +62,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     }
   });
   
-  const fundsToAllocate = monthlyIncome - totalBudgetedForAllCategories;
+  const fundsToAllocate = totalIncomeReceived - totalBudgetedForAllCategories;
   const isOverAllocated = fundsToAllocate < 0;
 
   const overallSpendingRemaining = totalBudgetedForAllCategories - savingsCategoryBudgetedAmount - totalSpentExcludingSavingsCategory;
@@ -73,12 +73,12 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Monthly Income</CardTitle>
-          <Wallet className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Income Received</CardTitle>
+          <Coins className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${monthlyIncome.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Your total earnings for the month.</p>
+          <div className="text-2xl font-bold">${totalIncomeReceived.toFixed(2)}</div>
+          <p className="text-xs text-muted-foreground">Total income recorded for this month.</p>
         </CardContent>
       </Card>
 

@@ -9,6 +9,8 @@ import { BudgetActions } from "@/components/budget/BudgetActions";
 import { BudgetChart } from "@/components/budget/BudgetChart";
 import { EditBudgetModal } from "@/components/budget/EditBudgetModal";
 import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
+import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; // New Import
+import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,13 +19,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, LayoutDashboard, Moon, Sun, KeyRound, Lock } from 'lucide-react';
 import { useTheme } from "next-themes";
 
-const APP_PASSWORD = "Biologi2007!"; // Your private password
+const APP_PASSWORD = "Biologi2007!";
 
 export default function HomePage() {
   const [isPseudoAuthenticated, setIsPseudoAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [appLoading, setAppLoading] = useState(true); // General app loading state
+  const [appLoading, setAppLoading] = useState(true);
 
   const { 
     currentBudgetMonth, 
@@ -33,6 +35,7 @@ export default function HomePage() {
   } = useBudget();
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
+  const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false); // New State
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
@@ -40,7 +43,7 @@ export default function HomePage() {
     if (storedAuth === 'true') {
       setIsPseudoAuthenticated(true);
     }
-    setAppLoading(false); // Done checking auth state
+    setAppLoading(false);
   }, []);
 
   useEffect(() => {
@@ -165,9 +168,11 @@ export default function HomePage() {
         ) : (
           <>
             <SummaryCards budgetMonth={currentBudgetMonth} />
+            <CreditCardDebtSummary budgetMonth={currentBudgetMonth} />
             <BudgetActions 
               onEditBudget={() => setIsEditBudgetModalOpen(true)}
               onAddExpense={() => setIsAddExpenseModalOpen(true)}
+              onAddIncome={() => setIsAddIncomeModalOpen(true)} // New Prop
             />
 
             {categories.length > 0 ? (
@@ -216,6 +221,11 @@ export default function HomePage() {
           <AddExpenseModal
             isOpen={isAddExpenseModalOpen}
             onClose={() => setIsAddExpenseModalOpen(false)}
+            monthId={currentDisplayMonthId}
+          />
+          <AddIncomeModal 
+            isOpen={isAddIncomeModalOpen}
+            onClose={() => setIsAddIncomeModalOpen(false)}
             monthId={currentDisplayMonthId}
           />
         </>

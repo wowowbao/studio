@@ -3,15 +3,16 @@
 import { Button } from "@/components/ui/button";
 import { useBudget } from "@/hooks/useBudget";
 import { getYearMonthFromDate, parseYearMonth } from "@/hooks/useBudgetCore";
-import { Edit3, PlusCircle, Copy, AlertTriangle, CheckCircle, ArchiveRestore } from "lucide-react";
+import { Edit3, PlusCircle, Copy, AlertTriangle, CheckCircle, ArchiveRestore, Coins } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BudgetActionsProps {
   onEditBudget: () => void;
   onAddExpense: () => void;
+  onAddIncome: () => void; // New prop
 }
 
-export function BudgetActions({ onEditBudget, onAddExpense }: BudgetActionsProps) {
+export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: BudgetActionsProps) {
   const { currentDisplayMonthId, currentBudgetMonth, duplicateMonthBudget, rolloverUnspentBudget } = useBudget();
   const { toast } = useToast();
 
@@ -33,7 +34,7 @@ export function BudgetActions({ onEditBudget, onAddExpense }: BudgetActionsProps
     toast({
       title: result.success ? "Rollover Processed" : "Rollover Info",
       description: result.message,
-      variant: result.success ? "default" : "default", // could use 'destructive' for errors if preferred
+      variant: result.success ? "default" : "default",
       action: result.success ? <CheckCircle className="text-green-500" /> : <AlertTriangle className="text-yellow-500" />,
     });
   };
@@ -41,26 +42,28 @@ export function BudgetActions({ onEditBudget, onAddExpense }: BudgetActionsProps
   const hasSavingsCategory = currentBudgetMonth?.categories.some(cat => cat.name.toLowerCase() === 'savings');
   const isRolledOver = currentBudgetMonth?.isRolledOver;
 
-  // Disable edit/add if month is rolled over
   const disablePrimaryActions = isRolledOver;
 
 
   return (
     <div className="my-6 p-4 bg-card border rounded-lg shadow-sm">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Button onClick={onEditBudget} variant="outline" className="w-full" disabled={disablePrimaryActions}>
           <Edit3 className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Edit Budget"}
+        </Button>
+        <Button onClick={onAddIncome} variant="outline" className="w-full" disabled={disablePrimaryActions}> {/* New Add Income Button */}
+            <Coins className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Income"}
         </Button>
         <Button onClick={onAddExpense} className="w-full" disabled={disablePrimaryActions}>
           <PlusCircle className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Expense"}
         </Button>
-        <Button onClick={handleDuplicateMonth} variant="secondary" className="w-full col-span-1 sm:col-span-2 lg:col-span-1">
+        <Button onClick={handleDuplicateMonth} variant="secondary" className="w-full sm:col-span-1">
           <Copy className="mr-2 h-4 w-4" /> Duplicate Month
         </Button>
          <Button 
           onClick={handleRolloverUnspent} 
           variant="secondary" 
-          className="w-full col-span-1 sm:col-span-2 lg:col-span-1"
+          className="w-full sm:col-span-2"
           disabled={isRolledOver || !hasSavingsCategory}
         >
           <ArchiveRestore className="mr-2 h-4 w-4" /> 
@@ -69,7 +72,7 @@ export function BudgetActions({ onEditBudget, onAddExpense }: BudgetActionsProps
       </div>
        {isRolledOver && (
         <p className="text-xs text-muted-foreground mt-3 text-center">
-          This month's budget has been closed and remaining funds rolled over. Editing and adding expenses are disabled.
+          This month's budget has been closed. Editing, adding expenses/income, and rollover are disabled.
         </p>
       )}
       {!isRolledOver && !hasSavingsCategory && (

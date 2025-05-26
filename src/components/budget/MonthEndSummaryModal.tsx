@@ -4,7 +4,7 @@ import type { BudgetMonth, BudgetCategory } from "@/types/budget";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, TrendingDown, CheckCircle, AlertCircle, DollarSign, PiggyBank, Landmark } from "lucide-react";
+import { TrendingUp, TrendingDown, CheckCircle, DollarSign, PiggyBank, Landmark, Coins } from "lucide-react"; // Added Coins
 import { cn } from "@/lib/utils";
 
 interface MonthEndSummaryModalProps {

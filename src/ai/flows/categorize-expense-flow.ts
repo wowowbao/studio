@@ -29,9 +29,9 @@ const CategorizeExpenseInputSchema = z.object({
 export type CategorizeExpenseInput = z.infer<typeof CategorizeExpenseInputSchema>;
 
 const CategorizeExpenseOutputSchema = z.object({
-  suggestedCategoryId: z.string().optional().describe('The ID of the suggested category or subcategory for the expense.'),
-  suggestedAmount: z.number().optional().describe('The suggested monetary amount of the expense.'),
-  suggestedDescription: z.string().optional().describe('A suggested description for the expense (e.g., store name or item).'),
+  suggestedCategoryId: z.string().optional().describe('The ID of the suggested category or subcategory for the expense. MUST be one of the IDs from the availableCategories list.'),
+  suggestedAmount: z.number().optional().describe('The total monetary amount of the expense extracted from the receipt.'),
+  suggestedDescription: z.string().optional().describe('A very concise description for the expense (e.g., store name or main item purchased). Keep it short and to the point.'),
   aiError: z.string().optional().describe('Any error message if the AI failed to process the request.'),
 });
 export type CategorizeExpenseOutput = z.infer<typeof CategorizeExpenseOutputSchema>;
@@ -56,9 +56,9 @@ The user has the following available budget categories/subcategories (with their
 {{{json availableCategories}}}
 
 Based on the image content:
-1.  Determine the most appropriate category/subcategory for this expense and set 'suggestedCategoryId' to its ID.
-2.  Extract the total monetary amount of the expense and set 'suggestedAmount'.
-3.  Create a brief description for the expense (e.g., store name, primary item purchased) and set 'suggestedDescription'.
+1.  Determine the most appropriate category/subcategory for this expense and set 'suggestedCategoryId'. You MUST select an ID from the 'availableCategories' list provided. Do not invent new categories or IDs. If no suitable category is found, leave this field blank.
+2.  Extract the total monetary amount of the expense and set 'suggestedAmount'. If the amount cannot be clearly determined, leave this field blank.
+3.  Create a very concise description for the expense (e.g., store name, or main item if clear, like "Starbucks" or "Groceries"). Keep it short and to the point, ideally 1-3 words. Set 'suggestedDescription'.
 
 If you cannot confidently determine any of these, leave the respective field blank in the output.
 If there's a clear error in processing (e.g., image is not a receipt), set 'aiError'.

@@ -1,7 +1,7 @@
 
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, Coins, PiggyBank, Landmark, AlertTriangle, CreditCard } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Coins, PiggyBank, Landmark, AlertTriangle, CreditCard, Banknote, Target } from "lucide-react";
 import type { BudgetMonth, BudgetCategory, SubCategory } from "@/types/budget";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +24,8 @@ const getEffectiveCategoryBudget = (category: BudgetCategory): number => {
 export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   if (!budgetMonth) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-        {[...Array(5)].map((_, i) => ( 
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(6)].map((_, i) => ( 
           <Card key={i} className="animate-pulse">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="h-4 bg-muted rounded w-1/2"></div>
@@ -47,15 +47,18 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   const plannedSavings = savingsCategory ? getEffectiveCategoryBudget(savingsCategory) : 0;
   const actualSavings = savingsCategory ? getCategorySpentAmount(savingsCategory) : 0;
 
-  // This card will now reflect the total starting debt for the month
+  const ccPaymentsCategory = budgetMonth.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+  const plannedCCPayments = ccPaymentsCategory ? getEffectiveCategoryBudget(ccPaymentsCategory) : 0;
+  // const actualCCPayments = ccPaymentsCategory ? getCategorySpentAmount(ccPaymentsCategory) : 0; // Not used in main summary directly
+
   const startingCreditCardDebtForMonth = budgetMonth.startingCreditCardDebt || 0;
 
-  let operationalCategoriesBudget = 0;
+  let totalOperationalBudget = 0;
   let totalOperationalSpending = 0;
 
   budgetMonth.categories.forEach(cat => {
     if (!cat.isSystemCategory) { 
-      operationalCategoriesBudget += getEffectiveCategoryBudget(cat);
+      totalOperationalBudget += getEffectiveCategoryBudget(cat);
       if (cat.subcategories && cat.subcategories.length > 0) {
         cat.subcategories.forEach(sub => {
           totalOperationalSpending += getCategorySpentAmount(sub);
@@ -66,11 +69,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     }
   });
   
-  // This calculation now uses the total starting debt
-  const fundsAfterPrimaryAllocations = totalIncomeReceived - plannedSavings - startingCreditCardDebtForMonth;
-  const operationalAllocationDifference = fundsAfterPrimaryAllocations - operationalCategoriesBudget;
-  
-  const overallOperationalSpendingRemaining = operationalCategoriesBudget - totalOperationalSpending;
+  const overallOperationalSpendingRemaining = totalOperationalBudget - totalOperationalSpending;
   const isOverSpentOnOperational = overallOperationalSpendingRemaining < 0;
   
   let savingsStatusText = "No specific savings goal set this month.";
@@ -80,30 +79,51 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       savingsStatusText = "Goal Met!";
       savingsStatusColor = "text-green-600 dark:text-green-500 font-medium";
     } else if (actualSavings > 0) {
-      savingsStatusText = "Progress made. Keep going!";
+      savingsStatusText = `Saved $${actualSavings.toFixed(2)} of $${plannedSavings.toFixed(2)}. Keep going!`;
       savingsStatusColor = "text-amber-600 dark:text-amber-500";
     } else {
-      savingsStatusText = "Goal set, start saving!";
+      savingsStatusText = `Planned $${plannedSavings.toFixed(2)}. Start saving!`;
       savingsStatusColor = "text-muted-foreground";
     }
   } else if (actualSavings > 0) {
-      savingsStatusText = `Saved $${actualSavings.toFixed(2)} without a specific goal.`;
+      savingsStatusText = `Saved $${actualSavings.toFixed(2)} without a specific plan.`;
       savingsStatusColor = "text-green-600 dark:text-green-500";
   }
 
-
+  let operationalSpendingStatusText = `$${overallOperationalSpendingRemaining.toFixed(2)} remaining`;
   let operationalSpendingStatusColor = "text-muted-foreground";
-  if (operationalCategoriesBudget > 0) {
-    const spentRatio = totalOperationalSpending / operationalCategoriesBudget;
+  if (totalOperationalBudget > 0 || totalOperationalSpending > 0) { // Only apply colors if there's activity or budget
     if (isOverSpentOnOperational) {
+      operationalSpendingStatusText = `Overspent by $${Math.abs(overallOperationalSpendingRemaining).toFixed(2)}`;
       operationalSpendingStatusColor = "text-destructive font-medium";
-    } else if (spentRatio < 0.8) {
-      operationalSpendingStatusColor = "text-green-600 dark:text-green-500";
     } else {
-      operationalSpendingStatusColor = "text-amber-600 dark:text-amber-500";
+      const spentRatio = totalOperationalBudget > 0 ? totalOperationalSpending / totalOperationalBudget : 0;
+      if (spentRatio < 0.8 && totalOperationalSpending > 0) { // Well under and some spending
+        operationalSpendingStatusColor = "text-green-600 dark:text-green-500";
+      } else if (spentRatio <= 1 && totalOperationalSpending > 0) { // Close to budget or on budget
+        operationalSpendingStatusColor = "text-amber-600 dark:text-amber-500";
+      } else if (totalOperationalSpending === 0 && totalOperationalBudget > 0){ // Budgeted but not spent
+         operationalSpendingStatusColor = "text-green-600 dark:text-green-500";
+      } else if (totalOperationalBudget === 0 && totalOperationalSpending === 0) {
+         operationalSpendingStatusText = "No operational budget or spending.";
+      }
     }
-  } else if (totalOperationalSpending > 0) {
-     operationalSpendingStatusColor = "text-destructive font-medium"; // Spending with no budget
+  } else {
+     operationalSpendingStatusText = "No operational budget or spending.";
+  }
+
+  const monthlyBudgetBalance = totalIncomeReceived - plannedSavings - plannedCCPayments - totalOperationalBudget;
+  let balanceStatusText = "";
+  let balanceStatusColor = "text-muted-foreground";
+  if (monthlyBudgetBalance > 0) {
+    balanceStatusText = `Unallocated funds: $${monthlyBudgetBalance.toFixed(2)}`;
+    balanceStatusColor = "text-green-600 dark:text-green-500 font-medium";
+  } else if (monthlyBudgetBalance < 0) {
+    balanceStatusText = `Budget shortfall: $${Math.abs(monthlyBudgetBalance).toFixed(2)}`;
+    balanceStatusColor = "text-destructive font-medium";
+  } else {
+    balanceStatusText = "Budget is perfectly allocated!";
+    balanceStatusColor = "text-green-600 dark:text-green-500 font-medium";
   }
 
 
@@ -112,7 +132,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Income Received</CardTitle>
-          <Coins className="h-4 w-4 text-muted-foreground" />
+          <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${totalIncomeReceived.toFixed(2)}</div>
@@ -127,7 +147,6 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${actualSavings.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Planned: ${plannedSavings.toFixed(2)}</p>
           <p className={cn("text-xs mt-1", savingsStatusColor)}>{savingsStatusText}</p>
         </CardContent>
       </Card>
@@ -142,43 +161,44 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
           <p className="text-xs text-muted-foreground">Debt at the start of the month.</p>
         </CardContent>
       </Card>
-
-       <Card>
+      
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Operational Budget</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Planned CC Repayment</CardTitle>
+          <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${operationalCategoriesBudget.toFixed(2)}</div>
-           <p className="text-xs text-muted-foreground">
-            Available for ops (after savings & start debt): ${fundsAfterPrimaryAllocations.toFixed(2)}.
-          </p>
-          {operationalAllocationDifference >= 0 ? (
-            <p className="text-xs text-green-600 dark:text-green-500 mt-1">
-              Unbudgeted for operations: ${operationalAllocationDifference.toFixed(2)}.
-            </p>
-          ) : (
-            <p className="text-xs text-destructive mt-1 font-medium">
-              Operational budget shortfall: ${Math.abs(operationalAllocationDifference).toFixed(2)}.
-            </p>
-          )}
+          <div className="text-2xl font-bold">${plannedCCPayments.toFixed(2)}</div>
+          <p className="text-xs text-muted-foreground">Your planned debt repayment this month.</p>
         </CardContent>
       </Card>
       
-      <Card className="md:col-span-2 lg:col-span-2">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Spent (Operational)</CardTitle>
-          { isOverSpentOnOperational ? <TrendingDown className="h-4 w-4 text-destructive" /> : <TrendingUp className="h-4 w-4 text-muted-foreground" /> }
+          <CardTitle className="text-sm font-medium">Operational Budget & Spending</CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className={cn("text-2xl font-bold", isOverSpentOnOperational && "text-destructive")}>
-            ${totalOperationalSpending.toFixed(2)} 
+          <div className="text-xl font-bold mb-1">Budgeted: ${totalOperationalBudget.toFixed(2)}</div>
+          <div className={cn("text-xl font-bold", totalOperationalSpending > totalOperationalBudget && totalOperationalBudget > 0 ? "text-destructive" : "")}>
+            Spent: ${totalOperationalSpending.toFixed(2)}
           </div>
-          <p className={cn("text-xs", operationalSpendingStatusColor)}>
-            {isOverSpentOnOperational ? 
-              `Overspent by $${Math.abs(overallOperationalSpendingRemaining).toFixed(2)}` : 
-              (operationalCategoriesBudget > 0 || totalOperationalSpending > 0 ? `$${overallOperationalSpendingRemaining.toFixed(2)} remaining` : "No operational spending or budget.")}
+          <p className={cn("text-xs mt-1", operationalSpendingStatusColor)}>
+            {operationalSpendingStatusText}
           </p>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Monthly Budget Balance</CardTitle>
+          {monthlyBudgetBalance >= 0 ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
+        </CardHeader>
+        <CardContent>
+          <div className={cn("text-2xl font-bold", balanceStatusColor.includes('green') ? 'text-green-600 dark:text-green-500' : balanceStatusColor.includes('destructive') ? 'text-destructive' : '')}>
+            ${monthlyBudgetBalance.toFixed(2)}
+            </div>
+          <p className={cn("text-xs mt-1", balanceStatusColor)}>{balanceStatusText}</p>
         </CardContent>
       </Card>
     </div>

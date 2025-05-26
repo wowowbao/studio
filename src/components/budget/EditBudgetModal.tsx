@@ -146,11 +146,9 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         <SelectValue placeholder="Select icon" />
                       </SelectTrigger>
                       <SelectContent>
-                        <ScrollArea className="h-48">
+                        <ScrollArea className="h-72"> {/* Increased height from h-48 */}
                           {ALL_ICONS.map(iconName => {
                             const CurrentIcon = (LucideIcons as any)[iconName];
-                            // This check was added implicitly by correcting ALL_ICONS definition
-                            // No need for: if (typeof CurrentIcon !== 'function') return null;
                             return (
                               <SelectItem key={iconName} value={iconName}>
                                 <div className="flex items-center">

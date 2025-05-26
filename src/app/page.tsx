@@ -17,10 +17,11 @@ import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Landmark, PiggyBank } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { BudgetCategory } from '@/types/budget';
 
 
 export default function HomePage() {
@@ -31,7 +32,6 @@ export default function HomePage() {
     currentBudgetMonth, 
     currentDisplayMonthId, 
     isLoading: budgetLoading, 
-    // ensureMonthExists, // Removed as per new strategy
     budgetMonths,
   } = useBudget();
 
@@ -41,7 +41,6 @@ export default function HomePage() {
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
 
-  // Show guest alert only once per session after initial load if not authenticated
   useEffect(() => {
     if (!authLoading && !isUserAuthenticated) {
       const guestAlertDismissed = sessionStorage.getItem('guestAlertDismissed');
@@ -51,14 +50,9 @@ export default function HomePage() {
     }
   }, [authLoading, isUserAuthenticated]);
 
-  // The main data loading effect in useBudgetCore.ts, triggered by currentDisplayMonthId changes,
-  // is now responsible for ensuring the month exists.
-  // The useEffect block that previously called ensureMonthExists here has been removed.
-
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      // Data saving/loading will switch to guest mode in useBudgetCore
       router.push('/'); 
     } catch (error) {
       console.error("Error signing out: ", error);
@@ -88,7 +82,24 @@ export default function HomePage() {
     );
   }
   
-  const categories = currentBudgetMonth?.categories || [];
+  const allCategories = currentBudgetMonth?.categories || [];
+  const systemCategories: BudgetCategory[] = [];
+  const operationalCategories: BudgetCategory[] = [];
+
+  allCategories.forEach(cat => {
+    if (cat.isSystemCategory && (cat.name.toLowerCase() === 'savings' || cat.name.toLowerCase() === 'credit card payments')) {
+      systemCategories.push(cat);
+    } else if (!cat.isSystemCategory) {
+      operationalCategories.push(cat);
+    }
+  });
+  // Ensure specific order for system categories if needed
+  systemCategories.sort((a, b) => {
+    if (a.name.toLowerCase() === 'savings') return -1; // Savings first
+    if (b.name.toLowerCase() === 'savings') return 1;
+    return 0;
+  });
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -183,17 +194,36 @@ export default function HomePage() {
               onAddIncome={() => setIsAddIncomeModalOpen(true)}
             />
 
-            {categories.length > 0 ? (
+            {systemCategories.length > 0 && (
               <>
-                <h2 className="text-xl font-semibold mt-8 mb-4 text-primary">Categories</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categories.map(cat => (
+                <h2 className="text-xl font-semibold mt-8 mb-4 text-primary flex items-center">
+                  <PiggyBank className="mr-2 h-6 w-6 text-primary/80" /> Financial Goals & Obligations
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                  {systemCategories.map(cat => (
                     <CategoryCard key={cat.id} category={cat} />
                   ))}
                 </div>
-                <BudgetChart budgetMonth={currentBudgetMonth} />
               </>
-            ) : (
+            )}
+
+            {operationalCategories.length > 0 && (
+              <>
+                <h2 className="text-xl font-semibold mt-6 mb-4 text-primary">Operational Categories</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {operationalCategories.map(cat => (
+                    <CategoryCard key={cat.id} category={cat} />
+                  ))}
+                </div>
+              </>
+            )}
+            
+            {(systemCategories.length > 0 || operationalCategories.length > 0) && (
+                <BudgetChart budgetMonth={currentBudgetMonth} />
+            )}
+
+
+            {allCategories.length === 0 && (
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
                   <AlertTriangle className="mx-auto h-10 w-10 text-accent mb-3" />

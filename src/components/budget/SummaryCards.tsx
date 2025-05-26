@@ -25,7 +25,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   if (!budgetMonth) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-        {[...Array(6)].map((_, i) => ( 
+        {[...Array(6)].map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="h-4 bg-muted rounded w-1/2"></div>
@@ -68,9 +68,8 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     }
   });
   
-  const fundsAvailableForBudgeting = totalIncomeReceived - plannedCCPayments;
-  const totalAllocatedFromAvailable = plannedSavings + operationalCategoriesBudget;
-  const budgetAllocationDifference = fundsAvailableForBudgeting - totalAllocatedFromAvailable;
+  const fundsAvailableForOperational = totalIncomeReceived - plannedSavings - plannedCCPayments;
+  const operationalBudgetAllocationDifference = fundsAvailableForOperational - operationalCategoriesBudget;
   
   const overallOperationalSpendingRemaining = operationalCategoriesBudget - totalOperationalSpending;
   const isOverSpentOverallOnOperational = overallOperationalSpendingRemaining < 0;
@@ -87,28 +86,6 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
           <p className="text-xs text-muted-foreground">Total income recorded for this month.</p>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Planned CC Payments</CardTitle>
-          <Landmark className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">${plannedCCPayments.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Budgeted for "Credit Card Payments".</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Funds Available for Budgeting</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">${fundsAvailableForBudgeting.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Income after planned CC payments.</p>
-        </CardContent>
-      </Card>
       
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -121,6 +98,17 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Planned CC Payments</CardTitle>
+          <Landmark className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">${plannedCCPayments.toFixed(2)}</div>
+          <p className="text-xs text-muted-foreground">Budgeted for "Credit Card Payments".</p>
+        </CardContent>
+      </Card>
+
        <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Operational Budget</CardTitle>
@@ -128,10 +116,11 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${operationalCategoriesBudget.toFixed(2)}</div>
-           <p className={cn("text-xs", budgetAllocationDifference < 0 ? "text-destructive/80" : "text-muted-foreground")}>
-            {budgetAllocationDifference < 0 
-              ? `Over-allocated by $${Math.abs(budgetAllocationDifference).toFixed(2)} (Savings + Operational)` 
-              : `$${budgetAllocationDifference.toFixed(2)} of available funds not allocated to savings/operational`}
+           <p className={cn("text-xs", operationalBudgetAllocationDifference < 0 ? "text-destructive/80" : "text-muted-foreground")}>
+            Funds for operations (after savings & CC pay): ${fundsAvailableForOperational.toFixed(2)}.
+            {operationalBudgetAllocationDifference < 0 
+              ? ` Over-budgeted by $${Math.abs(operationalBudgetAllocationDifference).toFixed(2)}.` 
+              : ` $${operationalBudgetAllocationDifference.toFixed(2)} unallocated.`}
           </p>
         </CardContent>
       </Card>

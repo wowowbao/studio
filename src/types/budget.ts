@@ -26,7 +26,7 @@ export interface BudgetCategory {
   budgetedAmount: number;
   expenses: Expense[];
   subcategories?: SubCategory[];
-  isSystemCategory?: boolean; // To identify special categories like "Savings" or "Credit Card Payments"
+  isSystemCategory?: boolean; // To identify special categories like "Credit Card Payments"
 }
 
 export interface BudgetMonth {
@@ -45,8 +45,9 @@ export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'mon
   startingCreditCardDebt?: number;
 };
 
+// "Savings" category is removed. Savings are now tracked against a global savingsGoal
+// and calculated as (Income - Operational Spending - CC Payments).
 export const DEFAULT_CATEGORIES: Omit<BudgetCategory, 'id' | 'budgetedAmount' | 'subcategories' | 'expenses'>[] = [
-  { name: "Savings", isSystemCategory: true },
   { name: "Credit Card Payments", isSystemCategory: true },
   { name: "Groceries" },
   { name: "Rent/Mortgage" },

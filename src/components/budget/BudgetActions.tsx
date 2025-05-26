@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 interface BudgetActionsProps {
   onEditBudget: () => void;
   onAddExpense: () => void;
-  onAddIncome: () => void; // New prop
+  onAddIncome: () => void;
 }
 
 export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: BudgetActionsProps) {
@@ -32,16 +32,15 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
   const handleRolloverUnspent = () => {
     const result = rolloverUnspentBudget(currentDisplayMonthId);
     toast({
-      title: result.success ? "Rollover Processed" : "Rollover Info",
+      title: result.success ? "Month Closed" : "Month Close Info",
       description: result.message,
       variant: result.success ? "default" : "default",
       action: result.success ? <CheckCircle className="text-green-500" /> : <AlertTriangle className="text-yellow-500" />,
     });
   };
   
-  const hasSavingsCategory = currentBudgetMonth?.categories.some(cat => cat.name.toLowerCase() === 'savings');
+  // hasSavingsCategory is no longer relevant as Savings is not a category
   const isRolledOver = currentBudgetMonth?.isRolledOver;
-
   const disablePrimaryActions = isRolledOver;
 
 
@@ -51,7 +50,7 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
         <Button onClick={onEditBudget} variant="outline" className="w-full" disabled={disablePrimaryActions}>
           <Edit3 className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Edit Budget"}
         </Button>
-        <Button onClick={onAddIncome} variant="outline" className="w-full" disabled={disablePrimaryActions}> {/* New Add Income Button */}
+        <Button onClick={onAddIncome} variant="outline" className="w-full" disabled={disablePrimaryActions}>
             <Coins className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Income"}
         </Button>
         <Button onClick={onAddExpense} className="w-full" disabled={disablePrimaryActions}>
@@ -64,10 +63,10 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
           onClick={handleRolloverUnspent} 
           variant="secondary" 
           className="w-full sm:col-span-2"
-          disabled={isRolledOver || !hasSavingsCategory}
+          disabled={isRolledOver} // Only disable if already rolled over
         >
           <ArchiveRestore className="mr-2 h-4 w-4" /> 
-          {isRolledOver ? "Month Closed" : (!hasSavingsCategory ? "No Savings Cat." : "Rollover Unspent")}
+          {isRolledOver ? "Month Closed" : "Finalize & Close Month"}
         </Button>
       </div>
        {isRolledOver && (
@@ -75,11 +74,7 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
           This month's budget has been closed. Editing, adding expenses/income, and rollover are disabled.
         </p>
       )}
-      {!isRolledOver && !hasSavingsCategory && (
-        <p className="text-xs text-muted-foreground mt-3 text-center">
-          Create a "Savings" category to enable rollover of unspent funds.
-        </p>
-      )}
+      {/* Message about needing a "Savings" category is removed as it's no longer relevant */}
     </div>
   );
 }

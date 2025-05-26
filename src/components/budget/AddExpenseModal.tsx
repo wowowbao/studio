@@ -119,14 +119,15 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       }
       // Sort options: System categories first, then others alphabetically
       options.sort((a, b) => {
-        const aIsSystem = budgetData?.categories.find(c => c.id === a.value)?.isSystemCategory || false;
-        const bIsSystem = budgetData?.categories.find(c => c.id === b.value)?.isSystemCategory || false;
+        const aIsSystem = budgetData?.categories.find(c => c.id === (a.parentCategoryId || a.value))?.isSystemCategory || budgetData?.categories.find(c => c.id === a.value)?.isSystemCategory || false;
+        const bIsSystem = budgetData?.categories.find(c => c.id === (b.parentCategoryId || b.value))?.isSystemCategory || budgetData?.categories.find(c => c.id === b.value)?.isSystemCategory || false;
+
         if (aIsSystem && !bIsSystem) return -1;
         if (!aIsSystem && bIsSystem) return 1;
         if (aIsSystem && bIsSystem) { // Specific order for system categories
             if (a.label === "Savings") return -1;
             if (b.label === "Savings") return 1;
-            if (a.label === "Credit Card Payments") return -1; // After Savings
+            if (a.label === "Credit Card Payments") return -1; 
             if (b.label === "Credit Card Payments") return 1;
         }
         return a.label.localeCompare(b.label);
@@ -137,7 +138,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       setCameraStream(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, monthId, budgetLoading]); // Removed getBudgetForMonth from deps as it's stable from useBudget
+  }, [isOpen, monthId, budgetLoading]);
 
 
   const getCameraPermissionAndStream = async (deviceId?: string): Promise<MediaStream | null> => {
@@ -407,7 +408,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md w-[90vw] max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
         </DialogHeader>
@@ -536,16 +537,16 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           ) : categoryOptions.length === 0 ? (
             <p className="text-muted-foreground py-4">No categories or subcategories available for this month. Please add them first in 'Manage Budget'.</p>
           ) : (
-            <>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="category" className="text-right col-span-1">
+            <div className="space-y-4"> {/* Changed from grid to space-y for stacking */}
+              <div className="space-y-1"> {/* Group for Label + Input */}
+                <Label htmlFor="category">
                   Category
                 </Label>
                 <Select value={selectedTargetId} onValueChange={handleSelectionChange} disabled={isAiProcessing}>
-                  <SelectTrigger id="category" className="col-span-3">
+                  <SelectTrigger id="category" className="w-full"> {/* Ensure full width */}
                     <SelectValue placeholder="Select target" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60"> {/* Added max-h-60 for scroll */}
+                  <SelectContent className="max-h-60">
                     {categoryOptions.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
@@ -554,8 +555,8 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right col-span-1">
+              <div className="space-y-1">
+                <Label htmlFor="amount">
                   Amount
                 </Label>
                 <Input
@@ -564,12 +565,12 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="col-span-3"
+                  className="w-full"
                   disabled={isAiProcessing}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right col-span-1">
+              <div className="space-y-1">
+                <Label htmlFor="description">
                   Description
                 </Label>
                 <Textarea
@@ -577,13 +578,13 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g., Weekly groceries"
-                  className="col-span-3"
+                  className="w-full"
                   rows={2}
                   disabled={isAiProcessing}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right col-span-1">
+              <div className="space-y-1">
+                <Label htmlFor="date">
                   Date
                 </Label>
                 <Popover>
@@ -591,7 +592,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                     <Button
                       variant={"outline"}
                       className={cn(
-                        "col-span-3 justify-start text-left font-normal",
+                        "w-full justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                       )}
                       disabled={isAiProcessing}
@@ -610,7 +611,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   </PopoverContent>
                 </Popover>
               </div>
-               <Alert variant="default" className="mt-4 col-span-4">
+               <Alert variant="default" className="mt-4">
                   <Info className="h-4 w-4" />
                   <AlertTitle className="font-semibold">Quick Tip!</AlertTitle>
                   <AlertDescription className="text-xs">
@@ -618,16 +619,16 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                     For credit card payments, select "Credit Card Payments". These are treated as expenses to these specific categories.
                   </AlertDescription>
                 </Alert>
-            </>
+            </div>
           )}
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-0">
           <DialogClose asChild>
-            <Button variant="outline" onClick={onCloseModal} disabled={isAiProcessing}>
+            <Button variant="outline" onClick={onCloseModal} disabled={isAiProcessing} className="w-full sm:w-auto">
               <XCircle className="mr-2 h-4 w-4" /> Cancel
             </Button>
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={budgetLoading || categoryOptions.length === 0 || isAiProcessing}>
+          <Button onClick={handleSubmit} disabled={budgetLoading || categoryOptions.length === 0 || isAiProcessing} className="w-full sm:w-auto">
             {isAiProcessing && !imageDataUri && mode !== 'cameraView' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
             {isAiProcessing && !imageDataUri && mode !== 'cameraView' ? "Processing..." : (isAiProcessing ? "Processing..." : "Add Expense")}
           </Button>

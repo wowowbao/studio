@@ -2,7 +2,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { useBudget } from "@/hooks/useBudget";
-import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2, CheckCircle, AlertTriangle } from "lucide-react"; // Added CheckCircle & AlertTriangle
+import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2, CheckCircle, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BudgetActionsProps {
@@ -30,13 +30,15 @@ export function BudgetActions({
 
     if (result.success) {
       if (currentBudgetMonth.isRolledOver) { 
+        // This case means the month was just reopened
         toast({
           title: "Month Reopened",
           description: result.message,
           action: <ArchiveX className="text-blue-500" />
         });
       } else {
-        // Toast for successful month close is now handled by the summary modal trigger
+        // This case means the month was just closed
+        // Toast for successful month close is now handled by the summary modal trigger in page.tsx
         onFinalizeMonth(); 
       }
     } else {
@@ -55,6 +57,10 @@ export function BudgetActions({
 
   return (
     <div className="my-6 p-4 bg-card border rounded-lg shadow-sm space-y-3">
+      <Button onClick={onAddExpense} className="w-full" disabled={disablePrimaryActions}>
+        <PlusCircle className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Expense"}
+      </Button>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Button onClick={onEditBudget} variant="outline" className="w-full" disabled={disablePrimaryActions}>
           <Edit3 className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Manage Budget"}
@@ -63,10 +69,6 @@ export function BudgetActions({
             <Coins className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Manage Income"}
         </Button>
       </div>
-      
-      <Button onClick={onAddExpense} className="w-full" disabled={disablePrimaryActions}>
-        <PlusCircle className="mr-2 h-4 w-4" /> {disablePrimaryActions ? "Month Closed" : "Add Expense"}
-      </Button>
         
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
         <Button onClick={onPrepNextMonth} variant="secondary" className="w-full">

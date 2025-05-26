@@ -52,14 +52,14 @@ export function CategoryCard({ category }: CategoryCardProps) {
 
   let mainProgressIndicatorClassName = "bg-primary"; 
   if (isCCPaymentsCategory && mainCategorySpentAmount > 0) {
-    mainProgressIndicatorClassName = mainGoalMet ? "bg-green-500" : "bg-green-500"; // Keep green if any paid
+    mainProgressIndicatorClassName = mainGoalMet ? "bg-green-500" : "bg-green-500"; 
   } else if (isSavingsCategory && mainCategorySpentAmount > 0) {
-    mainProgressIndicatorClassName = mainGoalMet ? "bg-green-500" : "bg-green-500"; // Keep green if any saved
+    mainProgressIndicatorClassName = mainGoalMet ? "bg-green-500" : "bg-green-500"; 
   } else if (mainCategoryIsOverBudget) {
     mainProgressIndicatorClassName = "bg-destructive";
   }
   
-  if (mainGoalMet) { // This handles the 'goal met' state for savings/cc payments
+  if (mainGoalMet) { 
     mainProgressIndicatorClassName = "bg-green-500";
   }
 
@@ -76,7 +76,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
     mainRemainingTextClass = "text-destructive";
     mainRemainingIsBold = true;
   } else { 
-    if (category.budgetedAmount > 0 && mainCategorySpentAmount > 0) { // Only color if budget exists and spending occurred
+    if (category.budgetedAmount > 0 && mainCategorySpentAmount > 0) { 
         const spentRatio = mainCategorySpentAmount / category.budgetedAmount;
         if (spentRatio < 0.8) { 
             mainRemainingTextClass = "text-green-600 dark:text-green-500";
@@ -86,7 +86,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
     } else if (category.budgetedAmount === 0 && mainCategorySpentAmount === 0) {
         // Keep default color if budget and spent are both 0
     } else if (category.budgetedAmount > 0 && mainCategorySpentAmount === 0) {
-        mainRemainingTextClass = "text-green-600 dark:text-green-500"; // Fully unspent, positive
+        mainRemainingTextClass = "text-green-600 dark:text-green-500"; 
     }
   }
 
@@ -108,7 +108,16 @@ export function CategoryCard({ category }: CategoryCardProps) {
     }
     const remaining = subCategory.budgetedAmount - spent;
     const isOverBudget = remaining < 0;
-    const sortedExpenses = [...(subCategory.expenses || [])].sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
+    
+    // Apply robust sorting directly here
+    const sortedExpenses = [...(subCategory.expenses || [])].sort((a, b) => {
+      const dateA = new Date(a.dateAdded);
+      const dateB = new Date(b.dateAdded);
+      if (!isValid(dateA) && !isValid(dateB)) return 0; // both invalid, treat as equal
+      if (!isValid(dateA)) return 1; // invalid A comes after valid B (sorts invalid to the end)
+      if (!isValid(dateB)) return -1; // invalid B comes after valid A (sorts invalid to the end)
+      return dateB.getTime() - dateA.getTime(); // newest first
+    });
     return { spent, progress, remaining, isOverBudget, expenses: sortedExpenses, subCategory };
   };
 
@@ -138,7 +147,8 @@ export function CategoryCard({ category }: CategoryCardProps) {
   const sortedMainCategoryExpenses = [...safeCategoryExpenses].sort((a,b) => {
       const dateA = new Date(a.dateAdded);
       const dateB = new Date(b.dateAdded);
-      if (!isValid(dateA)) return 1; // push invalid dates to the end
+      if (!isValid(dateA) && !isValid(dateB)) return 0;
+      if (!isValid(dateA)) return 1; 
       if (!isValid(dateB)) return -1;
       return dateB.getTime() - dateA.getTime();
   });

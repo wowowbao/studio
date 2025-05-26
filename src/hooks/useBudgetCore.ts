@@ -178,7 +178,7 @@ export const useBudgetCore = () => {
     });
 
     return () => unsubscribe();
-  }, [user, authLoading, currentDisplayMonthId]); // Added currentDisplayMonthId
+  }, [user, authLoading, currentDisplayMonthId, getUserBudgetDocRef]); // Added getUserBudgetDocRef and currentDisplayMonthId
 
 
   const saveBudgetMonthsToFirestore = useCallback(async (monthsToSave: Record<string, BudgetMonth>) => {
@@ -303,7 +303,7 @@ export const useBudgetCore = () => {
       // Firestore save will be triggered by the useEffect watching budgetMonths
     }
     return monthData!;
-  }, [budgetMonths, createNewMonthBudget, setBudgetMonths]);
+  }, [budgetMonths, createNewMonthBudget]);
 
 
   const updateMonthBudget = useCallback((yearMonthId: string, payload: BudgetUpdatePayload) => {
@@ -351,7 +351,7 @@ export const useBudgetCore = () => {
     if (updatedMonth.incomes === undefined) updatedMonth.incomes = [];
 
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
 
   const addExpense = useCallback((yearMonthId: string, categoryOrSubCategoryId: string, amount: number, description: string, dateAdded: string, isSubCategory: boolean = false) => {
@@ -375,7 +375,7 @@ export const useBudgetCore = () => {
     });
     const updatedMonth = { ...monthToUpdate, categories: updatedCategoriesList };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
   
   const deleteExpense = useCallback((yearMonthId: string, categoryOrSubCategoryId: string, expenseId: string, isSubCategory: boolean = false) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
@@ -396,7 +396,7 @@ export const useBudgetCore = () => {
     });
     const updatedMonth = { ...monthToUpdate, categories: updatedCategoriesList };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
   const addIncome = useCallback((yearMonthId: string, description: string, amount: number, dateAdded: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
@@ -405,7 +405,7 @@ export const useBudgetCore = () => {
     const newIncomeEntry: IncomeEntry = { id: uuidv4(), description, amount, dateAdded };
     const updatedMonth = { ...monthToUpdate, incomes: [...(monthToUpdate.incomes || []), newIncomeEntry] };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
   const deleteIncome = useCallback((yearMonthId: string, incomeId: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
@@ -413,7 +413,7 @@ export const useBudgetCore = () => {
 
     const updatedMonth = { ...monthToUpdate, incomes: (monthToUpdate.incomes || []).filter(inc => inc.id !== incomeId) };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
 
   const duplicateMonthBudget = useCallback((sourceMonthId: string, targetMonthId: string) => {
@@ -499,7 +499,7 @@ export const useBudgetCore = () => {
 
     setBudgetMonths(prev => ({ ...prev, [targetMonthId]: newMonthData }));
     setCurrentDisplayMonthId(targetMonthId); 
-  }, [getBudgetForMonth, budgetMonths, createNewMonthBudget, setCurrentDisplayMonthId, setBudgetMonths]); 
+  }, [getBudgetForMonth, budgetMonths, createNewMonthBudget, setCurrentDisplayMonthId]); 
 
   const navigateToPreviousMonth = useCallback(() => {
     const prevMonthId = getPreviousMonthId(currentDisplayMonthId);
@@ -529,7 +529,7 @@ export const useBudgetCore = () => {
     
     return { success: true, message: "Month closed and finalized." };
 
-  }, [getBudgetForMonth, setBudgetMonths]); 
+  }, [getBudgetForMonth]); 
 
   const addCategoryToMonth = useCallback((yearMonthId: string, categoryName: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId); 
@@ -542,7 +542,7 @@ export const useBudgetCore = () => {
 
     const updatedMonth = { ...monthToUpdate, categories: updatedCategories };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]); 
+  }, [ensureMonthExists]); 
 
   const updateCategoryInMonth = useCallback((yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories' | 'isSystemCategory'>>) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
@@ -559,7 +559,7 @@ export const useBudgetCore = () => {
     const { updatedCategories } = ensureSystemCategories(newCategories, monthToUpdate.startingCreditCardDebt || 0);
     const updatedMonth = { ...monthToUpdate, categories: updatedCategories };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
   
   const deleteCategoryFromMonth = useCallback((yearMonthId: string, categoryId: string) => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
@@ -572,7 +572,7 @@ export const useBudgetCore = () => {
 
     const updatedMonth = { ...monthToUpdate, categories: updatedCategories };
     setBudgetMonths(prev => ({ ...prev, [yearMonthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
   const addSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => {
     const monthToUpdate = ensureMonthExists(monthId);
@@ -588,7 +588,7 @@ export const useBudgetCore = () => {
     });
     const updatedMonth = { ...monthToUpdate, categories: updatedCategoriesList };
     setBudgetMonths(prev => ({ ...prev, [monthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
   const updateSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => {
     const monthToUpdate = ensureMonthExists(monthId);
@@ -608,7 +608,7 @@ export const useBudgetCore = () => {
     });
     const updatedMonth = { ...monthToUpdate, categories: updatedCategoriesList };
     setBudgetMonths(prev => ({ ...prev, [monthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
   const deleteSubCategory = useCallback((monthId: string, parentCategoryId: string, subCategoryId: string) => {
     const monthToUpdate = ensureMonthExists(monthId);
@@ -623,7 +623,7 @@ export const useBudgetCore = () => {
     });
     const updatedMonth = { ...monthToUpdate, categories: updatedCategoriesList };
     setBudgetMonths(prev => ({ ...prev, [monthId]: updatedMonth }));
-  }, [ensureMonthExists, setBudgetMonths]);
+  }, [ensureMonthExists]);
 
 
   return {

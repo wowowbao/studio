@@ -3,7 +3,9 @@
 import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload } from '@/types/budget';
 import { DEFAULT_CATEGORIES } from '@/types/budget';
 import { useState, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs for categories
+import { v4 as uuidv4 } from 'uuid';
+import { auth } from '@/lib/firebase'; // Import auth to get current user
+import type { User } from 'firebase/auth';
 
 // Helper to get current YYYY-MM string
 export const getCurrentYearMonth = (): string => {
@@ -23,54 +25,91 @@ export const parseYearMonth = (yearMonth: string): Date => {
 };
 
 export const useBudgetCore = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser);
   const [budgetMonths, setBudgetMonths] = useState<Record<string, BudgetMonth>>({});
   const [currentDisplayMonthId, setCurrentDisplayMonthId] = useState<string>(getCurrentYearMonth());
   const [isLoading, setIsLoading] = useState(true);
 
+  // Listen to Firebase auth state changes to update currentUser
   useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      setCurrentUser(user);
+      // When user changes, we might need to reload/re-initialize budget data
+      // This effect will trigger the data load/save effects below.
+    });
+    return () => unsubscribe();
+  }, []);
+  
+  const getBudgetDataKey = useCallback(() => {
+    return `budgetFlowData-${currentUser?.uid || 'guest'}`;
+  }, [currentUser]);
+
+  const getDisplayMonthKey = useCallback(() => {
+    return `budgetFlowDisplayMonth-${currentUser?.uid || 'guest'}`;
+  }, [currentUser]);
+
+
+  // Load data from localStorage when component mounts or user changes
+  useEffect(() => {
+    setIsLoading(true);
     try {
-      const storedBudgets = localStorage.getItem('budgetFlowData');
+      const budgetDataKey = getBudgetDataKey();
+      const displayMonthKey = getDisplayMonthKey();
+
+      const storedBudgets = localStorage.getItem(budgetDataKey);
       if (storedBudgets) {
         setBudgetMonths(JSON.parse(storedBudgets));
       } else {
-        // Initialize with current month if no data found
         const initialMonthId = getCurrentYearMonth();
         const newMonth = createNewMonthBudget(initialMonthId);
         setBudgetMonths({ [initialMonthId]: newMonth });
       }
-      const storedDisplayMonth = localStorage.getItem('budgetFlowDisplayMonth');
-      if (storedDisplayMonth && Object.keys(budgetMonths).includes(storedDisplayMonth)) {
+      
+      const storedDisplayMonth = localStorage.getItem(displayMonthKey);
+      // Validate if storedDisplayMonth is for the current user's data scope
+      const currentBudgets = storedBudgets ? JSON.parse(storedBudgets) : {};
+      if (storedDisplayMonth && Object.keys(currentBudgets).includes(storedDisplayMonth)) {
          setCurrentDisplayMonthId(storedDisplayMonth);
       } else {
-        setCurrentDisplayMonthId(getCurrentYearMonth());
+        // If not valid or not present, default to current month
+        const currentMonthDefault = getCurrentYearMonth();
+        setCurrentDisplayMonthId(currentMonthDefault);
+        // If initializing, ensure this default month exists in budgetMonths
+        if (!currentBudgets[currentMonthDefault]) {
+            const newMonth = createNewMonthBudget(currentMonthDefault);
+            setBudgetMonths(prev => ({ ...prev, [currentMonthDefault]: newMonth }));
+        }
       }
 
     } catch (error) {
       console.error("Failed to load budgets from localStorage:", error);
-      // Initialize with current month on error
       const initialMonthId = getCurrentYearMonth();
       const newMonth = createNewMonthBudget(initialMonthId);
       setBudgetMonths({ [initialMonthId]: newMonth });
       setCurrentDisplayMonthId(initialMonthId);
     }
     setIsLoading(false);
-  }, []);
+  }, [currentUser, getBudgetDataKey, getDisplayMonthKey]); // Rerun on user change
 
+  // Save data to localStorage when budgetMonths changes
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading) { // Only save if not initially loading
       try {
-        localStorage.setItem('budgetFlowData', JSON.stringify(budgetMonths));
+        const budgetDataKey = getBudgetDataKey();
+        localStorage.setItem(budgetDataKey, JSON.stringify(budgetMonths));
       } catch (error) {
         console.error("Failed to save budgets to localStorage:", error);
       }
     }
-  }, [budgetMonths, isLoading]);
+  }, [budgetMonths, isLoading, getBudgetDataKey]);
 
+  // Save display month to localStorage when it changes
   useEffect(() => {
     if(!isLoading) {
-      localStorage.setItem('budgetFlowDisplayMonth', currentDisplayMonthId);
+      const displayMonthKey = getDisplayMonthKey();
+      localStorage.setItem(displayMonthKey, currentDisplayMonthId);
     }
-  }, [currentDisplayMonthId, isLoading]);
+  }, [currentDisplayMonthId, isLoading, getDisplayMonthKey]);
 
 
   const createNewMonthBudget = useCallback((yearMonthId: string): BudgetMonth => {
@@ -113,7 +152,6 @@ export const useBudgetCore = () => {
         updatedMonth.savingsGoal = payload.savingsGoal;
       }
       if (payload.categories) {
-         // Ensure all new categories have IDs and default spent/budgeted amounts if missing
         updatedMonth.categories = payload.categories.map(cat => ({
           id: cat.id || uuidv4(),
           name: cat.name,
@@ -205,8 +243,8 @@ export const useBudgetCore = () => {
     const [targetYear, targetMonthNum] = targetMonthId.split('-').map(Number);
     const newCategories = sourceBudget.categories.map(cat => ({
       ...cat,
-      id: uuidv4(), // New ID for the duplicated category
-      spentAmount: 0, // Reset spent amount for the new month
+      id: uuidv4(), 
+      spentAmount: 0, 
     }));
 
     const newMonthData: BudgetMonth = {
@@ -214,18 +252,18 @@ export const useBudgetCore = () => {
       year: targetYear,
       month: targetMonthNum,
       categories: newCategories,
-      savingsGoal: sourceBudget.savingsGoal, // Carry over savings goal
+      savingsGoal: sourceBudget.savingsGoal,
     };
 
     setBudgetMonths(prev => ({ ...prev, [targetMonthId]: newMonthData }));
-    setCurrentDisplayMonthId(targetMonthId); // Switch view to the new month
+    setCurrentDisplayMonthId(targetMonthId); 
   }, [getBudgetForMonth]);
 
   const navigateToPreviousMonth = useCallback(() => {
     const currentDate = parseYearMonth(currentDisplayMonthId);
     currentDate.setMonth(currentDate.getMonth() - 1);
     const prevMonthId = getYearMonthFromDate(currentDate);
-    ensureMonthExists(prevMonthId);
+    ensureMonthExists(prevMonthId); // Ensure month exists before setting it as current
     setCurrentDisplayMonthId(prevMonthId);
   }, [currentDisplayMonthId, ensureMonthExists]);
 
@@ -233,7 +271,7 @@ export const useBudgetCore = () => {
     const currentDate = parseYearMonth(currentDisplayMonthId);
     currentDate.setMonth(currentDate.getMonth() + 1);
     const nextMonthId = getYearMonthFromDate(currentDate);
-    ensureMonthExists(nextMonthId);
+    ensureMonthExists(nextMonthId); // Ensure month exists before setting it as current
     setCurrentDisplayMonthId(nextMonthId);
   }, [currentDisplayMonthId, ensureMonthExists]);
   
@@ -253,7 +291,7 @@ export const useBudgetCore = () => {
     budgetMonths,
     currentDisplayMonthId,
     currentBudgetMonth,
-    isLoading,
+    isLoading, // This now primarily reflects localStorage loading
     getBudgetForMonth,
     updateMonthBudget,
     addExpense,

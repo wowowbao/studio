@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { BudgetProvider } from '@/components/providers/BudgetProvider';
+import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
 
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
   title: 'BudgetFlow',
   description: 'Manage your monthly budget with ease.',
   manifest: '/manifest.json', // For PWA capabilities
-  themeColor: '#6699CC', // Primary color
+  // themeColor: '#0F172A', // Example for dark primary from new theme
   appleWebAppCapable: 'yes',
   appleWebAppStatusBarStyle: 'default',
 };
@@ -31,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>{/* Added suppressHydrationWarning for next-themes */}
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
@@ -39,12 +40,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <BudgetProvider>
-            <div className="flex flex-col min-h-screen">
-              {children}
-            </div>
-            <Toaster />
-          </BudgetProvider>
+          <AuthProvider> {/* Wrap BudgetProvider with AuthProvider */}
+            <BudgetProvider>
+              <div className="flex flex-col min-h-screen">
+                {children}
+              </div>
+              <Toaster />
+            </BudgetProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

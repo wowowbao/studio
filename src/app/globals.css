@@ -3,102 +3,102 @@
 @tailwind utilities;
 
 body {
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 @layer base {
   :root {
-    --background: 208 100% 97%; /* #F0F8FF - Light, desaturated blue */
-    --foreground: 224 71% 4%; /* Darker blue for text, for contrast on light blue */
+    --background: 0 0% 98%; /* Very light gray */
+    --foreground: 0 0% 17%; /* Dark gray */
 
-    --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 0 0% 17%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
+    --popover-foreground: 0 0% 17%;
 
-    --primary: 210 40% 60%; /* #6699CC - Calming blue */
-    --primary-foreground: 0 0% 100%; /* White text on primary */
+    --primary: 0 0% 9%; /* Near black for primary actions */
+    --primary-foreground: 0 0% 98%; /* Light text on primary */
 
-    --secondary: 210 40% 85%; /* Lighter shade of primary for secondary elements */
-    --secondary-foreground: 210 40% 30%; /* Darker blue for text on secondary */
+    --secondary: 0 0% 94%; /* Lighter gray for secondary elements */
+    --secondary-foreground: 0 0% 9%; /* Dark text on secondary */
 
-    --muted: 210 40% 90%; /* Muted version of primary */
-    --muted-foreground: 210 25% 45%; 
+    --muted: 0 0% 90%; 
+    --muted-foreground: 0 0% 45%; 
 
-    --accent: 33 100% 64%; /* #FFB347 - Warm orange */
-    --accent-foreground: 0 0% 0%; /* Black/Dark text on accent */
+    --accent: 0 0% 50%; /* A mid-gray for accents */
+    --accent-foreground: 0 0% 98%; /* Light text on accent */
 
-    --destructive: 0 72% 51%; /* Standard destructive red */
+    --destructive: 0 84% 60%; /* Standard destructive red */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 20% 75%; /* Softer border color */
-    --input: 210 20% 90%; /* Input background */
-    --ring: 210 40% 60%; /* Ring color same as primary */
+    --border: 0 0% 88%; /* Light gray border */
+    --input: 0 0% 96%; /* Slightly off-white for inputs */
+    --ring: 0 0% 60%; /* Gray for focus rings */
 
-    --chart-1: 210 40% 60%; /* Primary */
-    --chart-2: 33 100% 64%; /* Accent */
-    --chart-3: 120 40% 60%; /* A green for positive values */
-    --chart-4: 0 60% 60%; /* A red for negative/overages */
-    --chart-5: 240 40% 60%; /* Another blue variant */
+    --chart-1: 0 0% 50%; /* Primary gray */
+    --chart-2: 0 0% 30%; /* Darker Accent gray */
+    --chart-3: 120 30% 60%; /* A desaturated green for positive values */
+    --chart-4: 0 70% 65%; /* A desaturated red for negative/overages */
+    --chart-5: 0 0% 70%; /* Another gray variant */
 
-    --radius: 0.5rem;
+    --radius: 0.75rem; /* Apple-like radius */
 
-    /* Sidebar variables updated to match theme, though sidebar might not be used */
-    --sidebar-background: 208 100% 95%;
-    --sidebar-foreground: 224 71% 4%;
-    --sidebar-primary: 210 40% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 33 100% 64%;
-    --sidebar-accent-foreground: 0 0% 0%;
-    --sidebar-border: 210 20% 75%;
-    --sidebar-ring: 210 40% 60%;
+    /* Sidebar variables */
+    --sidebar-background: 0 0% 95%;
+    --sidebar-foreground: 0 0% 17%;
+    --sidebar-primary: 0 0% 9%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 50%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 0 0% 60%;
   }
 
   .dark {
-    --background: 224 71% 10%; /* Dark blue background */
-    --foreground: 210 40% 90%; /* Light text for dark mode */
+    --background: 0 0% 10%; /* Dark gray background */
+    --foreground: 0 0% 90%; /* Light gray text for dark mode */
 
-    --card: 224 71% 12%;
-    --card-foreground: 210 40% 90%;
+    --card: 0 0% 13%; /* Slightly lighter dark gray for cards */
+    --card-foreground: 0 0% 90%;
 
-    --popover: 224 71% 10%;
-    --popover-foreground: 210 40% 90%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 90%;
 
-    --primary: 210 40% 60%; /* #6699CC - Calming blue (same as light) */
-    --primary-foreground: 0 0% 100%;
+    --primary: 0 0% 98%; /* White/very light gray for primary actions in dark mode */
+    --primary-foreground: 0 0% 9%; /* Dark text on primary */
 
-    --secondary: 210 40% 30%; /* Darker shade for secondary */
-    --secondary-foreground: 210 40% 90%;
+    --secondary: 0 0% 20%; /* Darker gray for secondary */
+    --secondary-foreground: 0 0% 90%;
 
-    --muted: 210 40% 20%;
-    --muted-foreground: 210 25% 65%;
+    --muted: 0 0% 25%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 33 100% 64%; /* #FFB347 - Warm orange (same as light) */
-    --accent-foreground: 0 0% 0%;
+    --accent: 0 0% 50%; /* Mid-gray accent (same as light) */
+    --accent-foreground: 0 0% 9%; /* Dark text on accent */
 
-    --destructive: 0 63% 40%; 
+    --destructive: 0 70% 50%; 
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 20% 30%;
-    --input: 210 20% 25%;
-    --ring: 210 40% 60%;
+    --border: 0 0% 25%; /* Darker border */
+    --input: 0 0% 18%; /* Darker input background */
+    --ring: 0 0% 40%; /* Lighter gray for focus rings in dark mode */
 
-    --chart-1: 210 40% 60%;
-    --chart-2: 33 100% 64%;
-    --chart-3: 120 40% 50%;
-    --chart-4: 0 60% 50%;
-    --chart-5: 240 40% 50%;
+    --chart-1: 0 0% 60%;
+    --chart-2: 0 0% 80%;
+    --chart-3: 120 30% 50%;
+    --chart-4: 0 70% 55%;
+    --chart-5: 0 0% 40%;
 
     /* Sidebar variables updated for dark theme */
-    --sidebar-background: 224 71% 12%;
-    --sidebar-foreground: 210 40% 90%;
-    --sidebar-primary: 210 40% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 33 100% 64%;
-    --sidebar-accent-foreground: 0 0% 0%;
-    --sidebar-border: 210 20% 30%;
-    --sidebar-ring: 210 40% 60%;
+    --sidebar-background: 0 0% 12%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 9%;
+    --sidebar-accent: 0 0% 50%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 25%;
+    --sidebar-ring: 0 0% 40%;
   }
 }
 
@@ -109,6 +109,8 @@ body {
   body {
     @apply bg-background text-foreground;
     -webkit-tap-highlight-color: transparent; /* Improve mobile tap feel */
+    -webkit-font-smoothing: antialiased; /* Smoother fonts on WebKit */
+    -moz-osx-font-smoothing: grayscale; /* Smoother fonts on Firefox */
   }
 }
 

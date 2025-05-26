@@ -20,20 +20,17 @@ const BUDGET_DATA_KEY_PREFIX = 'budgetFlowData_';
 const DISPLAY_MONTH_KEY_PREFIX = 'budgetFlowDisplayMonth_';
 
 const getUserSpecificKey = (baseKey: string) => {
-  // Using a static pseudoUserId as per previous setup
   const pseudoUserId = "localUser"; 
   return `${baseKey}${pseudoUserId}`;
 };
 
-// Ensures system categories exist, are marked as such, and have no subcategories.
-// Returns the updated categories array and a boolean indicating if any actual changes were made.
 const ensureSystemCategories = (categories: BudgetCategory[], startingDebtForMonth: number): { updatedCategories: BudgetCategory[], wasChanged: boolean } => {
   let newCategories = [...categories];
   let wasActuallyChanged = false;
 
   const systemCategoryDefinitions = [
+    { name: "savings", isSystemCategory: true },
     { name: "credit card payments", isSystemCategory: true }
-    // "Savings" category is no longer a system/default category to be enforced here.
   ];
 
   systemCategoryDefinitions.forEach(sysDef => {
@@ -49,22 +46,19 @@ const ensureSystemCategories = (categories: BudgetCategory[], startingDebtForMon
         categoryNeedsUpdate = true;
       }
       if (currentCat.subcategories && currentCat.subcategories.length > 0) {
-        updatedCatData.subcategories = []; // System categories should not have subcategories
+        updatedCatData.subcategories = []; 
         categoryNeedsUpdate = true;
       }
       
-      // For "Credit Card Payments", budget is user-settable, not tied to startingDebt.
-      // No specific budget update logic needed here for system categories beyond flags.
-
       if (categoryNeedsUpdate) {
         newCategories[existingIndex] = { ...currentCat, ...updatedCatData };
         wasActuallyChanged = true;
       }
-    } else { // System category does not exist, add it
+    } else { 
       newCategories.push({
         id: uuidv4(),
-        name: sysDef.name.charAt(0).toUpperCase() + sysDef.name.slice(1), // Capitalize
-        budgetedAmount: 0, // Default budget, user can edit
+        name: sysDef.name.charAt(0).toUpperCase() + sysDef.name.slice(1),
+        budgetedAmount: 0, 
         expenses: [],
         subcategories: [],
         isSystemCategory: true,
@@ -72,22 +66,6 @@ const ensureSystemCategories = (categories: BudgetCategory[], startingDebtForMon
       wasActuallyChanged = true;
     }
   });
-
-  // Ensure "Savings" category is NOT present as a default system category.
-  // If an old "Savings" category exists from previous data and is marked system, unmark it or remove it.
-  // For simplicity, we'll just ensure it's not enforced. If user creates "Savings", it's a normal category.
-  const savingsCatIndex = newCategories.findIndex(cat => cat.name.toLowerCase() === 'savings' && cat.isSystemCategory);
-  if (savingsCatIndex > -1) {
-    // Option 1: Remove it if it's an old system one
-    // newCategories.splice(savingsCatIndex, 1);
-    // wasActuallyChanged = true;
-    // Option 2: Unmark it as system (safer if user might have expenses in it)
-    // newCategories[savingsCatIndex] = { ...newCategories[savingsCatIndex], isSystemCategory: false };
-    // wasActuallyChanged = true;
-    // For now, let's assume if "Savings" category is being removed, it should be fully removed from default list.
-    // The DEFAULT_CATEGORIES no longer includes it. This function primarily ensures *required* system cats.
-  }
-
 
   return { updatedCategories: newCategories, wasChanged: wasActuallyChanged };
 };
@@ -117,7 +95,6 @@ export const useBudgetCore = () => {
           if (!month.incomes) month.incomes = []; 
           const { updatedCategories } = ensureSystemCategories(month.categories || [], month.startingCreditCardDebt || 0);
           month.categories = updatedCategories;
-          // Ensure all categories have expenses/subcategories arrays
           month.categories.forEach(cat => {
             if (!cat.expenses) cat.expenses = [];
             if (!cat.subcategories && !cat.isSystemCategory) cat.subcategories = [];
@@ -127,15 +104,10 @@ export const useBudgetCore = () => {
             });
           });
           if (month.isRolledOver === undefined) month.isRolledOver = false;
-          if (month.savingsGoal === undefined) {
-            const prevMonthId = getPreviousMonthId(month.id);
-            const prevMonth = parsedBudgets[prevMonthId];
-            month.savingsGoal = prevMonth ? prevMonth.savingsGoal : 0;
-          }
+          // savingsGoal logic removed
         });
         setBudgetMonths(parsedBudgets);
       } else {
-        // Initialize first month if no stored budgets
         const newMonth = createNewMonthBudget(DEFAULT_START_MONTH);
         setBudgetMonths({ [DEFAULT_START_MONTH]: newMonth });
       }
@@ -189,8 +161,7 @@ export const useBudgetCore = () => {
     const prevMonthId = getPreviousMonthId(yearMonthId);
     const prevMonthBudget = budgetMonths[prevMonthId]; 
     let calculatedStartingDebt = 0;
-    let initialSavingsGoal = 0; 
-
+    
     if (prevMonthBudget) {
       const ccPaymentsCategory = prevMonthBudget.categories.find(
         cat => cat.name.toLowerCase() === "credit card payments" && cat.isSystemCategory
@@ -199,7 +170,6 @@ export const useBudgetCore = () => {
         ? ccPaymentsCategory.expenses.reduce((sum, exp) => sum + exp.amount, 0)
         : 0;
       calculatedStartingDebt = (prevMonthBudget.startingCreditCardDebt || 0) - paymentsMadeLastMonth;
-      initialSavingsGoal = prevMonthBudget.savingsGoal; // Carry over savings goal
     }
     
     const initialDebt = Math.max(0, calculatedStartingDebt);
@@ -214,13 +184,23 @@ export const useBudgetCore = () => {
 
     const { updatedCategories } = ensureSystemCategories(defaultCatsPayload, initialDebt);
 
+    // Initialize "Savings" category budget based on previous month's "Savings" budget
+    if (prevMonthBudget) {
+        const prevSavingsCat = prevMonthBudget.categories.find(cat => cat.name.toLowerCase() === "savings" && cat.isSystemCategory);
+        const currentSavingsCat = updatedCategories.find(cat => cat.name.toLowerCase() === "savings" && cat.isSystemCategory);
+        if (prevSavingsCat && currentSavingsCat) {
+            currentSavingsCat.budgetedAmount = prevSavingsCat.budgetedAmount;
+        }
+    }
+
+
     return {
       id: yearMonthId,
       year,
       month,
       incomes: [],
       categories: updatedCategories,
-      savingsGoal: initialSavingsGoal,
+      // savingsGoal: initialSavingsGoal, // Removed
       isRolledOver: false,
       startingCreditCardDebt: initialDebt,
     };
@@ -258,12 +238,7 @@ export const useBudgetCore = () => {
         monthData = { ...monthData, isRolledOver: false };
         changed = true;
       }
-       if (monthData.savingsGoal === undefined) {
-        const prevMonthId = getPreviousMonthId(yearMonthId);
-        const prevMonthBudget = budgetMonths[prevMonthId]; 
-        monthData = { ...monthData, savingsGoal: prevMonthBudget ? prevMonthBudget.savingsGoal : 0 };
-        changed = true;
-      }
+      // savingsGoal logic removed
       if (changed) {
         needsStateUpdate = true;
       }
@@ -282,9 +257,7 @@ export const useBudgetCore = () => {
       let monthToUpdate = { ...existingMonth };
       let startingDebtForMonth = monthToUpdate.startingCreditCardDebt || 0;
 
-      if (payload.savingsGoal !== undefined) {
-        monthToUpdate.savingsGoal = payload.savingsGoal;
-      }
+      // savingsGoal logic removed
       if (payload.startingCreditCardDebt !== undefined) {
         monthToUpdate.startingCreditCardDebt = payload.startingCreditCardDebt;
         startingDebtForMonth = payload.startingCreditCardDebt; 
@@ -293,7 +266,8 @@ export const useBudgetCore = () => {
       if (payload.categories) {
         monthToUpdate.categories = payload.categories.map(catPayload => {
           const existingCat = monthToUpdate.categories.find(c => c.id === catPayload.id);
-          const isCCPayments = catPayload.name?.toLowerCase() === 'credit card payments';
+          const catNameLower = catPayload.name?.toLowerCase();
+          const isSystemCat = catNameLower === 'savings' || catNameLower === 'credit card payments';
           
           return {
             id: catPayload.id || uuidv4(),
@@ -302,13 +276,13 @@ export const useBudgetCore = () => {
                             ? catPayload.budgetedAmount 
                             : (existingCat ? existingCat.budgetedAmount : 0),
             expenses: catPayload.expenses || existingCat?.expenses || [],
-            subcategories: (isCCPayments && catPayload.isSystemCategory) ? [] : (catPayload.subcategories || existingCat?.subcategories || []).map(subCatPayload => ({
+            subcategories: (isSystemCat && catPayload.isSystemCategory) ? [] : (catPayload.subcategories || existingCat?.subcategories || []).map(subCatPayload => ({
               id: subCatPayload.id || uuidv4(),
               name: subCatPayload.name,
               budgetedAmount: subCatPayload.budgetedAmount === undefined ? 0 : subCatPayload.budgetedAmount,
               expenses: subCatPayload.expenses || existingCat?.subcategories?.find(sc => sc.id === subCatPayload.id)?.expenses || [],
             })),
-            isSystemCategory: isCCPayments || catPayload.isSystemCategory || existingCat?.isSystemCategory || false,
+            isSystemCategory: catPayload.isSystemCategory || existingCat?.isSystemCategory || false,
           };
         });
       }
@@ -349,7 +323,8 @@ export const useBudgetCore = () => {
     const monthToUpdate = ensureMonthExists(yearMonthId);
     let newCategories = monthToUpdate.categories.map(cat => {
       if (cat.id === categoryId) {
-        if (cat.isSystemCategory) { // e.g. CC Payments
+        // System category names cannot be changed, but their budget can (e.g. "Savings" budget)
+        if (cat.isSystemCategory) { 
           return { ...cat, budgetedAmount: updatedCategoryData.budgetedAmount ?? cat.budgetedAmount };
         }
         return { ...cat, ...updatedCategoryData, subcategories: cat.subcategories || [] }; 
@@ -614,7 +589,7 @@ export const useBudgetCore = () => {
       month: targetMonthNum,
       incomes: [], 
       categories: updatedCategories,
-      savingsGoal: sourceBudget.savingsGoal, 
+      // savingsGoal logic removed
       isRolledOver: false, 
       startingCreditCardDebt: targetStartingDebt,
     };
@@ -637,18 +612,7 @@ export const useBudgetCore = () => {
     setCurrentDisplayMonthId(nextMonthId);
   }, [currentDisplayMonthId, ensureMonthExists]);
 
-  const setSavingsGoalForMonth = useCallback((yearMonthId: string, goal: number) => {
-    const monthToUpdate = ensureMonthExists(yearMonthId);
-     if (monthToUpdate.isRolledOver) return; 
-   
-    setBudgetMonths(prev => ({
-      ...prev,
-      [yearMonthId]: {
-        ...monthToUpdate, 
-        savingsGoal: goal,
-      },
-    }));
-  }, [ensureMonthExists]);
+  // setSavingsGoalForMonth removed
 
   const rolloverUnspentBudget = useCallback((yearMonthId: string): { success: boolean; message: string } => {
     const monthBudget = getBudgetForMonth(yearMonthId); 
@@ -662,7 +626,8 @@ export const useBudgetCore = () => {
     let totalPositiveUnspentOperational = 0;
     monthBudget.categories.forEach(cat => {
       const catNameLower = cat.name.toLowerCase();
-      if (!(cat.isSystemCategory && catNameLower === 'credit card payments')) { // Exclude CC Payments
+      // Only consider non-system categories for unspent operational funds
+      if (!cat.isSystemCategory) {
         if (!cat.subcategories || cat.subcategories.length === 0) {
             const mainCatSpent = (cat.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
             const mainCatUnspent = cat.budgetedAmount - mainCatSpent;
@@ -683,13 +648,13 @@ export const useBudgetCore = () => {
     
     setBudgetMonths(prev => ({
       ...prev,
-      [yearMonthId]: { ...prev[yearMonthId], isRolledOver: true }, // Use existing month object from prev state
+      [yearMonthId]: { ...prev[yearMonthId], isRolledOver: true },
     }));
 
     if (totalPositiveUnspentOperational <= 0) {
       return { success: true, message: "Month closed. No unspent funds from operational categories." };
     } else {
-      return { success: true, message: `Month closed. $${totalPositiveUnspentOperational.toFixed(2)} from operational categories was unspent.` };
+      return { success: true, message: `Month closed. $${totalPositiveUnspentOperational.toFixed(2)} from operational categories was unspent (contributing to overall savings).` };
     }
   }, [getBudgetForMonth]); 
 
@@ -712,7 +677,7 @@ export const useBudgetCore = () => {
     addCategoryToMonth,
     updateCategoryInMonth,
     deleteCategoryFromMonth,
-    setSavingsGoalForMonth,
+    // setSavingsGoalForMonth removed
     rolloverUnspentBudget,
     addSubCategory,
     updateSubCategory,

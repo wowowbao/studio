@@ -2,7 +2,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import type { BudgetCategory, BudgetMonth, SubCategory } from "@/types/budget";
-// DEFAULT_CATEGORIES is not used here anymore as categories are loaded from budgetData or initialized by useBudgetCore
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -36,7 +35,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   } = useBudget();
   
   const [editableCategories, setEditableCategories] = useState<EditableCategory[]>([]);
-  const [monthSavingsGoal, setMonthSavingsGoal] = useState<number>(0);
+  // const [monthSavingsGoal, setMonthSavingsGoal] = useState<number>(0); // Removed
   const [startingDebt, setStartingDebt] = useState<number>(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const { toast } = useToast();
@@ -50,16 +49,16 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         setEditableCategories(budgetData.categories.map(c => ({
             ...c,
             id: c.id, 
-            budgetedAmount: c.budgetedAmount, // Keep user-set budget for CC Payments
+            budgetedAmount: c.budgetedAmount,
             subcategories: (c.isSystemCategory) ? [] : (c.subcategories || []).map(sc => ({ ...sc, id: sc.id, expenses: sc.expenses || [] })),
             expenses: c.expenses || [],
             isSystemCategory: c.isSystemCategory || false,
         })));
-        setMonthSavingsGoal(budgetData.savingsGoal || 0);
+        // setMonthSavingsGoal(budgetData.savingsGoal || 0); // Removed
         setStartingDebt(currentStartingDebt);
       } else {
         setEditableCategories([]);
-        setMonthSavingsGoal(0);
+        // setMonthSavingsGoal(0); // Removed
         setStartingDebt(0);
          toast({ title: "Loading Error", description: "Could not load budget data. Please try again.", variant: "destructive" });
       }
@@ -74,14 +73,11 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     }
   }, [isOpen, loadBudgetData]);
 
-  // Note: No longer automatically updating CC Payments budget based on startingDebt here.
-  // The user sets their planned payment, and startingDebt is for informational carry-over.
 
   const handleCategoryChange = (id: string, field: keyof EditableCategory , value: string | number) => {
     setEditableCategories(prev =>
       prev.map(cat => {
         if (cat.id === id) {
-          // Prevent changing name of system categories
           if (cat.isSystemCategory && field === 'name') {
             return cat; 
           }
@@ -163,7 +159,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         .map(cat => ({
             id: cat.id,
             name: cat.name,
-            budgetedAmount: cat.budgetedAmount, // User-defined budget for all, including system
+            budgetedAmount: cat.budgetedAmount,
             expenses: cat.expenses || [],
             isSystemCategory: cat.isSystemCategory || false,
             subcategories: (cat.isSystemCategory) ? [] : (cat.subcategories || [])
@@ -178,7 +174,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
 
     updateMonthBudget(monthId, { 
       categories: finalCategoriesToSave, 
-      savingsGoal: monthSavingsGoal,
+      // savingsGoal: monthSavingsGoal, // Removed
       startingCreditCardDebt: startingDebt,
     });
     toast({
@@ -201,30 +197,18 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         </DialogHeader>
         <ScrollArea className="max-h-[65vh] p-1">
           <div className="space-y-6 pr-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                <Label htmlFor="startingDebt" className="text-base font-medium">Credit Card Debt at Start of Month</Label>
-                <Input
-                  id="startingDebt"
-                  type="number"
-                  value={startingDebt}
-                  onChange={(e) => setStartingDebt(parseFloat(e.target.value) || 0)}
-                  className="mt-1 text-sm"
-                  placeholder="e.g., 1000"
-                />
-              </div>
-              <div>
-                <Label htmlFor="savingsGoal" className="text-base font-medium">Overall Savings Goal</Label>
-                <Input
-                  id="savingsGoal"
-                  type="number"
-                  value={monthSavingsGoal}
-                  onChange={(e) => setMonthSavingsGoal(parseFloat(e.target.value) || 0)}
-                  className="mt-1 text-sm"
-                  placeholder="e.g., 500"
-                />
-              </div>
+            <div>
+              <Label htmlFor="startingDebt" className="text-base font-medium">Credit Card Debt at Start of Month</Label>
+              <Input
+                id="startingDebt"
+                type="number"
+                value={startingDebt}
+                onChange={(e) => setStartingDebt(parseFloat(e.target.value) || 0)}
+                className="mt-1 text-sm"
+                placeholder="e.g., 1000"
+              />
             </div>
+            {/* Overall Savings Goal input removed */}
 
             <h3 className="text-lg font-medium border-b pb-2">Categories</h3>
             {editableCategories.map(cat => {
@@ -254,16 +238,15 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                     </div>
                     <div>
                       <Label htmlFor={`categoryBudget-${cat.id}`}>
-                        {isSavings ? "Planned Transfer to Savings" : (isCCPayments ? "Planned Payment" : "Category Budgeted Amount")}
+                        {isSavings ? "Planned Contribution to Savings" : (isCCPayments ? "Planned Payment" : "Category Budgeted Amount")}
                       </Label>
                       <Input
                         id={`categoryBudget-${cat.id}`}
                         type="number"
                         value={cat.budgetedAmount}
                         onChange={(e) => handleCategoryChange(cat.id, "budgetedAmount", e.target.value)}
-                        placeholder={isSavings && cat.budgetedAmount === 0 ? "0.00" : String(cat.budgetedAmount)}
+                        placeholder={cat.budgetedAmount === 0 ? "0.00" : String(cat.budgetedAmount)}
                         className="mt-1 text-sm"
-                        // System categories can have their budget edited (e.g. planned savings, planned CC payment)
                       />
                     </div>
                   </div>
@@ -314,6 +297,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                      <div className="flex items-center text-xs text-muted-foreground mt-2">
                        <ShieldAlert className="h-3 w-3 mr-1" /> 
                        This is a system category. Its name is fixed. It cannot be deleted or have subcategories.
+                       {isSavings ? " Set your planned savings contribution above." : " Set your planned payment amount above."}
                      </div>
                    )}
                 </div>

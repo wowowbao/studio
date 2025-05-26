@@ -34,12 +34,11 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
     toast({
       title: result.success ? "Month Closed" : "Month Close Info",
       description: result.message,
-      variant: result.success ? "default" : "default",
+      variant: result.success ? "default" : "default", // Keep default to allow for info or success toasts
       action: result.success ? <CheckCircle className="text-green-500" /> : <AlertTriangle className="text-yellow-500" />,
     });
   };
   
-  // hasSavingsCategory is no longer relevant as Savings is not a category
   const isRolledOver = currentBudgetMonth?.isRolledOver;
   const disablePrimaryActions = isRolledOver;
 
@@ -63,7 +62,7 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
           onClick={handleRolloverUnspent} 
           variant="secondary" 
           className="w-full sm:col-span-2"
-          disabled={isRolledOver} // Only disable if already rolled over
+          disabled={isRolledOver} 
         >
           <ArchiveRestore className="mr-2 h-4 w-4" /> 
           {isRolledOver ? "Month Closed" : "Finalize & Close Month"}
@@ -74,7 +73,6 @@ export function BudgetActions({ onEditBudget, onAddExpense, onAddIncome }: Budge
           This month's budget has been closed. Editing, adding expenses/income, and rollover are disabled.
         </p>
       )}
-      {/* Message about needing a "Savings" category is removed as it's no longer relevant */}
     </div>
   );
 }

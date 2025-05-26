@@ -15,19 +15,17 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category }: CategoryCardProps) {
-  const { deleteExpense } = useBudget();
+  const { deleteExpense, currentDisplayMonthId } = useBudget(); // Call useBudget at the top level
   const { toast } = useToast();
 
   const mainCategorySpentAmount = category.expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const isSavingsCategory = category.name.toLowerCase() === 'savings' && category.isSystemCategory;
-  const isCCPaymentsCategory = category.name.toLowerCase() === 'credit card payments' && category.isSystemCategory;
+  const isSavingsCategory = category.isSystemCategory && category.name.toLowerCase() === 'savings';
+  const isCCPaymentsCategory = category.isSystemCategory && category.name.toLowerCase() === 'credit card payments';
 
   let mainCategoryProgress = 0;
   if (category.budgetedAmount > 0) {
     mainCategoryProgress = (mainCategorySpentAmount / category.budgetedAmount) * 100;
   } else if ((isSavingsCategory || isCCPaymentsCategory) && mainCategorySpentAmount > 0) {
-    // If it's a savings/CC goal and something is saved/paid, show 100% if no budget (goal) is set.
-    // Or, if goal is 0 and saved > 0, it means goal achieved.
     mainCategoryProgress = 100;
   }
 
@@ -42,14 +40,8 @@ export function CategoryCard({ category }: CategoryCardProps) {
   );
 
   const handleDeleteExpense = (expenseId: string, targetId: string, isSub: boolean, expenseDescription: string) => {
-    const currentMonthId = category.id.substring(0, category.id.lastIndexOf('-') > 0 ? category.id.lastIndexOf('-') : category.id.length);
-     // This is a bit of a hack to get monthId, assuming category.id is not the monthId
-     // A better way would be to pass monthId down to CategoryCard or have it available in category object
-     // For now, let's try to infer it or assume useBudget's currentDisplayMonthId is the context
-     const monthIdFromHook = useBudget().currentDisplayMonthId;
-
-
-    deleteExpense(monthIdFromHook, targetId, expenseId, isSub);
+    // currentDisplayMonthId is now available from the top-level useBudget() call
+    deleteExpense(currentDisplayMonthId, targetId, expenseId, isSub);
     toast({
       title: "Expense Deleted",
       description: `Expense "${expenseDescription}" has been removed.`,
@@ -74,9 +66,9 @@ export function CategoryCard({ category }: CategoryCardProps) {
         <span className="font-medium">{expense.description}</span>: ${expense.amount.toFixed(2)}
         <span className="text-muted-foreground/80 ml-2">({format(new Date(expense.dateAdded), "MMM d")})</span>
       </div>
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
         onClick={() => handleDeleteExpense(expense.id, targetId, isSub, expense.description)}
         aria-label="Delete expense"

@@ -1,7 +1,7 @@
 
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, Coins, PiggyBank, Landmark, AlertTriangle } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Coins, PiggyBank, Landmark, AlertTriangle, CreditCard } from "lucide-react";
 import type { BudgetMonth, BudgetCategory, SubCategory } from "@/types/budget";
 import { cn } from "@/lib/utils";
 
@@ -47,9 +47,8 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
   const plannedSavings = savingsCategory ? getEffectiveCategoryBudget(savingsCategory) : 0;
   const actualSavings = savingsCategory ? getCategorySpentAmount(savingsCategory) : 0;
 
-  const ccPaymentsCategory = budgetMonth.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-  const plannedCCPayments = ccPaymentsCategory ? getEffectiveCategoryBudget(ccPaymentsCategory) : 0;
-  // const actualCCPayments = ccPaymentsCategory ? getCategorySpentAmount(ccPaymentsCategory) : 0; // Not directly used in these cards, but in CC Debt Summary
+  // This card will now reflect the total starting debt for the month
+  const startingCreditCardDebtForMonth = budgetMonth.startingCreditCardDebt || 0;
 
   let operationalCategoriesBudget = 0;
   let totalOperationalSpending = 0;
@@ -67,7 +66,8 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
     }
   });
   
-  const fundsAfterPrimaryAllocations = totalIncomeReceived - plannedSavings - plannedCCPayments;
+  // This calculation now uses the total starting debt
+  const fundsAfterPrimaryAllocations = totalIncomeReceived - plannedSavings - startingCreditCardDebtForMonth;
   const operationalAllocationDifference = fundsAfterPrimaryAllocations - operationalCategoriesBudget;
   
   const overallOperationalSpendingRemaining = operationalCategoriesBudget - totalOperationalSpending;
@@ -134,12 +134,12 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Planned CC Payments</CardTitle>
-          <Landmark className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Starting CC Debt</CardTitle>
+          <CreditCard className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${plannedCCPayments.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Your planned debt repayment.</p>
+          <div className="text-2xl font-bold">${startingCreditCardDebtForMonth.toFixed(2)}</div>
+          <p className="text-xs text-muted-foreground">Debt at the start of the month.</p>
         </CardContent>
       </Card>
 
@@ -151,7 +151,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
         <CardContent>
           <div className="text-2xl font-bold">${operationalCategoriesBudget.toFixed(2)}</div>
            <p className="text-xs text-muted-foreground">
-            Available for ops (after savings & CC pay): ${fundsAfterPrimaryAllocations.toFixed(2)}.
+            Available for ops (after savings & start debt): ${fundsAfterPrimaryAllocations.toFixed(2)}.
           </p>
           {operationalAllocationDifference >= 0 ? (
             <p className="text-xs text-green-600 dark:text-green-500 mt-1">
@@ -167,7 +167,7 @@ export function SummaryCards({ budgetMonth }: SummaryCardsProps) {
       
       <Card className="md:col-span-2 lg:col-span-2">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Operational Spent</CardTitle>
+          <CardTitle className="text-sm font-medium">Total Spent (Operational)</CardTitle>
           { isOverSpentOnOperational ? <TrendingDown className="h-4 w-4 text-destructive" /> : <TrendingUp className="h-4 w-4 text-muted-foreground" /> }
         </CardHeader>
         <CardContent>

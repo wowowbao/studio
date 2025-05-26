@@ -7,16 +7,24 @@ import { Progress } from "@/components/ui/progress";
 import { useBudget } from "@/hooks/useBudget";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { CornerDownRight, Trash2 } from "lucide-react";
+import { CornerDownRight, Trash2, ChevronDown, ChevronUp } from "lucide-react"; // Added ChevronDown, ChevronUp
 import { format } from "date-fns";
+import { useState } from "react"; // Added useState
 
 interface CategoryCardProps {
   category: BudgetCategory;
 }
 
+const MAX_TRANSACTIONS_VISIBLE_DEFAULT = 5;
+
 export function CategoryCard({ category }: CategoryCardProps) {
   const { deleteExpense, currentDisplayMonthId } = useBudget();
   const { toast } = useToast();
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (sectionId: string) => {
+    setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  };
 
   const mainCategorySpentAmount = category.expenses.reduce((sum, exp) => sum + exp.amount, 0);
   const isSavingsCategory = category.isSystemCategory && category.name.toLowerCase() === 'savings';
@@ -55,7 +63,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
     mainProgressIndicatorClassName = "bg-green-500";
   }
 
-  let mainRemainingTextClass = "text-muted-foreground"; // Default
+  let mainRemainingTextClass = "text-muted-foreground";
   let mainRemainingIsBold = false;
 
   if (isSavingsCategory || isCCPaymentsCategory) {
@@ -63,20 +71,18 @@ export function CategoryCard({ category }: CategoryCardProps) {
         mainRemainingTextClass = "text-green-600 dark:text-green-500";
         mainRemainingIsBold = true;
     }
-    // else, it stays default text-muted-foreground if goal not met or no goal
   } else if (mainCategoryIsOverBudget) {
     mainRemainingTextClass = "text-destructive";
     mainRemainingIsBold = true;
-  } else { // Regular category, not overspent
+  } else { 
     if (category.budgetedAmount > 0) {
         const spentRatio = mainCategorySpentAmount / category.budgetedAmount;
-        if (spentRatio < 0.8) { // Less than 80% spent
+        if (spentRatio < 0.8) { 
             mainRemainingTextClass = "text-green-600 dark:text-green-500";
-        } else if (spentRatio <= 1) { // Between 80% and 100% spent (inclusive)
+        } else if (spentRatio <= 1) { 
             mainRemainingTextClass = "text-amber-600 dark:text-amber-500";
         }
     }
-    // If budgetedAmount is 0 and not overspent (i.e., spent is 0), it remains text-muted-foreground.
   }
 
 
@@ -97,7 +103,8 @@ export function CategoryCard({ category }: CategoryCardProps) {
     }
     const remaining = subCategory.budgetedAmount - spent;
     const isOverBudget = remaining < 0;
-    return { spent, progress, remaining, isOverBudget, expenses: subCategory.expenses, subCategory };
+    const sortedExpenses = [...subCategory.expenses].sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
+    return { spent, progress, remaining, isOverBudget, expenses: sortedExpenses, subCategory };
   };
 
   const renderExpenseItem = (expense: Expense, targetId: string, isSub: boolean) => (
@@ -117,6 +124,11 @@ export function CategoryCard({ category }: CategoryCardProps) {
       </Button>
     </li>
   );
+
+  const sortedMainCategoryExpenses = [...category.expenses].sort((a,b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
+  const isMainSectionExpanded = expandedSections[category.id] || false;
+  const mainCategoryExpensesToDisplay = isMainSectionExpanded ? sortedMainCategoryExpenses : sortedMainCategoryExpenses.slice(0, MAX_TRANSACTIONS_VISIBLE_DEFAULT);
+
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 flex flex-col">
@@ -160,9 +172,17 @@ export function CategoryCard({ category }: CategoryCardProps) {
           {/* Main Category Expenses List */}
           {(!category.subcategories || category.subcategories.length === 0) && category.expenses && category.expenses.length > 0 && (
             <div className="mt-3 pt-2 border-t border-border/50">
-              <h5 className="text-xs font-semibold uppercase text-muted-foreground mb-1">Transactions</h5>
-              <ul className="space-y-0.5 max-h-24 overflow-y-auto pr-1">
-                {category.expenses.map(exp => renderExpenseItem(exp, category.id, false))}
+              <div className="flex justify-between items-center mb-1">
+                <h5 className="text-xs font-semibold uppercase text-muted-foreground">Transactions</h5>
+                {sortedMainCategoryExpenses.length > MAX_TRANSACTIONS_VISIBLE_DEFAULT && (
+                  <Button variant="link" size="xs" onClick={() => toggleExpand(category.id)} className="text-xs p-0 h-auto">
+                    {isMainSectionExpanded ? "Show Less" : `View All (${sortedMainCategoryExpenses.length})`}
+                    {isMainSectionExpanded ? <ChevronUp className="ml-1 h-3 w-3" /> : <ChevronDown className="ml-1 h-3 w-3" />}
+                  </Button>
+                )}
+              </div>
+              <ul className="space-y-0.5 max-h-60 overflow-y-auto pr-1"> {/* Increased max-h for when expanded */}
+                {mainCategoryExpensesToDisplay.map(exp => renderExpenseItem(exp, category.id, false))}
               </ul>
             </div>
           )}
@@ -174,7 +194,10 @@ export function CategoryCard({ category }: CategoryCardProps) {
               <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Subcategories</h4>
               <ul className="space-y-3">
                 {category.subcategories.map(sub => {
-                  const subInfo = calculateSubCategoryInfo(sub);
+                  const subInfo = calculateSubCategoryInfo(sub); // subInfo.expenses is already sorted
+                  const isSubSectionExpanded = expandedSections[sub.id] || false;
+                  const subCategoryExpensesToDisplay = isSubSectionExpanded ? subInfo.expenses : subInfo.expenses.slice(0, MAX_TRANSACTIONS_VISIBLE_DEFAULT);
+
                   const subProgressIndicatorClassName = cn(subInfo.isOverBudget ? "bg-destructive" : "bg-primary/80");
                   
                   let subRemainingTextClass = "text-muted-foreground/90";
@@ -183,12 +206,12 @@ export function CategoryCard({ category }: CategoryCardProps) {
                   if (subInfo.isOverBudget) {
                       subRemainingTextClass = "text-destructive";
                       subRemainingIsBold = true;
-                  } else { // Not overspent
+                  } else { 
                       if (subInfo.subCategory.budgetedAmount > 0) {
                           const subSpentRatio = subInfo.spent / subInfo.subCategory.budgetedAmount;
-                          if (subSpentRatio < 0.8) { // Less than 80% spent
+                          if (subSpentRatio < 0.8) { 
                               subRemainingTextClass = "text-green-600 dark:text-green-500";
-                          } else if (subSpentRatio <= 1) { // Between 80% and 100% spent (inclusive)
+                          } else if (subSpentRatio <= 1) { 
                               subRemainingTextClass = "text-amber-600 dark:text-amber-500";
                           }
                       }
@@ -216,12 +239,21 @@ export function CategoryCard({ category }: CategoryCardProps) {
                       <p className={cn("text-xs", subRemainingTextClass, { "font-semibold": subRemainingIsBold })}>
                         {subInfo.isOverBudget ? `Overspent by $${Math.abs(subInfo.remaining).toFixed(2)}` : `Remaining: $${subInfo.remaining.toFixed(2)}`}
                       </p>
+                      
                       {/* Subcategory Expenses List */}
                       {subInfo.expenses && subInfo.expenses.length > 0 && (
                         <div className="mt-2 pt-1 border-t border-border/30">
-                          <h6 className="text-2xs font-semibold uppercase text-muted-foreground/70 mb-0.5">Transactions</h6>
-                          <ul className="space-y-0.5 max-h-20 overflow-y-auto pr-1">
-                            {subInfo.expenses.map(exp => renderExpenseItem(exp, sub.id, true))}
+                           <div className="flex justify-between items-center mb-0.5">
+                            <h6 className="text-2xs font-semibold uppercase text-muted-foreground/70">Transactions</h6>
+                            {subInfo.expenses.length > MAX_TRANSACTIONS_VISIBLE_DEFAULT && (
+                              <Button variant="link" size="xs" onClick={() => toggleExpand(sub.id)} className="text-2xs p-0 h-auto">
+                                {isSubSectionExpanded ? "Show Less" : `View All (${subInfo.expenses.length})`}
+                                {isSubSectionExpanded ? <ChevronUp className="ml-1 h-3 w-3" /> : <ChevronDown className="ml-1 h-3 w-3" />}
+                              </Button>
+                            )}
+                          </div>
+                          <ul className="space-y-0.5 max-h-48 overflow-y-auto pr-1"> {/* Increased max-h */}
+                            {subCategoryExpensesToDisplay.map(exp => renderExpenseItem(exp, sub.id, true))}
                           </ul>
                         </div>
                       )}
@@ -237,3 +269,5 @@ export function CategoryCard({ category }: CategoryCardProps) {
   );
 }
 
+
+    

@@ -12,7 +12,7 @@ import { Trash2, PlusCircle, CheckCircle, XCircle, MinusCircle, CornerDownRight,
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 import { setupBudgetFromImage, type SetupBudgetInput, type SetupBudgetOutput } from '@/ai/flows/setup-budget-flow';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
 import { parseYearMonth } from "@/hooks/useBudgetCore";
 
@@ -274,17 +274,16 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         setAiBudgetError(result.aiError);
         toast({ title: "AI Budget Setup Error", description: result.aiError, variant: "destructive" });
       } else if (result.categories && result.categories.length > 0) {
-        // Process AI suggestions
+        
         let aiSuggestedCategoriesAsUserCategories = result.categories.map(suggestedCat => {
             const subcategories = (suggestedCat.subcategories || []).map(suggestedSub => ({
                 id: uuidv4(),
                 name: suggestedSub.name,
                 budgetedAmount: suggestedSub.budgetedAmount || 0,
-                expenses: [], // AI suggestions start with no expenses
+                expenses: [], 
             }));
 
             let finalBudgetedAmount = suggestedCat.budgetedAmount || 0;
-            // If AI suggests subcategories, parent budget is sum of subs
             if (subcategories.length > 0) {
                 finalBudgetedAmount = subcategories.reduce((sum, sub) => sum + sub.budgetedAmount, 0);
             }
@@ -294,54 +293,48 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
               name: suggestedCat.name,
               budgetedAmount: finalBudgetedAmount,
               subcategories: subcategories,
-              isSystemCategory: false, // AI suggestions are initially NOT system categories
-              expenses: [], // AI suggestions start with no expenses
+              isSystemCategory: false, 
+              expenses: [], 
             };
         });
 
         const existingSystemCategories = editableCategories.filter(c => c.isSystemCategory);
         const finalCategories: EditableCategory[] = [];
+        const systemCategoryNames = ["Savings", "Credit Card Payments"];
 
-        // Handle system categories: "Savings", "Credit Card Payments"
-        ["Savings", "Credit Card Payments"].forEach(sysName => {
+        systemCategoryNames.forEach(sysName => {
             const existingSysCat = existingSystemCategories.find(c => c.name === sysName);
-            const aiSuggestedThisSysCat = aiSuggestedCategoriesAsUserCategories.find(c => c.name.toLowerCase() === sysName.toLowerCase());
+            const aiSuggestedThisSysCatIndex = aiSuggestedCategoriesAsUserCategories.findIndex(c => c.name.toLowerCase() === sysName.toLowerCase());
+            const aiSuggestedThisSysCat = aiSuggestedThisSysCatIndex !== -1 ? aiSuggestedCategoriesAsUserCategories[aiSuggestedThisSysCatIndex] : undefined;
 
             if (existingSysCat) {
-                // System category already exists. Update its budget if AI suggested a new one. Preserve expenses.
                 let updatedBudget = existingSysCat.budgetedAmount;
                 if (aiSuggestedThisSysCat && aiSuggestedThisSysCat.budgetedAmount !== undefined) {
                     updatedBudget = aiSuggestedThisSysCat.budgetedAmount;
                 }
                 finalCategories.push({
-                    ...existingSysCat, // Preserve ID, system flag, expenses
+                    ...existingSysCat, 
                     budgetedAmount: updatedBudget,
                 });
-                // Remove the AI version so it's not added as a duplicate user category
                 if (aiSuggestedThisSysCat) {
-                    aiSuggestedCategoriesAsUserCategories = aiSuggestedCategoriesAsUserCategories.filter(c => c.id !== aiSuggestedThisSysCat.id);
+                    aiSuggestedCategoriesAsUserCategories.splice(aiSuggestedThisSysCatIndex, 1);
                 }
             } else if (aiSuggestedThisSysCat) {
-                // System category doesn't exist, but AI suggested it. Create it as a system category.
                 finalCategories.push({
-                    id: aiSuggestedThisSysCat.id, // Use AI's ID if needed or generate new
-                    name: sysName, // Standardize the name
+                    id: aiSuggestedThisSysCat.id, 
+                    name: sysName, 
                     budgetedAmount: aiSuggestedThisSysCat.budgetedAmount,
-                    isSystemCategory: true, // Mark as system
-                    subcategories: [], // System categories cannot have subcategories
-                    expenses: [], // Start with no expenses for new system category
+                    isSystemCategory: true, 
+                    subcategories: [], 
+                    expenses: [], 
                 });
-                // Remove the AI version
-                aiSuggestedCategoriesAsUserCategories = aiSuggestedCategoriesAsUserCategories.filter(c => c.id !== aiSuggestedThisSysCat.id);
+                aiSuggestedCategoriesAsUserCategories.splice(aiSuggestedThisSysCatIndex, 1);
             }
         });
-
-        // Combine preserved/updated system categories with the remaining AI-suggested user categories
+        
         const newEditableCategories = [
             ...finalCategories,
-            ...aiSuggestedCategoriesAsUserCategories.filter(aiCat => // Ensure we don't re-add something processed as system
-                !["savings", "credit card payments"].includes(aiCat.name.toLowerCase())
-            )
+            ...aiSuggestedCategoriesAsUserCategories
         ];
         
         setEditableCategories(newEditableCategories);
@@ -542,16 +535,17 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         type="number"
                         value={parentDisplayBudget !== undefined ? parentDisplayBudget.toFixed(2) : '0.00'}
                         onChange={(e) => {
-                           if (!isSystem || (isSystem && cat.name === "Savings") || (isSystem && cat.name === "Credit Card Payments")) { // Allow edit for System Savings/CC
+                           // Allow edit for System Savings/CC AND for non-system categories without subs
+                           if ( (isSystem && (cat.name === "Savings" || cat.name === "Credit Card Payments")) || (!isSystem && !hasSubcategories) ) { 
                                 handleCategoryChange(cat.id, "budgetedAmount", e.target.value);
                            }
                         }}
-                        readOnly={hasSubcategories && !isSystem}
+                        readOnly={!isSystem && hasSubcategories} // Read-only only for non-system cats with subs
                         placeholder="0.00"
-                        className={`mt-1 text-sm ${(hasSubcategories && !isSystem) ? "bg-muted/50 cursor-default" : ""}`}
+                        className={`mt-1 text-sm ${(!isSystem && hasSubcategories) ? "bg-muted/50 cursor-default" : ""}`}
                       />
                        {hasSubcategories && !isSystem && <p className="text-xs text-muted-foreground mt-1">Parent budget is sum of subcategories.</p>}
-                       {(parentDisplayBudget === 0 && (!hasSubcategories || isSystem)) && <p className="text-xs text-muted-foreground mt-1">Enter 0 if no budget for this category.</p>}
+                       {((parentDisplayBudget === 0 || parentDisplayBudget === undefined) && (!hasSubcategories || isSystem)) && <p className="text-xs text-muted-foreground mt-1">Enter 0 if no budget for this category.</p>}
                     </div>
                   </div>
 

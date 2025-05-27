@@ -43,6 +43,9 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
 
   useEffect(() => {
     if (isOpen && currentMonthData) {
+      // Ensure isLoadingAi is reset first
+      setIsLoadingAi(false); 
+      
       const totalIncome = currentMonthData.incomes.reduce((sum, inc) => sum + inc.amount, 0);
       setCurrentIncome(totalIncome);
 
@@ -51,8 +54,8 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
       setCurrentActualSavings(actualSavings);
       
       const ccPaymentsCat = currentMonthData.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-      const paymentsMade = ccPaymentsCat?.expenses.reduce((sum, exp) => sum + exp.amount, 0) || 0;
-      setCurrentEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMade));
+      const paymentsMadeThisMonth = ccPaymentsCat?.expenses.reduce((sum, exp) => sum + exp.amount, 0) || 0;
+      setCurrentEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
 
       setStatementFiles([]);
       setStatementPreviewDetails([]);
@@ -60,7 +63,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
       setUserGoals("");
       setAiSuggestions(null);
       setAiError(null);
-      setIsLoadingAi(false);
+      // setIsLoadingAi(false); // Already set at the beginning of this block
       if (statementFileInputRef.current) {
         statementFileInputRef.current.value = "";
       }
@@ -74,8 +77,8 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
       setStatementFiles(prev => [...prev, ...newFilesArray]);
       setAiError(null);
 
-      const newPreviewDetails: { name: string; type: string; dataUri?: string }[] = [];
-      const newDataUris: string[] = [];
+      const newPreviewDetailsArray: { name: string; type: string; dataUri?: string }[] = [];
+      const newDataUrisArray: string[] = [];
 
       for (const file of newFilesArray) {
         try {
@@ -85,8 +88,8 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
-          newDataUris.push(dataUri);
-          newPreviewDetails.push({
+          newDataUrisArray.push(dataUri);
+          newPreviewDetailsArray.push({
             name: file.name,
             type: file.type,
             dataUri: file.type.startsWith('image/') ? dataUri : undefined,
@@ -94,13 +97,12 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
         } catch (error) {
           console.error("Error reading file:", file.name, error);
           setAiError(`Error processing file: ${file.name}.`);
-          // Optionally skip this file or stop processing
         }
       }
-      setStatementDataUris(prev => [...prev, ...newDataUris]);
-      setStatementPreviewDetails(prev => [...prev, ...newPreviewDetails]);
+      setStatementDataUris(prev => [...prev, ...newDataUrisArray]);
+      setStatementPreviewDetails(prev => [...prev, ...newPreviewDetailsArray]);
     }
-    if (event.target) event.target.value = ''; // Clear input for re-selection
+    if (event.target) event.target.value = '';
   };
 
   const handleClearStatementFiles = () => {
@@ -219,7 +221,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-lg md:max-w-2xl lg:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold flex items-center">
@@ -273,7 +275,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
                 id="statementUpload"
                 type="file"
                 accept="image/*,application/pdf"
-                multiple // Allow multiple files
+                multiple
                 ref={statementFileInputRef}
                 onChange={handleStatementFileChange}
                 className="hidden"
@@ -348,7 +350,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
                 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button className="w-full mt-4" variant="default" size="lg" disabled={!aiSuggestions.suggestedCategories || aiSuggestions.suggestedCategories.length === 0}>
+                    <Button className="w-full mt-4" variant="default" size="lg" disabled={!aiSuggestions.suggestedCategories || aiSuggestions.suggestedCategories.length === 0 || isLoadingAi}>
                         <CheckCircle className="mr-2 h-5 w-5"/> Apply This Budget to Next Month
                     </Button>
                   </AlertDialogTrigger>
@@ -361,8 +363,11 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleApplyBudget}>Yes, Apply Budget</AlertDialogAction>
+                      <AlertDialogCancel disabled={isLoadingAi}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleApplyBudget} disabled={isLoadingAi}>
+                        {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null }
+                        Yes, Apply Budget
+                      </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -373,7 +378,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
         </ScrollArea>
         <DialogFooter className="mt-4 gap-2">
           <DialogClose asChild>
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} disabled={isLoadingAi}>
               <XCircle className="mr-2 h-4 w-4" /> Close
             </Button>
           </DialogClose>
@@ -382,3 +387,5 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
     </Dialog>
   );
 }
+
+    

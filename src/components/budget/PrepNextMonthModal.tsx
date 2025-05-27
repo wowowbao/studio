@@ -180,7 +180,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
 
     toast({
       title: "Budget Applied!",
-      description: `AI-suggested budget has been applied to ${nextMonthId}. You will be navigated to the new month.`,
+      description: `AI-suggested budget has been applied to ${getFormattedMonthTitle(nextMonthId)}. You will be navigated to the new month.`,
       action: <CheckCircle className="text-green-500" />,
     });
     setCurrentDisplayMonthId(nextMonthId);
@@ -209,6 +209,12 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
     );
   };
 
+  const getFormattedMonthTitle = (monthId: string) => {
+    if (!monthId) return "";
+    const dateObj = parseYearMonth(monthId);
+    return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
 
   if (!isOpen) return null;
 
@@ -224,7 +230,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
           <div className="space-y-6 p-4 pr-2">
             
             <div className="p-4 border rounded-lg bg-card/50">
-                <h3 className="text-lg font-medium mb-2">Current Financial Snapshot (Month: {currentMonthData.id})</h3>
+                <h3 className="text-lg font-medium mb-2">Current Financial Snapshot (Month: {getFormattedMonthTitle(currentMonthData.id)})</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                     <div className="p-2 bg-muted/30 rounded-md">
                         <DollarSign className="h-4 w-4 text-green-500 mb-1"/>
@@ -350,7 +356,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
                     <AlertDialogHeader>
                       <AlertDialogTitle>Confirm Apply Budget</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will set up the budget for the next month ({ getYearMonthFromDate(new Date(parseYearMonth(currentMonthData.id).setMonth(parseYearMonth(currentMonthData.id).getMonth() + 1))) }) 
+                        This will set up the budget for the next month ({ getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(currentMonthData.id).setMonth(parseYearMonth(currentMonthData.id).getMonth() + 1)))) }) 
                         using the AI's suggestions. Any existing budget for that month will be overwritten. Are you sure?
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -376,5 +382,3 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
     </Dialog>
   );
 }
-
-    

@@ -23,6 +23,7 @@ import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { BudgetCategory, BudgetMonth } from '@/types/budget';
+import { parseYearMonth } from '@/hooks/useBudgetCore';
 
 
 export default function HomePage() {
@@ -76,6 +77,12 @@ export default function HomePage() {
   };
 
   const isLoading = authLoading || budgetLoading;
+
+  const getFormattedMonthTitle = (monthId: string) => {
+    if (!monthId) return "";
+    const dateObj = parseYearMonth(monthId);
+    return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
 
 
   if (isLoading && !Object.keys(budgetMonths).length && !currentBudgetMonth) { 
@@ -172,7 +179,7 @@ export default function HomePage() {
         
         {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
             <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {/* Adjusted for 6 cards, fits 3x2 */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
                  {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
               </div>
               <Skeleton className="h-32 w-full rounded-lg" /> 
@@ -190,10 +197,10 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-6">
-                Let's set up your first budget for {currentDisplayMonthId}.
+                Let's set up your first budget for {getFormattedMonthTitle(currentDisplayMonthId)}.
               </p>
               <Button onClick={() => setIsEditBudgetModalOpen(true)} size="lg">
-                Create Budget for {currentDisplayMonthId}
+                Create Budget for {getFormattedMonthTitle(currentDisplayMonthId)}
               </Button>
             </CardContent>
           </Card>
@@ -248,7 +255,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">
-                    You haven't added any categories to your budget for {currentDisplayMonthId} yet. Use "Manage Budget" to add them or try the AI setup.
+                    You haven't added any categories to your budget for {getFormattedMonthTitle(currentDisplayMonthId)} yet. Use "Manage Budget" to add them or try the AI setup.
                   </p>
                   <Button variant="outline" onClick={() => setIsEditBudgetModalOpen(true)}>
                     Add Categories
@@ -262,7 +269,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.13 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.14 (Studio Preview)
           </div>
       </footer>
 

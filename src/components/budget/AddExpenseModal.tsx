@@ -20,6 +20,7 @@ import { categorizeExpenseFromImage, type CategorizeExpenseInput, type Categoriz
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { parseYearMonth } from "@/hooks/useBudgetCore";
 
 
 interface AddExpenseModalProps {
@@ -432,13 +433,19 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     }
   };
 
+  const getFormattedMonthTitle = () => {
+    if (!monthId) return "";
+    const dateObj = parseYearMonth(monthId);
+    return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
   if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
       <DialogContent className="sm:max-w-lg w-[90vw] max-w-[576px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
+          <DialogTitle className="text-2xl font-semibold">Add Expense for {getFormattedMonthTitle()}</DialogTitle>
         </DialogHeader>
         
         <video 

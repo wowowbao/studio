@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { setupBudgetFromImage, type SetupBudgetInput, type SetupBudgetOutput } from '@/ai/flows/setup-budget-flow';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
+import { parseYearMonth } from "@/hooks/useBudgetCore";
 
 
 interface EditBudgetModalProps {
@@ -212,7 +213,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     });
     toast({
       title: "Budget Updated",
-      description: `Budget for ${monthId} has been saved.`,
+      description: `Budget for ${getFormattedMonthTitle()} has been saved.`,
       action: <CheckCircle className="text-green-500" />,
     });
     onCloseModal();
@@ -332,6 +333,11 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     }
   };
 
+  const getFormattedMonthTitle = () => {
+    if (!monthId) return "";
+    const dateObj = parseYearMonth(monthId);
+    return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
 
   if (!isOpen) {
     return null;
@@ -341,7 +347,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
             <DialogContent className="max-w-md sm:max-w-lg md:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-2xl font-semibold">Edit Budget for {monthId}</DialogTitle>
+                    <DialogTitle className="text-2xl font-semibold">Edit Budget for {getFormattedMonthTitle()}</DialogTitle>
                 </DialogHeader>
                 <div className="flex items-center justify-center h-64">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -357,7 +363,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
       <DialogContent className="max-w-md sm:max-w-lg md:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold">Edit Budget for {monthId}</DialogTitle>
+          <DialogTitle className="text-2xl font-semibold">Edit Budget for {getFormattedMonthTitle()}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] p-1">
           <div className="space-y-6 pr-4">
@@ -505,12 +511,12 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                             handleCategoryChange(cat.id, "budgetedAmount", e.target.value);
                           }
                         }}
-                        readOnly={hasSubcategories && !isSystem} // Read-only only for non-system categories with subcategories
+                        readOnly={hasSubcategories && !isSystem}
                         placeholder="0.00"
                         className={`mt-1 text-sm ${(hasSubcategories && !isSystem) ? "bg-muted/50 cursor-default" : ""}`}
                       />
                        {hasSubcategories && !isSystem && <p className="text-xs text-muted-foreground mt-1">Parent budget is sum of subcategories.</p>}
-                       {cat.budgetedAmount === 0 && (!hasSubcategories && !isSystem) && <p className="text-xs text-muted-foreground mt-1">Enter 0 if no budget for this category.</p>}
+                       {cat.budgetedAmount === 0 && (!hasSubcategories || isSystem) && <p className="text-xs text-muted-foreground mt-1">Enter 0 if no budget for this category.</p>}
                     </div>
                   </div>
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TrendingUp, TrendingDown, CheckCircle, DollarSign, PiggyBank, Landmark, Coins } from "lucide-react"; // Added Coins
 import { cn } from "@/lib/utils";
+import { parseYearMonth } from "@/hooks/useBudgetCore";
 
 interface MonthEndSummaryModalProps {
   isOpen: boolean;
@@ -63,13 +64,19 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
     </div>
   );
 
+  const getFormattedMonthTitle = (monthId: string) => {
+    if (!monthId) return "";
+    const dateObj = parseYearMonth(monthId);
+    return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md md:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-center">
-            Month-End Summary: {budgetMonth.id}
+            Month-End Summary: {getFormattedMonthTitle(budgetMonth.id)}
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] p-1 pr-3">

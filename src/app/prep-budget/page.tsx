@@ -34,16 +34,13 @@ export default function PrepareBudgetPage() {
   const [statementDataUris, setStatementDataUris] = useState<string[]>([]);
   const [userGoals, setUserGoals] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
-  // Removed aiSuggestions state - it will be passed to review page
   const [aiError, setAiError] = useState<string | null>(null);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [currentIncome, setCurrentIncome] = useState(0);
-  const [currentActualSavings, setCurrentActualSavings] = useState(0);
-  const [currentEstimatedDebt, setCurrentEstimatedDebt] = useState(0);
+  const [currentIncomeForDisplay, setCurrentIncomeForDisplay] = useState(0);
+  const [currentActualSavingsForDisplay, setCurrentActualSavingsForDisplay] = useState(0);
+  const [currentEstimatedDebtForDisplay, setCurrentEstimatedDebtForDisplay] = useState(0);
   
-  // Removed inputsUsedForSuggestion state
-
 
   useEffect(() => {
     const sourceMonthId = initialMonthId;
@@ -83,19 +80,19 @@ export default function PrepareBudgetPage() {
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
 
       const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
-      setCurrentIncome(totalIncome);
+      setCurrentIncomeForDisplay(totalIncome);
 
       const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
       const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-      setCurrentActualSavings(actualSavingsContribution);
+      setCurrentActualSavingsForDisplay(actualSavingsContribution);
       
       const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
       const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-      setCurrentEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
+      setCurrentEstimatedDebtForDisplay(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
     } else {
-      setCurrentIncome(0);
-      setCurrentActualSavings(0);
-      setCurrentEstimatedDebt(0);
+      setCurrentIncomeForDisplay(0);
+      setCurrentActualSavingsForDisplay(0);
+      setCurrentEstimatedDebtForDisplay(0);
     }
   }, [currentMonthData]);
 
@@ -169,13 +166,26 @@ export default function PrepareBudgetPage() {
     setIsLoadingAi(true);
     setAiError(null);
 
+    // Recalculate financial snapshot directly from currentMonthData for AI input
+    const incomesArrayForSnapshot = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
+    const calculatedCurrentIncome = incomesArrayForSnapshot.reduce((sum, inc) => sum + inc.amount, 0);
+
+    const categoriesArrayForSnapshot = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+    const savingsCatForSnapshot = categoriesArrayForSnapshot.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+    const calculatedCurrentActualSavings = (savingsCatForSnapshot?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+    
+    const ccPaymentsCatForSnapshot = categoriesArrayForSnapshot.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+    const paymentsMadeThisMonthForSnapshot = (ccPaymentsCatForSnapshot?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+    const calculatedCurrentEstimatedDebt = Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonthForSnapshot);
+
+
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
       userGoals,
       currentMonthId: currentMonthData.id,
-      currentIncome: currentIncome,
-      currentSavingsTotal: currentActualSavings, 
-      currentCCDebtTotal: currentEstimatedDebt,
+      currentIncome: calculatedCurrentIncome,
+      currentSavingsTotal: calculatedCurrentActualSavings, 
+      currentCCDebtTotal: calculatedCurrentEstimatedDebt,
     };
 
     try {
@@ -184,16 +194,15 @@ export default function PrepareBudgetPage() {
         setAiError(result.aiError);
         toast({ title: "AI Suggestion Error", description: result.aiError, variant: "destructive" });
       } else {
-        // Store results and inputs in sessionStorage for the review page
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
           userGoals,
           statementFileNames: statementPreviewDetails.map(f => f.name),
           currentMonthId: currentMonthData.id,
-          currentIncome,
-          currentActualSavings,
-          currentEstimatedDebt,
-          statementDataUris // Pass statement data URIs for re-submission if needed
+          currentIncome: calculatedCurrentIncome,
+          currentActualSavings: calculatedCurrentActualSavings,
+          currentEstimatedDebt: calculatedCurrentEstimatedDebt,
+          statementDataUris 
         }));
         
         toast({ title: "AI Suggestions Ready!", description: "Redirecting to review page...", duration: 3000 });
@@ -279,17 +288,17 @@ export default function PrepareBudgetPage() {
                       <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
                           <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
                           <p className="text-xs text-muted-foreground">Income This Month</p>
-                          <p className="font-semibold text-lg">${currentIncome.toFixed(2)}</p>
+                          <p className="font-semibold text-lg">${currentIncomeForDisplay.toFixed(2)}</p>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
                           <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
                           <p className="text-xs text-muted-foreground">Actual Savings This Month</p>
-                          <p className="font-semibold text-lg">${currentActualSavings.toFixed(2)}</p>
+                          <p className="font-semibold text-lg">${currentActualSavingsForDisplay.toFixed(2)}</p>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
                           <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
                           <p className="text-xs text-muted-foreground">Est. CC Debt End of Month</p>
-                          <p className="font-semibold text-lg">${currentEstimatedDebt.toFixed(2)}</p>
+                          <p className="font-semibold text-lg">${currentEstimatedDebtForDisplay.toFixed(2)}</p>
                       </div>
                   </CardContent>
               </Card>
@@ -393,6 +402,8 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
+    
+
     
 
     

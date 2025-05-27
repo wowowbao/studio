@@ -22,7 +22,7 @@ interface StoredAIPrepData {
     userGoals: string;
     statementFileNames: string[];
     currentMonthId: string;
-    currentIncome: number;
+    currentIncome: number; // Income from the source month (used as fallback)
     currentActualSavings: number;
     currentEstimatedDebt: number;
     statementDataUris?: string[]; 
@@ -76,7 +76,7 @@ export default function PrepareBudgetReviewPage() {
       statementDataUris: initialInputs.statementDataUris, 
       userGoals: updatedUserGoals,
       currentMonthId: initialInputs.currentMonthId,
-      currentIncome: initialInputs.currentIncome,
+      currentIncome: initialInputs.currentIncome, // This is the source month's income
       currentSavingsTotal: initialInputs.currentActualSavings,
       currentCCDebtTotal: initialInputs.currentEstimatedDebt,
     };
@@ -91,6 +91,7 @@ export default function PrepareBudgetReviewPage() {
         setRefinementText(""); 
         toast({ title: "AI Suggestions Updated", description: "Review the updated plan.", duration: 5000 });
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
+        // Update the userGoals in sessionStorage to reflect the refinement
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
             ...initialInputs,
             userGoals: updatedUserGoals 
@@ -111,8 +112,8 @@ export default function PrepareBudgetReviewPage() {
       toast({ title: "No Budget to Apply", description: "AI did not provide budget categories.", variant: "destructive" });
       return;
     }
-    if (!initialInputs) {
-        toast({ title: "Error", description: "Initial input data for context is missing.", variant: "destructive" });
+    if (!initialInputs || currentSuggestions.incomeBasisForBudget === undefined) {
+        toast({ title: "Error", description: "Initial input data or AI income basis for context is missing.", variant: "destructive" });
         return;
     }
 
@@ -121,21 +122,14 @@ export default function PrepareBudgetReviewPage() {
     const nextMonthId = getYearMonthFromDate(currentMonthDate);
     
     const ccPaymentsCategory = currentSuggestions.suggestedCategories.find(c => c.name.toLowerCase() === "credit card payments");
-    const aiSuggestedCCPayment = ccPaymentsCategory?.budgetedAmount || 0;
-    // For applyAiGeneratedBudget, ccPaymentsMadeInCurrentMonth should be ACTUAL payments from CURRENT month.
-    // This info isn't directly available in initialInputs which has *estimated* debt.
-    // For simplicity, we'll pass the AI's suggested CC payment for *next* month.
-    // The useBudgetCore hook's applyAi... will need to correctly calculate next month's starting debt.
-    // This is a point of potential refinement for debt carryover accuracy.
+    const aiSuggestedCCPaymentForNextMonth = ccPaymentsCategory?.budgetedAmount || 0;
     
     applyAiGeneratedBudget(
       nextMonthId,
       currentSuggestions.suggestedCategories,
-      initialInputs.currentIncome, 
-      initialInputs.currentEstimatedDebt, 
-      aiSuggestedCCPayment // Passing AI's suggested payment for next month.
-                           // Actual previous month's payment needs to be fetched or calculated.
-                           // `useBudgetCore` `applyAiGeneratedBudget` should use `initialInputs.currentEstimatedDebt` as the starting debt for next month for now.
+      currentSuggestions.incomeBasisForBudget, // Use the income basis AI confirmed it used
+      initialInputs.currentEstimatedDebt, // This is the debt at the END of the current month, so it's STARTING for next
+      aiSuggestedCCPaymentForNextMonth 
     );
 
     toast({
@@ -199,7 +193,10 @@ export default function PrepareBudgetReviewPage() {
             totalBudgeted += cat.budgetedAmount || 0;
         }
     });
-    const projectedIncome = initialInputs.currentIncome;
+    // Use incomeBasisForBudget from AI suggestions if available, otherwise fallback
+    const projectedIncome = typeof currentSuggestions.incomeBasisForBudget === 'number' 
+                            ? currentSuggestions.incomeBasisForBudget 
+                            : initialInputs.currentIncome;
     const balance = projectedIncome - totalBudgeted;
     return { totalBudgeted, balance, projectedIncome };
   };
@@ -252,6 +249,7 @@ export default function PrepareBudgetReviewPage() {
                           </CardHeader>
                           <CardContent className="text-xs space-y-1">
                               <p className="whitespace-pre-wrap"><span className="font-semibold">Your Goals:</span> {initialInputs.userGoals || "Not specified"}</p>
+                              <p><span className="font-semibold">Source Month Income (from App):</span> ${initialInputs.currentIncome.toFixed(2)}</p>
                               <p><span className="font-semibold">Statements:</span> {initialInputs.statementFileNames.length > 0 ? initialInputs.statementFileNames.join(', ') : "None provided"}</p>
                           </CardContent>
                         </Card>
@@ -273,11 +271,17 @@ export default function PrepareBudgetReviewPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-lg">AI Budget Overview</CardTitle>
-                                <CardDescription>Summary of the AI's suggested plan against your income.</CardDescription>
+                                <CardDescription>Summary of the AI's suggested plan against the income basis it used.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
-                                <div className="flex justify-between"><span>Projected Income:</span> <span className="font-semibold">${budgetSummary.projectedIncome.toFixed(2)}</span></div>
-                                <div className="flex justify-between"><span>Total Suggested Budget:</span> <span className="font-semibold">${budgetSummary.totalBudgeted.toFixed(2)}</span></div>
+                                <div className="flex justify-between">
+                                    <span>Projected Income (AI Basis):</span> 
+                                    <span className="font-semibold">${budgetSummary.projectedIncome.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Total Suggested Budget:</span> 
+                                    <span className="font-semibold">${budgetSummary.totalBudgeted.toFixed(2)}</span>
+                                </div>
                                 <div className={`flex justify-between font-semibold ${budgetSummary.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                                     <span>{budgetSummary.balance >= 0 ? 'Remaining Unbudgeted:' : 'Shortfall:'}</span> 
                                     <span>${Math.abs(budgetSummary.balance).toFixed(2)}</span>
@@ -356,3 +360,4 @@ export default function PrepareBudgetReviewPage() {
 }
 
     
+

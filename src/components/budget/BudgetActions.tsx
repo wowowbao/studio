@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useBudget } from "@/hooks/useBudget";
-import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2 } from "lucide-react";
+import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2, AlertTriangle } from "lucide-react"; // Added AlertTriangle
 import { useToast } from "@/hooks/use-toast";
 
 interface BudgetActionsProps {
@@ -11,7 +11,6 @@ interface BudgetActionsProps {
   onAddExpense: () => void;
   onAddIncome: () => void;
   onFinalizeMonth: () => void;
-  // onPrepNextMonth prop removed
 }
 
 export function BudgetActions({ 

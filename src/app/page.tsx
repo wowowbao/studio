@@ -34,7 +34,7 @@ export default function HomePage() {
     isLoading: budgetLoading, 
     budgetMonths,
     getBudgetForMonth, 
-    ensureMonthExists, 
+    // ensureMonthExists, // Removed from here to prevent useEffect loop
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -45,11 +45,16 @@ export default function HomePage() {
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading && currentDisplayMonthId) { 
-      ensureMonthExists(currentDisplayMonthId);
-    }
-  }, [currentDisplayMonthId, authLoading, ensureMonthExists]);
+  // This useEffect was the likely cause of the "Maximum update depth exceeded" error.
+  // It called ensureMonthExists, which could update budgetMonthsState, which could change
+  // the reference of ensureMonthExists (a useCallback), re-triggering this effect.
+  // The core logic in useBudgetCore.ts's main data loading effect should handle
+  // ensuring the currentDisplayMonthId's data exists.
+  // useEffect(() => {
+  //   if (!authLoading && currentDisplayMonthId) { 
+  //     ensureMonthExists(currentDisplayMonthId);
+  //   }
+  // }, [currentDisplayMonthId, authLoading, ensureMonthExists]);
 
 
   useEffect(() => {
@@ -64,6 +69,7 @@ export default function HomePage() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
+      // Optionally, redirect or clear specific app state related to the user
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -118,10 +124,11 @@ export default function HomePage() {
     }
   });
 
+  // Sort system categories: Savings first, then Credit Card Payments
   systemCategories.sort((a, b) => {
     if (a.name.toLowerCase() === 'savings') return -1; 
     if (b.name.toLowerCase() === 'savings') return 1;
-    if (a.name.toLowerCase() === 'credit card payments') return -1; 
+    if (a.name.toLowerCase() === 'credit card payments') return -1; // This should be after Savings if both present
     if (b.name.toLowerCase() === 'credit card payments') return 1;
     return 0;
   });
@@ -183,13 +190,14 @@ export default function HomePage() {
         
         <MonthNavigator />
         
+        {/* More targeted loading state for when switching months but some data already exists */}
         {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
                  {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
               </div>
-              <Skeleton className="h-32 w-full rounded-lg" /> 
-              <Skeleton className="h-20 w-full rounded-lg" /> 
+              <Skeleton className="h-32 w-full rounded-lg" /> {/* Placeholder for CC Debt Summary */}
+              <Skeleton className="h-20 w-full rounded-lg" /> {/* Placeholder for BudgetActions */}
               <h2 className="text-xl font-semibold mt-8 mb-4 text-primary"><Skeleton className="h-6 w-32"/></h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-lg" />)}
@@ -247,12 +255,12 @@ export default function HomePage() {
               </>
             )}
             
-            {(operationalCategories.length > 0) && ( 
+            {(operationalCategories.length > 0) && ( // Only show chart if there are operational categories
                 <BudgetChart budgetMonth={currentBudgetMonth} />
             )}
 
 
-            {allCategories.length === 0 && ( 
+            {allCategories.length === 0 && ( // Show if no categories at all (neither system nor operational)
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
                   <XCircle className="mx-auto h-10 w-10 text-accent mb-3" />
@@ -274,11 +282,11 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.23 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.24 (Studio Preview)
           </div>
       </footer>
 
-      {currentDisplayMonthId && ( 
+      {currentDisplayMonthId && ( // Ensure monthId is available before rendering modals
         <>
           <EditBudgetModal 
             isOpen={isEditBudgetModalOpen} 
@@ -300,11 +308,12 @@ export default function HomePage() {
               isOpen={isMonthEndSummaryModalOpen}
               onClose={() => {
                 setIsMonthEndSummaryModalOpen(false);
+                // Re-fetch data for the summary modal if it's reopened after changes (e.g. month reopened)
                 const updatedData = getBudgetForMonth(currentDisplayMonthId);
-                if (updatedData && updatedData.isRolledOver) { 
+                if (updatedData && updatedData.isRolledOver) { // Only keep if still rolled over
                   setMonthEndSummaryData(updatedData);
                 } else {
-                  setMonthEndSummaryData(undefined); 
+                  setMonthEndSummaryData(undefined); // Clear if not rolled over anymore
                 }
               }}
               budgetMonth={monthEndSummaryData}

@@ -334,7 +334,7 @@ export default function PrepareBudgetPage() {
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
         <ScrollArea className="h-full pr-2"> 
           <div className="space-y-8 pb-8">
-              <> {/* Inputs Section - always visible */}
+              {/* Inputs Section - always visible */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
@@ -377,7 +377,7 @@ export default function PrepareBudgetPage() {
                             rows={5}
                             disabled={isLoadingAi}
                         />
-                         {aiSuggestions && (
+                         {aiSuggestions && ( // This alert guides users on how to refine
                             <Alert className="mt-4">
                                 <MessageSquareText className="h-4 w-4" />
                                 <AlertTitle className="font-semibold">Refine Your Plan!</AlertTitle>
@@ -453,7 +453,6 @@ export default function PrepareBudgetPage() {
                   {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
                   {aiSuggestions ? "Update AI Suggestions" : "Get AI Budget Suggestions"}
                 </Button>
-              </>
             
             {aiSuggestions && (
               <div className="space-y-6 pt-6 border-t mt-8">
@@ -484,9 +483,8 @@ export default function PrepareBudgetPage() {
                           {renderSuggestedCategories(aiSuggestions.suggestedCategories)}
                       </div>
                                             
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-                        {/* Removed "Edit Inputs & Regenerate" button, primary button above serves this purpose now */}
-                        <div className="sm:col-span-2"> {/* Ensure Apply button can be centered or full width if it's the only one */}
+                      <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 mt-6"> {/* Changed grid-cols-2 to grid-cols-1 for apply button */}
+                        <div className="sm:col-span-1"> {/* Ensure Apply button can be centered or full width if it's the only one */}
                           <AlertDialog>
                           <AlertDialogTrigger asChild>
                               <Button className="w-full py-3 text-base font-semibold" variant="default" size="lg" disabled={!aiSuggestions.suggestedCategories || aiSuggestions.suggestedCategories.length === 0 || isLoadingAi}>

@@ -107,7 +107,7 @@ Based on ALL the information above (goals, income, debt, savings contributions, 
     -   Provide general tips for improving financial health based on their situation (e.g., building an emergency fund if their "Actual Savings Contributed This Month" is low, strategies for debt reduction).
     -   **Address Trade-offs:** If achieving one goal (e.g., aggressive saving) means reducing spending in another desired area, or if accommodating a user's requested budget change impacts other goals, acknowledge this trade-off in a supportive way.
     -   If information seems insufficient to make a concrete plan (e.g., vague goals with very low income), state what additional information would be helpful, or make reasonable assumptions and clearly state them.
-    -   Your tone should be encouraging, supportive, and non-judgmental. Help them feel empowered and capable of achieving their financial goals. Avoid overly restrictive or negative language. Focus on positive framing and solutions.
+    *   Your tone should be encouraging, supportive, and non-judgmental. Help them feel empowered and capable of achieving their financial goals. Avoid overly restrictive or negative language. Focus on positive framing and solutions.
 
 Ensure your 'suggestedCategories' output is well-structured.
 If you cannot reasonably create a budget or provide advice (e.g., conflicting or impossible goals given the income, completely uncooperative user description), set an 'aiError' explaining why.

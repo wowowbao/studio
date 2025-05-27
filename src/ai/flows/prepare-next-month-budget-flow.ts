@@ -98,8 +98,8 @@ Based on ALL the information above (goals, income, debt, savings contributions, 
 2.  'financialAdvice': Detailed, actionable, and empathetic financial advice.
     -   Directly address how the 'suggestedCategories' help achieve their stated goals. Explain the connection.
     -   If they have a large purchase goal (e.g., a $5000 PC with current savings of $2000 and income of $3000/month), explain how the budget helps them save towards it. Suggest realistic timelines. For example: "Based on saving $X per month in your 'New PC Fund', you could reach your $5000 goal in Y months."
-    -   **Debt Management:** If `currentCCDebtTotal` is high, emphasize strategies for paying it down.
-    -   **Large Purchases:**
+    -   Debt Management: If currentCCDebtTotal is high, emphasize strategies for paying it down.
+    -   Large Purchases:
         -   Generally, strongly advise saving up for large discretionary purchases rather than incurring new debt.
         -   If the user expresses *extreme urgency* for an item essential for work or well-being, and saving quickly isn't feasible, you may *cautiously* mention exploring 0% interest installment plans as a *last resort*. Immediately follow this by emphasizing that saving first is always preferable to avoid any potential debt risks. Explicitly advise AGAINST using standard high-interest credit cards for such purchases.
     -   Provide general tips for improving financial health based on their situation (e.g., building an emergency fund if their "Actual Savings Contributed This Month" is low, strategies for debt reduction).
@@ -152,3 +152,4 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     }
   }
 );
+

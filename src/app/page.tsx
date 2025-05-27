@@ -34,6 +34,7 @@ export default function HomePage() {
     isLoading: budgetLoading, 
     budgetMonths,
     getBudgetForMonth, 
+    ensureMonthExists, 
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -43,6 +44,13 @@ export default function HomePage() {
   const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined); 
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && currentDisplayMonthId) { 
+      ensureMonthExists(currentDisplayMonthId);
+    }
+  }, [currentDisplayMonthId, authLoading, ensureMonthExists]);
+
 
   useEffect(() => {
     if (!authLoading && !isUserAuthenticated) {
@@ -313,3 +321,5 @@ export default function HomePage() {
     
 
 
+
+    

@@ -1,4 +1,3 @@
-
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -216,7 +215,7 @@ export default function HomePage() {
             {systemCategories.length > 0 && (
               <>
                 <h2 className="text-xl font-semibold mt-8 mb-4 text-primary flex items-center">
-                  <PiggyBank className="mr-2 h-6 w-6 text-primary/80" /> Financial Goals & Obligations
+                  <PiggyBank className="mr-2 h-6 w-6 text-primary/80" /> Financial Goals &amp; Obligations
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                   {systemCategories.map(cat => (
@@ -266,7 +265,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.15 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.16 (Studio Preview)
           </div>
       </footer>
 

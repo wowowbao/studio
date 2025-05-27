@@ -1,4 +1,3 @@
-
 "use client";
 import { useState, useEffect, useRef } from "react";
 import type { BudgetMonth } from "@/types/budget";
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, Edit3 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -20,6 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+type ViewMode = 'input' | 'suggestions';
+
 export default function PrepareBudgetPage() {
   const { getBudgetForMonth, applyAiGeneratedBudget, setCurrentDisplayMonthId, currentDisplayMonthId: initialMonthId } = useBudget();
   const { toast } = useToast();
@@ -27,10 +28,11 @@ export default function PrepareBudgetPage() {
 
   const [currentMonthData, setCurrentMonthData] = useState<BudgetMonth | null>(null);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('input');
 
   const [statementFiles, setStatementFiles] = useState<File[]>([]);
   const [statementPreviewDetails, setStatementPreviewDetails] = useState<{ name: string; type: string; dataUri?: string }[]>([]);
-  const [statementDataUris, setStatementDataUris] = useState<string[]>([]);
+  const [statementDataUris, setStatementDataUris = useState<string[]>([]);
   const [userGoals, setUserGoals] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
   const [aiSuggestions, setAiSuggestions] = useState<PrepareBudgetOutput | null>(null);
@@ -40,6 +42,9 @@ export default function PrepareBudgetPage() {
   const [currentIncome, setCurrentIncome] = useState(0);
   const [currentActualSavings, setCurrentActualSavings] = useState(0);
   const [currentEstimatedDebt, setCurrentEstimatedDebt] = useState(0);
+  
+  const [inputsForCurrentSuggestion, setInputsForCurrentSuggestion] = useState<{goals: string, statements: string[]}>({goals: "", statements: []});
+
 
   useEffect(() => {
     const sourceMonthId = initialMonthId;
@@ -62,8 +67,7 @@ export default function PrepareBudgetPage() {
 
 
   useEffect(() => {
-    // This effect runs when the page loads or initialMonthId changes.
-    // It resets the form to its initial state.
+    // Reset page state when initialMonthId (source month) changes, effectively a page reset
     setIsLoadingAi(false);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
@@ -71,6 +75,8 @@ export default function PrepareBudgetPage() {
     setUserGoals("");
     setAiSuggestions(null);
     setAiError(null);
+    setViewMode('input');
+    setInputsForCurrentSuggestion({goals: "", statements: []});
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
@@ -182,7 +188,12 @@ export default function PrepareBudgetPage() {
         toast({ title: "AI Suggestion Error", description: result.aiError, variant: "destructive" });
       } else {
         setAiSuggestions(result);
-        toast({ title: "AI Suggestions Loaded", description: "Review the suggestions and apply them to your next month's budget if you're happy.", duration: 5000 });
+        setInputsForCurrentSuggestion({
+            goals: userGoals,
+            statements: statementPreviewDetails.map(f => f.name)
+        });
+        setViewMode('suggestions');
+        toast({ title: "AI Suggestions Loaded", description: "Review the suggestions below.", duration: 5000 });
       }
     } catch (error: any) {
       const message = error.message || "An unexpected error occurred while getting AI suggestions.";
@@ -265,16 +276,26 @@ export default function PrepareBudgetPage() {
   };
   
   const handleStartOver = () => {
+    setIsLoadingAi(false);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
     setStatementDataUris([]);
     setUserGoals("");
     setAiSuggestions(null);
     setAiError(null);
+    setViewMode('input');
+    setInputsForCurrentSuggestion({goals: "", statements: []});
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
     toast({title: "Form Reset", description: "Please enter your goals and upload statements again."});
+  };
+
+  const handleEditInputs = () => {
+    setViewMode('input');
+    // Keep current inputs (userGoals, statementFiles etc.) so user can tweak them
+    setAiSuggestions(null); // Clear previous suggestions
+    setAiError(null);
   };
 
 
@@ -311,134 +332,142 @@ export default function PrepareBudgetPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary truncate px-2">AI Prep for {nextMonthToPrep}</h1>
-            <div className="w-8"></div>
+            <Button variant="outline" size="sm" onClick={handleStartOver} disabled={isLoadingAi} aria-label="Start Over">
+                <RotateCcw className="mr-2 h-4 w-4" /> Start Over
+            </Button>
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
         <ScrollArea className="h-full pr-2"> 
           <div className="space-y-8 pb-8">
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
-                      <CardDescription>Based on your latest data for {getFormattedMonthTitle(currentMonthData.id)}. This info helps the AI.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                          <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
-                          <p className="text-xs text-muted-foreground">Income This Month</p>
-                          <p className="font-semibold text-lg">${currentIncome.toFixed(2)}</p>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                          <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
-                          <p className="text-xs text-muted-foreground">Actual Savings This Month</p>
-                          <p className="font-semibold text-lg">${currentActualSavings.toFixed(2)}</p>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                          <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
-                          <p className="text-xs text-muted-foreground">Est. CC Debt End of Month</p>
-                          <p className="font-semibold text-lg">${currentEstimatedDebt.toFixed(2)}</p>
-                      </div>
-                  </CardContent>
-              </Card>
+            {viewMode === 'input' && (
+              <>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
+                        <CardDescription>Based on your latest data for {getFormattedMonthTitle(currentMonthData.id)}. This info helps the AI.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                            <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
+                            <p className="text-xs text-muted-foreground">Income This Month</p>
+                            <p className="font-semibold text-lg">${currentIncome.toFixed(2)}</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                            <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
+                            <p className="text-xs text-muted-foreground">Actual Savings This Month</p>
+                            <p className="font-semibold text-lg">${currentActualSavings.toFixed(2)}</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                            <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
+                            <p className="text-xs text-muted-foreground">Est. CC Debt End of Month</p>
+                            <p className="font-semibold text-lg">${currentEstimatedDebt.toFixed(2)}</p>
+                        </div>
+                    </CardContent>
+                </Card>
 
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="text-lg">Your Financial Goals for Next Month</CardTitle>
-                      <CardDescription>Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..." The more detail, the better the AI can assist.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <Textarea
-                          id="userGoals"
-                          value={userGoals}
-                          onChange={(e) => setUserGoals(e.target.value)}
-                          placeholder="Be specific about your goals..."
-                          className="min-h-[100px] text-base"
-                          rows={4}
-                          disabled={isLoadingAi}
-                      />
-                  </CardContent>
-              </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Your Financial Goals for Next Month</CardTitle>
+                        <CardDescription>Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..." The more detail, the better the AI can assist.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Textarea
+                            id="userGoals"
+                            value={userGoals}
+                            onChange={(e) => setUserGoals(e.target.value)}
+                            placeholder="Be specific about your goals..."
+                            className="min-h-[100px] text-base"
+                            rows={4}
+                            disabled={isLoadingAi}
+                        />
+                    </CardContent>
+                </Card>
 
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="text-lg">Upload Past Bank Statement(s) <span className="text-xs text-muted-foreground">(Optional)</span></CardTitle>
-                      <CardDescription>Provide images or PDFs of recent bank statements or spending summaries for more tailored AI suggestions.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                      <Input
-                          id="statementUpload"
-                          type="file"
-                          accept="image/*,application/pdf"
-                          multiple
-                          ref={statementFileInputRef}
-                          onChange={handleStatementFileChange}
-                          className="hidden"
-                          disabled={isLoadingAi}
-                      />
-                      <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => statementFileInputRef.current?.click()}
-                          disabled={isLoadingAi}
-                          className="w-full"
-                      >
-                          <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File(s)
-                      </Button>
-                      {statementFiles.length > 0 && (
-                          <div className="mt-4 space-y-3">
-                          <div className="flex justify-between items-center">
-                              <Label className="text-sm font-medium">Selected Files ({statementFiles.length}):</Label>
-                              <Button variant="ghost" size="sm" onClick={handleClearStatementFiles} disabled={isLoadingAi} className="text-xs h-7">
-                              <Trash2 className="mr-1 h-3 w-3" /> Clear All
-                              </Button>
-                          </div>
-                          <ScrollArea className="h-40 border rounded-md p-3 bg-muted/20">
-                              <ul className="space-y-2">
-                              {statementPreviewDetails.map((detail, index) => (
-                                  <li key={index} className="flex items-center justify-between text-xs p-2 bg-background rounded-md shadow">
-                                  <div className="flex items-center space-x-2 overflow-hidden flex-1">
-                                      {detail.type.startsWith('image/') && detail.dataUri ? (
-                                      <div className="relative w-12 h-12 border rounded-sm overflow-hidden bg-muted shrink-0">
-                                          <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="bank statement financial"/>
-                                      </div>
-                                      ) : detail.type === 'application/pdf' ? (
-                                      <FileText className="h-8 w-8 text-destructive shrink-0" />
-                                      ) : <Paperclip className="h-6 w-6 text-muted-foreground shrink-0"/> }
-                                      <span className="font-medium truncate flex-grow" title={detail.name}>{detail.name}</span>
-                                  </div>
-                                  <Button variant="ghost" size="icon" onClick={() => handleRemoveStatementFile(index)} disabled={isLoadingAi} className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2">
-                                      <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                  </li>
-                              ))}
-                              </ul>
-                          </ScrollArea>
-                          </div>
-                      )}
-                  </CardContent>
-              </Card>
-              
-              <Button onClick={handleGetAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
-                {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
-                {isLoadingAi ? "Getting Suggestions..." : (aiSuggestions ? "Update AI Suggestions" : "Get AI Budget Suggestions")}
-              </Button>
-
-              {aiError && (
-                <Alert variant="destructive" className="mt-4">
-                    <XCircle className="h-4 w-4"/>
-                    <AlertTitle>AI Error</AlertTitle>
-                    <AlertDescription>{aiError}</AlertDescription>
-                </Alert>
-              )}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Upload Past Bank Statement(s) <span className="text-xs text-muted-foreground">(Optional)</span></CardTitle>
+                        <CardDescription>Provide images or PDFs of recent bank statements or spending summaries for more tailored AI suggestions.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <Input
+                            id="statementUpload"
+                            type="file"
+                            accept="image/*,application/pdf"
+                            multiple
+                            ref={statementFileInputRef}
+                            onChange={handleStatementFileChange}
+                            className="hidden"
+                            disabled={isLoadingAi}
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => statementFileInputRef.current?.click()}
+                            disabled={isLoadingAi}
+                            className="w-full"
+                        >
+                            <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File(s)
+                        </Button>
+                        {statementFiles.length > 0 && (
+                            <div className="mt-4 space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-medium">Selected Files ({statementFiles.length}):</Label>
+                                <Button variant="ghost" size="sm" onClick={handleClearStatementFiles} disabled={isLoadingAi} className="text-xs h-7">
+                                <Trash2 className="mr-1 h-3 w-3" /> Clear All
+                                </Button>
+                            </div>
+                            <ScrollArea className="h-40 border rounded-md p-3 bg-muted/20">
+                                <ul className="space-y-2">
+                                {statementPreviewDetails.map((detail, index) => (
+                                    <li key={index} className="flex items-center justify-between text-xs p-2 bg-background rounded-md shadow">
+                                    <div className="flex items-center space-x-2 overflow-hidden flex-1">
+                                        {detail.type.startsWith('image/') && detail.dataUri ? (
+                                        <div className="relative w-12 h-12 border rounded-sm overflow-hidden bg-muted shrink-0">
+                                            <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="bank statement financial"/>
+                                        </div>
+                                        ) : detail.type === 'application/pdf' ? (
+                                        <FileText className="h-8 w-8 text-destructive shrink-0" />
+                                        ) : <Paperclip className="h-6 w-6 text-muted-foreground shrink-0"/> }
+                                        <span className="font-medium truncate flex-grow" title={detail.name}>{detail.name}</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveStatementFile(index)} disabled={isLoadingAi} className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                    </li>
+                                ))}
+                                </ul>
+                            </ScrollArea>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+                
+                <Button onClick={handleGetAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
+                  {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
+                  Get AI Budget Suggestions
+                </Button>
+              </>
+            )}
             
-            {aiSuggestions && (
+            {viewMode === 'suggestions' && aiSuggestions && (
               <div className="space-y-6 pt-6 border-t mt-8">
                 <Card className="shadow-lg border-primary/30">
                   <CardHeader>
                       <CardTitle className="text-xl text-primary">AI Suggestions for {nextMonthToPrep}</CardTitle>
-                      <CardDescription>Review the AI's plan. You can adjust your goals/statements above and "Update AI Suggestions", or "Apply" if satisfied, or "Start Over" to clear everything.</CardDescription>
+                      <CardDescription>Review the AI's plan. You can "Edit Inputs &amp; Regenerate" to refine or "Apply" if satisfied.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                      <Card className="bg-muted/30">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Inputs Used for This Suggestion:</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-xs space-y-1">
+                            <p><span className="font-semibold">Goals:</span> {inputsForCurrentSuggestion.goals || "Not specified"}</p>
+                            <p><span className="font-semibold">Statements:</span> {inputsForCurrentSuggestion.statements.length > 0 ? inputsForCurrentSuggestion.statements.join(', ') : "None provided"}</p>
+                        </CardContent>
+                      </Card>
+
                       <div>
                           <h4 className="text-lg font-medium flex items-center mb-2"><Info className="mr-2 h-5 w-5 text-blue-500"/>Financial Advice from AI:</h4>
                           <ScrollArea className="h-48 p-4 border rounded-lg bg-muted/20 text-sm shadow-inner">
@@ -458,8 +487,8 @@ export default function PrepareBudgetPage() {
                       </Alert>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-                        <Button onClick={handleStartOver} variant="outline" className="py-3 text-base" disabled={isLoadingAi}>
-                            <RotateCcw className="mr-2 h-5 w-5"/> Start Over (Clear All)
+                        <Button onClick={handleEditInputs} variant="outline" className="py-3 text-base" disabled={isLoadingAi}>
+                            <Edit3 className="mr-2 h-5 w-5"/> Edit Inputs &amp; Regenerate
                         </Button>
                         <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -489,11 +518,18 @@ export default function PrepareBudgetPage() {
                 </Card>
               </div>
             )}
+
+            {aiError && (
+              <Alert variant="destructive" className="mt-4">
+                  <XCircle className="h-4 w-4"/>
+                  <AlertTitle>AI Error</AlertTitle>
+                  <AlertDescription>{aiError}</AlertDescription>
+              </Alert>
+            )}
+
           </div>
         </ScrollArea>
         </main>
     </div>
   );
 }
-
-    

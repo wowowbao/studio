@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip } from "lucide-react"; // Added FileText
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -40,35 +40,47 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
   const [currentActualSavings, setCurrentActualSavings] = useState(0);
   const [currentEstimatedDebt, setCurrentEstimatedDebt] = useState(0);
 
-
+  // Effect to reset form state and isLoadingAi when modal opens
   useEffect(() => {
-    if (isOpen && currentMonthData) {
-      // Ensure isLoadingAi is reset first and very explicitly
-      setIsLoadingAi(false); 
-      
-      const totalIncome = currentMonthData.incomes.reduce((sum, inc) => sum + inc.amount, 0);
-      setCurrentIncome(totalIncome);
-
-      const savingsCat = currentMonthData.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
-      const actualSavings = savingsCat?.expenses.reduce((sum, exp) => sum + exp.amount, 0) || 0;
-      setCurrentActualSavings(actualSavings);
-      
-      const ccPaymentsCat = currentMonthData.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-      const paymentsMadeThisMonth = ccPaymentsCat?.expenses.reduce((sum, exp) => sum + exp.amount, 0) || 0;
-      setCurrentEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
-
+    if (isOpen) {
+      setIsLoadingAi(false); // Crucial reset
       setStatementFiles([]);
       setStatementPreviewDetails([]);
       setStatementDataUris([]);
       setUserGoals("");
       setAiSuggestions(null);
       setAiError(null);
-      
       if (statementFileInputRef.current) {
         statementFileInputRef.current.value = "";
       }
     }
-  }, [isOpen, currentMonthData]);
+  }, [isOpen]); // Only depends on isOpen to ensure these are reset when modal becomes visible
+
+  // Effect to update the displayed financial snapshot when modal is open and data is available/changes
+  useEffect(() => {
+    if (isOpen && currentMonthData) {
+      // Ensure currentMonthData and its properties are valid before trying to use them
+      const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
+      const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+
+      const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
+      setCurrentIncome(totalIncome);
+
+      const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+      const actualSavings = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+      setCurrentActualSavings(actualSavings);
+      
+      const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+      const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+      setCurrentEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
+    } else if (isOpen) {
+      // If modal is open but data is not (yet) fully ready, ensure derived display states are reset
+      setCurrentIncome(0);
+      setCurrentActualSavings(0);
+      setCurrentEstimatedDebt(0);
+    }
+  }, [isOpen, currentMonthData]); // Depends on isOpen and currentMonthData
+
 
   const handleStatementFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -170,7 +182,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
     const nextMonthId = getYearMonthFromDate(currentMonthDate);
     
     const ccPaymentsCat = currentMonthData.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-    const paymentsMadeThisMonth = ccPaymentsCat?.expenses.reduce((sum, exp) => sum + exp.amount, 0) || 0;
+    const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
 
     applyAiGeneratedBudget(
       nextMonthId,

@@ -19,6 +19,7 @@ import Image from 'next/image';
 import { categorizeExpenseFromImage, type CategorizeExpenseInput, type CategorizeExpenseOutput } from '@/ai/flows/categorize-expense-flow';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 
 interface AddExpenseModalProps {
@@ -81,7 +82,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>(undefined);
 
 
-  const resetFormFields = () => {
+  const resetFormFields = (keepCameraState = false) => {
     setSelectedTargetId("");
     setIsTargetSubcategory(false);
     setAmount("");
@@ -91,16 +92,19 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     setImagePreviewUrl(null);
     setImageDataUri(null);
     setAiSuggestionError(null);
-    setIsAiProcessing(false);
-    if (mode !== 'cameraView') { // Don't reset camera related things if just submitting form
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        setCameraStream(null);
-      }
-      setMode('idle');
-      // setHasCameraPermission(null); // Do not reset this, as user might have granted it.
-      setAvailableCameras([]);
-      setSelectedCameraId(undefined);
+    // setIsAiProcessing(false); // Don't reset this here, let operations manage it.
+
+    if (!keepCameraState) {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setMode('idle');
+        setHasCameraPermission(null); 
+        setAvailableCameras([]);
+        setSelectedCameraId(undefined);
+    } else if (mode !== 'cameraView') { // If keeping camera state, but not in camera view, reset to idle
+        setMode('idle');
     }
   };
   
@@ -165,14 +169,13 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   };
 
   const startStream = async (deviceId?: string) => {
-    stopCurrentStream(); // Ensure previous stream is stopped
+    stopCurrentStream(); 
 
     try {
       const constraints: MediaStreamConstraints = { video: {} };
       if (deviceId) {
         (constraints.video as MediaTrackConstraints).deviceId = { exact: deviceId };
       } else {
-        // Prefer rear camera if no specific device ID is given
         (constraints.video as MediaTrackConstraints).facingMode = { ideal: "environment" };
       }
 
@@ -189,13 +192,12 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
             title: 'Camera Playback Error',
             description: `Could not start camera preview. Error: ${e.message || 'Please try again.'}`,
           });
-          stopCurrentStream(); // Stop stream if play fails
+          stopCurrentStream(); 
           setHasCameraPermission(false);
-          throw e; // Re-throw to be caught by caller
+          throw e; 
         });
       }
       
-      // Enumerate devices again to update availableCameras and selectedCameraId
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(d => d.kind === 'videoinput');
       setAvailableCameras(videoDevices);
@@ -204,7 +206,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       if (currentStreamDeviceId) {
         setSelectedCameraId(currentStreamDeviceId);
       } else if (videoDevices.length > 0) {
-        setSelectedCameraId(videoDevices[0].deviceId); // Fallback to first device if current one not identifiable
+        setSelectedCameraId(videoDevices[0].deviceId); 
       }
 
       setMode('cameraView');
@@ -225,7 +227,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         title: 'Camera Access Error',
         description: description,
       });
-      setMode('idle'); // Revert to idle mode on error
+      setMode('idle'); 
       return null; 
     }
   };
@@ -235,7 +237,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     setIsAiProcessing(true);
     let targetDeviceId = selectedCameraId;
 
-    if (!targetDeviceId && availableCameras.length === 0) { // First time, or no cameras enumerated yet
+    if (!targetDeviceId && availableCameras.length === 0) { 
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoDevices = devices.filter(d => d.kind === 'videoinput');
@@ -264,7 +266,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       const nextCameraId = availableCameras[nextIndex].deviceId;
       
       setIsAiProcessing(true);
-      await startStream(nextCameraId); // This will update selectedCameraId internally
+      await startStream(nextCameraId); 
       setIsAiProcessing(false);
     } else if (availableCameras.length <= 1) {
         toast({ title: "Camera Info", description: "No other cameras available to switch to." });
@@ -314,7 +316,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         setImageDataUri(dataUri);
         setSelectedImageFile(null); 
         setMode('preview');
-        stopCurrentStream(); // Stop stream after capture
+        stopCurrentStream(); 
       }
     } else {
         toast({ variant: "destructive", title: "Camera Error", description: "Camera not ready or video dimensions not available. Please try again."});
@@ -383,7 +385,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       handleAiCategorize();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageDataUri, mode]); // Removed categoryOptions and aiSuggestionError to prevent re-triggering on error clear
+  }, [imageDataUri, mode]); 
 
   const handleSubmit = () => {
     const numericAmount = parseFloat(amount);
@@ -414,12 +416,10 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   };
   
   const onCloseModal = () => {
-    resetFormFields(); // Resets form fields, image previews, and AI errors
-    // Keep camera related state like `hasCameraPermission`, `availableCameras` as they are user/device specific and persist.
-    // Stop stream if modal is closed while camera is active
+    resetFormFields(mode === 'cameraView'); // Keep camera state if it was active, otherwise full reset
     if (mode === 'cameraView') {
-      stopCurrentStream();
-      setMode('idle'); // Ensure mode resets to idle
+      stopCurrentStream(); // Ensure stream stops if modal closes from camera view
+      setMode('idle'); 
     }
     onClose();
   };
@@ -441,7 +441,6 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
         </DialogHeader>
         
-        {/* Video element always rendered but visibility controlled by mode */}
         <video 
             ref={videoRef} 
             className={cn(
@@ -456,119 +455,21 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
 
         <ScrollArea className="max-h-[70vh] pr-4"> 
           <div className="grid gap-4 py-4"> 
-            {mode === 'idle' && (
-              <div className="flex flex-col items-center space-y-3 py-4 border rounded-lg p-4 bg-muted/20">
-                  <p className="text-base font-medium">Add Receipt Image (Optional)</p>
-                  <p className="text-xs text-muted-foreground text-center px-2">
-                      Upload an existing image or take a new picture with your camera for AI-powered suggestions.
-                  </p>
-                  <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 pt-2">
-                      <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={isAiProcessing}
-                          className="w-full"
-                      >
-                          <UploadCloud className="mr-2 h-4 w-4" />
-                          Upload Image
-                      </Button>
-                      <Input
-                          id="receipt-upload"
-                          type="file"
-                          accept="image/*"
-                          ref={fileInputRef}
-                          onChange={handleImageFileChange}
-                          className="hidden"
-                          disabled={isAiProcessing}
-                      />
-                      <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleEnableCamera}
-                          disabled={isAiProcessing || hasCameraPermission === false}
-                          className="w-full"
-                      >
-                          <Camera className="mr-2 h-4 w-4" />
-                          Take Picture
-                      </Button>
-                  </div>
-                  {hasCameraPermission === false && ( // Show if explicitly denied or failed
-                      <Alert variant="destructive" className="mt-2 w-full">
-                          <LocalAlertTriangle className="h-4 w-4" />
-                          <AlertTitle>Camera Access Issue</AlertTitle>
-                          <AlertDescription>
-                              Camera access was denied or is unavailable. Please check browser permissions and ensure a camera is connected. You might need to refresh the page after changing permissions.
-                          </AlertDescription>
-                      </Alert>
-                  )}
-              </div>
-            )}
-
-            {mode === 'cameraView' && (
-              <div className="space-y-3 p-2 border rounded-lg">
-                  <Label className="text-base font-medium">Camera View</Label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                      <Button onClick={handleCapturePhoto} className="flex-1" disabled={isAiProcessing || !cameraStream}>
-                          <Camera className="mr-2 h-4 w-4" /> Capture Photo
-                      </Button>
-                      {availableCameras.length > 1 && (
-                          <Button variant="outline" onClick={handleSwitchCamera} className="flex-1" disabled={isAiProcessing || !cameraStream}>
-                              <RefreshCcw className="mr-2 h-4 w-4" /> Switch Camera
-                          </Button>
-                      )}
-                  </div>
-                  <Button variant="outline" onClick={() => {
-                          stopCurrentStream();
-                          setMode('idle');
-                      }} className="w-full" disabled={isAiProcessing}>
-                          <XCircle className="mr-2 h-4 w-4" /> Back to Options
-                      </Button>
-              </div>
-            )}
-
-              {mode === 'preview' && imagePreviewUrl && (
-                  <div className="space-y-3 p-2 border rounded-lg">
-                      <Label className="text-base font-medium">Image Preview</Label>
-                      <div className="relative w-full aspect-video border rounded-md overflow-hidden bg-muted">
-                          <Image src={imagePreviewUrl} alt="Receipt preview" layout="fill" objectFit="contain" data-ai-hint="receipt payment"/>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                          <Button variant="outline" onClick={handleEnableCamera} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
-                              <Camera className="mr-2 h-4 w-4" /> {selectedImageFile ? "Take New" : "Retake"}
-                          </Button>
-                          <Button variant="outline" onClick={handleClearImage} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
-                              <FileImage className="mr-2 h-4 w-4" />
-                              Upload Different
-                          </Button>
-                      </div>
-                  </div>
-              )}
-
-              {isAiProcessing && (
-                <div className="flex items-center text-sm text-muted-foreground mt-2">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {imageDataUri ? "AI is analyzing your receipt..." : (mode === 'cameraView' ? "Initializing camera..." : "Processing...")}
-                </div>
-              )}
-              {aiSuggestionError && (
-                <Alert variant="destructive" className="mt-2">
-                  <LocalAlertTriangle className="h-4 w-4"/>
-                  <AlertTitle>AI Suggestion Error</AlertTitle>
-                  <AlertDescription>{aiSuggestionError}</AlertDescription>
-                </Alert>
-              )}
-            
+            {/* Manual Expense Entry Fields First */}
             {budgetLoading ? (
               <p>Loading categories...</p>
             ) : categoryOptions.length === 0 ? (
-              <p className="text-muted-foreground py-4">No categories or subcategories available for this month. Please add them first in 'Manage Budget'.</p>
+              <Alert variant="destructive">
+                <LocalAlertTriangle className="h-4 w-4" />
+                <AlertTitle>No Categories Available</AlertTitle>
+                <AlertDescription>
+                  No categories or subcategories available for this month. Please add them first in 'Manage Budget'.
+                </AlertDescription>
+              </Alert>
             ) : (
               <div className="space-y-4"> 
                 <div className="space-y-1"> 
-                  <Label htmlFor="category">
-                    Category
-                  </Label>
+                  <Label htmlFor="category">Category</Label>
                   <Select value={selectedTargetId} onValueChange={handleSelectionChange} disabled={isAiProcessing}>
                     <SelectTrigger id="category" className="w-full"> 
                       <SelectValue placeholder="Select target" />
@@ -583,9 +484,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="amount">
-                    Amount
-                  </Label>
+                  <Label htmlFor="amount">Amount</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -597,9 +496,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="description">
-                    Description
-                  </Label>
+                  <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
                     value={description}
@@ -611,9 +508,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="date">
-                    Date
-                  </Label>
+                  <Label htmlFor="date">Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -645,18 +540,127 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                       To record money transferred to savings, select the "Savings" category.
                       For credit card payments, select "Credit Card Payments". These are treated as expenses to these specific categories.
                     </AlertDescription>
-                  </Alert>
+                </Alert>
               </div>
             )}
+
+            <Separator className="my-6"/>
+
+            {/* Optional AI Assistance Section */}
+            <div className="space-y-3">
+                <h3 className="text-base font-medium text-center text-muted-foreground">Optional: AI Assistance with Image</h3>
+                {mode === 'idle' && (
+                <div className="flex flex-col items-center space-y-3 py-4 border rounded-lg p-4 bg-muted/20">
+                    <p className="text-xs text-muted-foreground text-center px-2">
+                        Upload a receipt or bank transaction image/photo for AI-powered suggestions.
+                    </p>
+                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 pt-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isAiProcessing}
+                            className="w-full"
+                        >
+                            <UploadCloud className="mr-2 h-4 w-4" />
+                            Upload Image
+                        </Button>
+                        <Input
+                            id="receipt-upload"
+                            type="file"
+                            accept="image/*"
+                            ref={fileInputRef}
+                            onChange={handleImageFileChange}
+                            className="hidden"
+                            disabled={isAiProcessing}
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleEnableCamera}
+                            disabled={isAiProcessing || hasCameraPermission === false}
+                            className="w-full"
+                        >
+                            <Camera className="mr-2 h-4 w-4" />
+                            Take Picture
+                        </Button>
+                    </div>
+                    {hasCameraPermission === false && ( 
+                        <Alert variant="destructive" className="mt-2 w-full">
+                            <LocalAlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Camera Access Issue</AlertTitle>
+                            <AlertDescription>
+                                Camera access was denied or is unavailable. Please check browser permissions and ensure a camera is connected. You might need to refresh the page after changing permissions.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </div>
+                )}
+
+                {mode === 'cameraView' && (
+                <div className="space-y-3 p-2 border rounded-lg">
+                    <Label className="text-base font-medium">Camera View</Label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Button onClick={handleCapturePhoto} className="flex-1" disabled={isAiProcessing || !cameraStream}>
+                            <Camera className="mr-2 h-4 w-4" /> Capture Photo
+                        </Button>
+                        {availableCameras.length > 1 && (
+                            <Button variant="outline" onClick={handleSwitchCamera} className="flex-1" disabled={isAiProcessing || !cameraStream}>
+                                <RefreshCcw className="mr-2 h-4 w-4" /> Switch Camera
+                            </Button>
+                        )}
+                    </div>
+                    <Button variant="outline" onClick={() => {
+                            stopCurrentStream();
+                            setMode('idle');
+                        }} className="w-full" disabled={isAiProcessing}>
+                            <XCircle className="mr-2 h-4 w-4" /> Back to Options
+                        </Button>
+                </div>
+                )}
+
+                {mode === 'preview' && imagePreviewUrl && (
+                    <div className="space-y-3 p-2 border rounded-lg">
+                        <Label className="text-base font-medium">Image Preview</Label>
+                        <div className="relative w-full aspect-video border rounded-md overflow-hidden bg-muted">
+                            <Image src={imagePreviewUrl} alt="Receipt preview" layout="fill" objectFit="contain" data-ai-hint="receipt payment"/>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button variant="outline" onClick={handleEnableCamera} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
+                                <Camera className="mr-2 h-4 w-4" /> {selectedImageFile ? "Take New" : "Retake"}
+                            </Button>
+                            <Button variant="outline" onClick={handleClearImage} className="w-full sm:w-auto flex-1" disabled={isAiProcessing}>
+                                <FileImage className="mr-2 h-4 w-4" />
+                                Upload Different
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {isAiProcessing && (
+                    <div className="flex items-center justify-center text-sm text-muted-foreground mt-2 py-3">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {imageDataUri ? "AI is analyzing your image..." : (mode === 'cameraView' ? "Initializing camera..." : "Processing...")}
+                    </div>
+                )}
+                {aiSuggestionError && (
+                    <Alert variant="destructive" className="mt-2">
+                    <LocalAlertTriangle className="h-4 w-4"/>
+                    <AlertTitle>AI Suggestion Error</AlertTitle>
+                    <AlertDescription>{aiSuggestionError}</AlertDescription>
+                    </Alert>
+                )}
+            </div>
+
           </div>
         </ScrollArea>
         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-0 pt-4 border-t"> 
           <DialogClose asChild>
-            <Button variant="outline" onClick={onCloseModal} disabled={isAiProcessing} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={onCloseModal} disabled={isAiProcessing && mode !== 'cameraView'} className="w-full sm:w-auto">
               <XCircle className="mr-2 h-4 w-4" /> Cancel
             </Button>
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={budgetLoading || categoryOptions.length === 0 || isAiProcessing} className="w-full sm:w-auto">
+          <Button onClick={handleSubmit} disabled={budgetLoading || categoryOptions.length === 0 || (isAiProcessing && mode !== 'cameraView')} className="w-full sm:w-auto">
             {(isAiProcessing && mode !== 'cameraView') ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
             {(isAiProcessing && mode !== 'cameraView') ? "Processing..." : "Add Expense"}
           </Button>
@@ -665,9 +669,3 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     </Dialog>
   );
 }
-    
-
-  
-
-    
-

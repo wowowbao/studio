@@ -12,7 +12,7 @@ import { Trash2, PlusCircle, CheckCircle, XCircle, MinusCircle, CornerDownRight,
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 import { setupBudgetFromImage, type SetupBudgetInput, type SetupBudgetOutput } from '@/ai/flows/setup-budget-flow';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogFooter } from "@/components/ui/alert-dialog"; // Added AlertDialogFooter
 import Image from "next/image";
 import { parseYearMonth } from "@/hooks/useBudgetCore";
 
@@ -71,12 +71,11 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
 
       if (budgetData) {
         const currentStartingDebt = budgetData.startingCreditCardDebt || 0;
-        // Ensure a deep clone to avoid state mutation issues, especially with nested arrays
         const clonedCategories = JSON.parse(JSON.stringify(budgetData.categories || []));
 
         setEditableCategories(clonedCategories.map((c: BudgetCategory) => ({
             ...c,
-            id: c.id || uuidv4(), // Ensure ID exists
+            id: c.id || uuidv4(), 
             budgetedAmount: c.budgetedAmount === undefined || c.budgetedAmount === null ? 0 : c.budgetedAmount,
             subcategories: (c.subcategories || []).map(sc => ({ ...sc, id: sc.id || uuidv4(), expenses: sc.expenses || [], budgetedAmount: sc.budgetedAmount === undefined || sc.budgetedAmount === null ? 0 : sc.budgetedAmount })),
             expenses: c.expenses || [],
@@ -84,13 +83,12 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         })));
         setStartingDebt(currentStartingDebt);
       } else {
-        // If no budget data for the month, initialize with empty or default structure
         setEditableCategories([]);
         setStartingDebt(0);
       }
       setIsDataLoaded(true);
     } else if (isLoading) {
-      setIsDataLoaded(false); // Ensure loading state is clear if parent is loading
+      setIsDataLoaded(false); 
     }
   }, [monthId, getBudgetForMonth, isLoading]);
 
@@ -106,11 +104,9 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     setEditableCategories(prev =>
       prev.map(cat => {
         if (cat.id === id) {
-          // Prevent name change for system categories
           if (cat.isSystemCategory && field === 'name') {
             return cat;
           }
-          // For non-system categories with subcategories, budgetedAmount is read-only
           const isNonSystemWithSubs = !cat.isSystemCategory && cat.subcategories && cat.subcategories.length > 0;
           if (field === 'budgetedAmount' && isNonSystemWithSubs) {
             return cat;
@@ -188,12 +184,10 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         return;
     }
 
-    // Final processing of categories before saving
     const finalCategoriesToSave: BudgetCategory[] = editableCategories
-        .filter(cat => cat.name.trim() !== "") // Remove categories with empty names
+        .filter(cat => cat.name.trim() !== "") 
         .map(cat => {
             let catBudget = cat.budgetedAmount;
-            // For non-system categories with subcategories, parent budget is sum of subs
             if (!cat.isSystemCategory && cat.subcategories && cat.subcategories.length > 0) {
                 catBudget = cat.subcategories.reduce((sum, sub) => sum + (Number(sub.budgetedAmount) || 0), 0);
             }
@@ -202,15 +196,15 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                 id: cat.id,
                 name: cat.name,
                 budgetedAmount: catBudget,
-                expenses: cat.expenses || [], // Ensure expenses array exists
-                isSystemCategory: cat.isSystemCategory || false, // Ensure flag exists
-                subcategories: (cat.isSystemCategory) ? [] : (cat.subcategories || []) // System cats don't have subs
-                    .filter(sub => sub.name.trim() !== "") // Remove subcategories with empty names
+                expenses: cat.expenses || [], 
+                isSystemCategory: cat.isSystemCategory || false, 
+                subcategories: (cat.isSystemCategory) ? [] : (cat.subcategories || []) 
+                    .filter(sub => sub.name.trim() !== "") 
                     .map(sub => ({
                         id: sub.id,
                         name: sub.name,
                         budgetedAmount: parseFloat(String(sub.budgetedAmount)) || 0,
-                        expenses: sub.expenses || [], // Ensure expenses array exists
+                        expenses: sub.expenses || [], 
                     })),
             };
         });
@@ -243,7 +237,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         if (file.type.startsWith('image/')) {
           setAiSetupFilePreviewUrl(reader.result as string);
         } else {
-          setAiSetupFilePreviewUrl(null); // No visual preview for PDFs in this modal
+          setAiSetupFilePreviewUrl(null); 
         }
       };
       reader.readAsDataURL(file);
@@ -275,7 +269,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         toast({ title: "AI Budget Setup Error", description: result.aiError, variant: "destructive" });
       } else if (result.categories && result.categories.length > 0) {
         
-        let aiSuggestedCategoriesAsUserCategories = result.categories.map(suggestedCat => {
+        let aiSuggestedCategoriesAsUserCategories: EditableCategory[] = result.categories.map(suggestedCat => {
             const subcategories = (suggestedCat.subcategories || []).map(suggestedSub => ({
                 id: uuidv4(),
                 name: suggestedSub.name,
@@ -305,25 +299,26 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         systemCategoryNames.forEach(sysName => {
             const existingSysCat = existingSystemCategories.find(c => c.name === sysName);
             const aiSuggestedThisSysCatIndex = aiSuggestedCategoriesAsUserCategories.findIndex(c => c.name.toLowerCase() === sysName.toLowerCase());
-            const aiSuggestedThisSysCat = aiSuggestedThisSysCatIndex !== -1 ? aiSuggestedCategoriesAsUserCategories[aiSuggestedThisSysCatIndex] : undefined;
-
+            
             if (existingSysCat) {
                 let updatedBudget = existingSysCat.budgetedAmount;
-                if (aiSuggestedThisSysCat && aiSuggestedThisSysCat.budgetedAmount !== undefined) {
-                    updatedBudget = aiSuggestedThisSysCat.budgetedAmount;
+                if (aiSuggestedThisSysCatIndex !== -1) {
+                    const aiCat = aiSuggestedCategoriesAsUserCategories[aiSuggestedThisSysCatIndex];
+                    if (aiCat.budgetedAmount !== undefined && (aiCat.subcategories === undefined || aiCat.subcategories.length === 0)) {
+                         updatedBudget = aiCat.budgetedAmount;
+                    }
+                    aiSuggestedCategoriesAsUserCategories.splice(aiSuggestedThisSysCatIndex, 1); 
                 }
                 finalCategories.push({
                     ...existingSysCat, 
                     budgetedAmount: updatedBudget,
                 });
-                if (aiSuggestedThisSysCat) {
-                    aiSuggestedCategoriesAsUserCategories.splice(aiSuggestedThisSysCatIndex, 1);
-                }
-            } else if (aiSuggestedThisSysCat) {
-                finalCategories.push({
-                    id: aiSuggestedThisSysCat.id, 
+            } else if (aiSuggestedThisSysCatIndex !== -1) {
+                const aiCat = aiSuggestedCategoriesAsUserCategories[aiSuggestedThisSysCatIndex];
+                 finalCategories.push({
+                    id: aiCat.id, 
                     name: sysName, 
-                    budgetedAmount: aiSuggestedThisSysCat.budgetedAmount,
+                    budgetedAmount: (aiCat.subcategories && aiCat.subcategories.length > 0) ? aiCat.subcategories.reduce((s,sc)=>s+sc.budgetedAmount,0) : aiCat.budgetedAmount,
                     isSystemCategory: true, 
                     subcategories: [], 
                     expenses: [], 
@@ -363,7 +358,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   if (!isOpen) {
     return null;
   }
-  if (!isDataLoaded && isOpen) { // Show loading state if modal is open but data isn't ready
+  if (!isDataLoaded && isOpen) { 
      return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
             <DialogContent className="max-w-md sm:max-w-lg md:max-w-2xl">
@@ -395,20 +390,10 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] p-1">
           <div className="space-y-6 pr-4">
-            {/* AI Budget Setup Section */}
             <div className="p-4 border rounded-lg shadow-sm bg-card/30 space-y-3">
               <h3 className="text-md font-medium flex items-center"><Wand2 className="mr-2 h-5 w-5 text-primary/80" /> AI Budget Setup from File</h3>
               <p className="text-xs text-muted-foreground">Upload an image or PDF of your current budget. AI will suggest categories and amounts. This will replace your current non-system categories. System categories ("Savings", "Credit Card Payments") will be updated if suggested by AI, or preserved.</p>
 
-              <Input
-                  id="ai-budget-upload"
-                  type="file"
-                  accept="image/*,application/pdf"
-                  ref={aiSetupFileInputRef}
-                  onChange={handleAiSetupFileChange}
-                  className="hidden"
-                  disabled={isAiBudgetProcessing}
-              />
               <Button
                 type="button"
                 variant="outline"
@@ -418,6 +403,16 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
               >
                 <UploadCloud className="mr-2 h-4 w-4" /> Select Budget File (Image or PDF)
               </Button>
+              <Input
+                  id="ai-budget-upload"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  ref={aiSetupFileInputRef}
+                  onChange={handleAiSetupFileChange}
+                  className="hidden"
+                  disabled={isAiBudgetProcessing}
+              />
+              
 
               {aiSetupFile && (
                   <div className="mt-3 space-y-2 p-3 border rounded-md bg-muted/50">
@@ -475,7 +470,6 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
               )}
             </div>
 
-            {/* Starting Debt Section */}
             <div>
               <Label htmlFor="startingDebt" className="text-base font-medium">Credit Card Debt at Start of Month</Label>
               <Input
@@ -535,12 +529,13 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         type="number"
                         value={parentDisplayBudget !== undefined ? parentDisplayBudget.toFixed(2) : '0.00'}
                         onChange={(e) => {
-                           // Allow edit for System Savings/CC AND for non-system categories without subs
-                           if ( (isSystem && (cat.name === "Savings" || cat.name === "Credit Card Payments")) || (!isSystem && !hasSubcategories) ) { 
+                           if (!isSystem || (isSystem && (cat.name === "Savings" || cat.name === "Credit Card Payments"))) {
+                             if (!hasSubcategories || isSystem) {
                                 handleCategoryChange(cat.id, "budgetedAmount", e.target.value);
+                             }
                            }
                         }}
-                        readOnly={!isSystem && hasSubcategories} // Read-only only for non-system cats with subs
+                        readOnly={hasSubcategories && !isSystem}
                         placeholder="0.00"
                         className={`mt-1 text-sm ${(!isSystem && hasSubcategories) ? "bg-muted/50 cursor-default" : ""}`}
                       />
@@ -549,7 +544,6 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                     </div>
                   </div>
 
-                  {/* Subcategories Section - only for non-system categories */}
                   {!isSystem && (
                     <div className="ml-4 mt-3 space-y-3 border-l pl-4 pt-2">
                         <div className="flex justify-between items-center">
@@ -587,7 +581,6 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                     </div>
                   )}
 
-                  {/* Delete Category Button - only for non-system categories */}
                   {!isSystem && (
                     <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(cat.id)} className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto mt-3">
                       <Trash2 className="mr-2 h-4 w-4" /> Delete Category
@@ -625,3 +618,5 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     </Dialog>
   );
 }
+
+    

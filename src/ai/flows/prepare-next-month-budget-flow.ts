@@ -19,7 +19,7 @@ const SuggestedSubCategorySchema = z.object({
 });
 
 const SuggestedCategorySchema = z.object({
-  name: z.string().describe("The name of the suggested category (e.g., 'Groceries', 'Rent', 'Savings', 'Credit Card Payments')."),
+  name: z.string().describe("The name of the suggested category (e.g., 'Groceries', 'Rent', 'Savings', 'Credit Card Payments'). Do NOT suggest a category named 'Income' or similar; income is a given figure, not a budget item."),
   budgetedAmount: z.number().optional().describe("The suggested budgeted amount for this category. If the category has subcategories, this amount should be the sum of subcategory budgets, or left blank if sums are handled by the app. If no subcategories, this is the direct budget. If not determinable, leave blank."),
   subcategories: z.array(SuggestedSubCategorySchema).optional().describe("An array of suggested subcategories under this category."),
 });
@@ -34,14 +34,14 @@ const PrepareBudgetInputSchema = z.object({
     ),
   userGoals: z.string().describe("A text description of the user's financial goals for the next month. This input may contain their initial goals, or it might include questions about a budget plan previously suggested, or specific requests to change parts of a previously suggested plan. Analyze this input carefully to understand the user's current intent."),
   currentMonthId: z.string().describe("The ID of the current month (YYYY-MM) from which planning is being done."),
-  currentIncome: z.number().describe("The user's total income for the current month."),
+  currentIncome: z.number().describe("The user's total income for the current month. This is the amount you should base the entire next month's budget on. Do NOT create an 'Income' category in your suggestions."),
   currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category)."),
   currentCCDebtTotal: z.number().describe("The user's current total *outstanding* credit card debt (estimated for end of current month)."),
 });
 export type PrepareBudgetInput = z.infer<typeof PrepareBudgetInputSchema>;
 
 const PrepareBudgetOutputSchema = z.object({
-  suggestedCategories: z.array(SuggestedCategorySchema).optional().describe("An array of suggested categories for the next month's budget, potentially with nested subcategories and their budgeted amounts. This should be a comprehensive budget proposal."),
+  suggestedCategories: z.array(SuggestedCategorySchema).optional().describe("An array of suggested categories for the next month's budget, potentially with nested subcategories and their budgeted amounts. This should be a comprehensive budget proposal. DO NOT include an 'Income' category here."),
   financialAdvice: z.string().describe("Actionable financial advice and explanations to help the user achieve their goals and improve financial health. This should address their stated goals (including any questions or desired changes), spending patterns (if statements were provided), and offer specific, encouraging recommendations. If a large purchase goal is mentioned, advise on saving strategies or low-interest financing rather than high-interest debt."),
   aiError: z.string().optional().describe('Any error message if the AI failed to process the request.'),
 });
@@ -63,7 +63,7 @@ const prompt = ai.definePrompt({
 Your primary goal is to help the user create a realistic and effective budget for their *next* month and provide actionable, supportive financial advice and explanations.
 
 User's Current Financial Context (based on their current month ending '{{currentMonthId}}'):
-- Income This Month: \${{currentIncome}}
+- Income This Month: \${{currentIncome}} (This is the total income you should use as the basis for all budget allocations for next month. Do NOT create an 'Income' category in your output.)
 - Actual Savings Contributed This Month: \${{currentSavingsTotal}}
 - Estimated Total Outstanding Credit Card Debt at end of this month: \${{currentCCDebtTotal}}
 
@@ -86,7 +86,8 @@ Your Task:
 Based on ALL the information above (goals, income, debt, savings contributions, past spending if available, and any specific questions or change requests embedded in their 'userGoals'), provide the following:
 
 1.  'suggestedCategories': A comprehensive suggested budget for the *next* month.
-    -   The budget should be realistic and achievable given the user's income.
+    -   The budget should be realistic and achievable given the user's provided 'currentIncome'.
+    -   DO NOT create a category named "Income" or similar.
     -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym).
     -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category compared to past spending (if known) or a reasonable general amount. If the user explicitly asks to change a specific category's budget, try to accommodate this if feasible or explain why it's challenging.
     -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts for these. For "Savings", align with their goals (e.g., if they want to save $500, budget $500 for Savings). For "Credit Card Payments", suggest an amount that makes meaningful progress on their debt, considering their income and other goals.
@@ -161,3 +162,4 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     
 
     
+

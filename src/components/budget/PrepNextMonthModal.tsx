@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip } from "lucide-react"; // Added FileText
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -43,7 +43,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
 
   useEffect(() => {
     if (isOpen && currentMonthData) {
-      // Ensure isLoadingAi is reset first
+      // Ensure isLoadingAi is reset first and very explicitly
       setIsLoadingAi(false); 
       
       const totalIncome = currentMonthData.incomes.reduce((sum, inc) => sum + inc.amount, 0);
@@ -63,7 +63,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
       setUserGoals("");
       setAiSuggestions(null);
       setAiError(null);
-      // setIsLoadingAi(false); // Already set at the beginning of this block
+      
       if (statementFileInputRef.current) {
         statementFileInputRef.current.value = "";
       }
@@ -225,7 +225,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
       <DialogContent className="max-w-lg md:max-w-2xl lg:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold flex items-center">
-            <Wand2 className="mr-3 h-7 w-7 text-primary" /> AI Budget Prep for Next Month
+            <Wand2 className="mr-3 h-7 w-7 text-primary" /> AI Budget Prep for {getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(currentMonthData.id).setMonth(parseYearMonth(currentMonthData.id).getMonth() + 1))))}
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[75vh] p-1">

@@ -1,8 +1,9 @@
 
 "use client";
+import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useBudget } from "@/hooks/useBudget";
-import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2, CheckCircle, AlertTriangle } from "lucide-react";
+import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BudgetActionsProps {
@@ -10,7 +11,7 @@ interface BudgetActionsProps {
   onAddExpense: () => void;
   onAddIncome: () => void;
   onFinalizeMonth: () => void;
-  onPrepNextMonth: () => void;
+  // onPrepNextMonth prop removed
 }
 
 export function BudgetActions({ 
@@ -18,7 +19,6 @@ export function BudgetActions({
   onAddExpense, 
   onAddIncome, 
   onFinalizeMonth,
-  onPrepNextMonth
 }: BudgetActionsProps) {
   const { currentDisplayMonthId, currentBudgetMonth, rolloverUnspentBudget } = useBudget();
   const { toast } = useToast();
@@ -30,15 +30,12 @@ export function BudgetActions({
 
     if (result.success) {
       if (currentBudgetMonth.isRolledOver) { 
-        // This case means the month was just reopened
         toast({
           title: "Month Reopened",
           description: result.message,
           action: <ArchiveX className="text-blue-500" />
         });
       } else {
-        // This case means the month was just closed
-        // Toast for successful month close is now handled by the summary modal trigger in page.tsx
         onFinalizeMonth(); 
       }
     } else {
@@ -71,9 +68,11 @@ export function BudgetActions({
       </div>
         
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        <Button onClick={onPrepNextMonth} variant="secondary" className="w-full">
-          <Wand2 className="mr-2 h-4 w-4" /> AI Budget Prep
-        </Button>
+        <Link href="/prep-budget" passHref legacyBehavior>
+          <Button asChild variant="secondary" className="w-full">
+            <a><Wand2 className="mr-2 h-4 w-4" /> AI Budget Prep</a>
+          </Button>
+        </Link>
 
          <Button 
           onClick={handleFinalizeOrReopenMonth} 
@@ -92,3 +91,4 @@ export function BudgetActions({
     </div>
   );
 }
+

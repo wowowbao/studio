@@ -36,7 +36,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     getBudgetForMonth,
     updateMonthBudget,
     isLoading,
-    currentBudgetMonth,
+    currentBudgetMonth: budgetContextCurrentMonth, // Renamed to avoid conflict with local currentBudgetMonth if needed
   } = useBudget();
 
   const [editableCategories, setEditableCategories] = useState<EditableCategory[]>([]);
@@ -45,8 +45,8 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   const { toast } = useToast();
 
   const [aiSetupFile, setAiSetupFile] = useState<File | null>(null);
-  const [aiSetupFilePreviewUrl, setAiSetupFilePreviewUrl] = useState<string | null>(null); // For image previews
-  const [aiSetupFileDataUri, setAiSetupFileDataUri] = useState<string | null>(null); // For sending to AI
+  const [aiSetupFilePreviewUrl, setAiSetupFilePreviewUrl] = useState<string | null>(null); 
+  const [aiSetupFileDataUri, setAiSetupFileDataUri] = useState<string | null>(null); 
   const [isAiBudgetProcessing, setIsAiBudgetProcessing] = useState<boolean>(false);
   const [aiBudgetError, setAiBudgetError] = useState<string | null>(null);
   const aiSetupFileInputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +55,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   const resetModalState = useCallback(() => {
     setEditableCategories([]);
     setStartingDebt(0);
-    setIsDataLoaded(false);
+    setIsDataLoaded(false); // Will be set to true after data is loaded
     setAiSetupFile(null);
     setAiSetupFilePreviewUrl(null);
     setAiSetupFileDataUri(null);
@@ -67,34 +67,40 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   }, []);
 
   const loadBudgetData = useCallback(() => {
-    if (!isLoading && monthId) {
-      const budgetData = (currentBudgetMonth && currentBudgetMonth.id === monthId) ? currentBudgetMonth : getBudgetForMonth(monthId);
+    if (!isLoading && monthId) { // isLoading is from useBudget() context
+      const budgetData = getBudgetForMonth(monthId);
 
       if (budgetData) {
         const currentStartingDebt = budgetData.startingCreditCardDebt || 0;
-        setEditableCategories((budgetData.categories || []).map(c => ({
+        // Deep clone categories to prevent direct mutation of context state
+        const clonedCategories = JSON.parse(JSON.stringify(budgetData.categories || []));
+        
+        setEditableCategories(clonedCategories.map((c: BudgetCategory) => ({
             ...c,
-            id: c.id,
+            id: c.id || uuidv4(), // Ensure ID exists
             budgetedAmount: c.budgetedAmount,
-            subcategories: (c.subcategories || []).map(sc => ({ ...sc, id: sc.id, expenses: sc.expenses || [] })),
+            subcategories: (c.subcategories || []).map(sc => ({ ...sc, id: sc.id || uuidv4(), expenses: sc.expenses || [] })),
             expenses: c.expenses || [],
             isSystemCategory: c.isSystemCategory || false,
         })));
         setStartingDebt(currentStartingDebt);
       } else {
+        // If no budget data for the month, initialize with empty/default state
         setEditableCategories([]);
         setStartingDebt(0);
       }
       setIsDataLoaded(true);
+    } else if (isLoading) {
+      setIsDataLoaded(false); // Still loading from context
     }
-  }, [monthId, getBudgetForMonth, isLoading, currentBudgetMonth]);
+  }, [monthId, getBudgetForMonth, isLoading]);
 
   useEffect(() => {
     if (isOpen) {
-      resetModalState();
-      loadBudgetData();
+      resetModalState(); // Reset first
+      loadBudgetData();   // Then load data
     }
-  }, [isOpen, loadBudgetData, resetModalState]);
+  }, [isOpen, monthId, loadBudgetData, resetModalState]); // Added monthId to ensure reload if monthId prop changes while open (though unlikely)
 
 
   const handleCategoryChange = (id: string, field: keyof EditableCategory , value: string | number) => {
@@ -102,12 +108,13 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
       prev.map(cat => {
         if (cat.id === id) {
           if (cat.isSystemCategory && field === 'name') {
-            return cat;
+            return cat; // Prevent renaming system categories
           }
           // For non-system categories with subcategories, the parent budget is derived, so don't allow direct edit here.
           // System categories or non-system categories without subcategories can have their budget directly edited.
-          if (field === 'budgetedAmount' && !cat.isSystemCategory && cat.subcategories && cat.subcategories.length > 0) {
-            return cat;
+          const isNonSystemWithSubs = !cat.isSystemCategory && cat.subcategories && cat.subcategories.length > 0;
+          if (field === 'budgetedAmount' && isNonSystemWithSubs) {
+            return cat; // Parent budget is sum of subs, don't edit directly
           }
           return { ...cat, [field]: typeof value === 'string' && field !== 'name' ? parseFloat(value) || 0 : value };
         }
@@ -186,6 +193,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         .filter(cat => cat.name.trim() !== "")
         .map(cat => {
             let catBudget = cat.budgetedAmount;
+            // If it's a non-system category and has subcategories, derive its budget from them
             if (!cat.isSystemCategory && cat.subcategories && cat.subcategories.length > 0) {
                 catBudget = cat.subcategories.reduce((sum, sub) => sum + (Number(sub.budgetedAmount) || 0), 0);
             }
@@ -193,7 +201,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
             return {
                 id: cat.id,
                 name: cat.name,
-                budgetedAmount: catBudget,
+                budgetedAmount: catBudget, // Use the derived or directly set budget
                 expenses: cat.expenses || [],
                 isSystemCategory: cat.isSystemCategory || false,
                 subcategories: (cat.isSystemCategory) ? [] : (cat.subcategories || [])
@@ -220,7 +228,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   };
 
   const onCloseModal = () => {
-    resetModalState();
+    resetModalState(); // Ensure full reset on close
     onClose();
   };
 
@@ -235,7 +243,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
         if (file.type.startsWith('image/')) {
           setAiSetupFilePreviewUrl(reader.result as string);
         } else {
-          setAiSetupFilePreviewUrl(null); // No visual preview for PDF, just filename
+          setAiSetupFilePreviewUrl(null); 
         }
       };
       reader.readAsDataURL(file);
@@ -268,56 +276,64 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
       } else if (result.categories && result.categories.length > 0) {
 
         const newAiCategories = result.categories.map(suggestedCat => {
-            const newCat: EditableCategory = {
-              id: uuidv4(),
-              name: suggestedCat.name,
-              budgetedAmount: (suggestedCat.subcategories && suggestedCat.subcategories.length > 0) ? 0 : (suggestedCat.budgetedAmount || 0),
-              subcategories: (suggestedCat.subcategories || []).map(suggestedSub => ({
+            // Determine if this AI category is a system category by name
+            const isSavingsByName = suggestedCat.name.toLowerCase() === "savings";
+            const isCCPaymentsByName = suggestedCat.name.toLowerCase() === "credit card payments";
+            const isSystemByName = isSavingsByName || isCCPaymentsByName;
+
+            const subcategories = (suggestedCat.subcategories || []).map(suggestedSub => ({
                 id: uuidv4(),
                 name: suggestedSub.name,
                 budgetedAmount: suggestedSub.budgetedAmount || 0,
                 expenses: [],
-              })),
-              isSystemCategory: false, // Will be checked and potentially overridden
+            }));
+
+            let finalBudgetedAmount = suggestedCat.budgetedAmount || 0;
+            if (!isSystemByName && subcategories.length > 0) {
+                finalBudgetedAmount = subcategories.reduce((sum, sub) => sum + sub.budgetedAmount, 0);
+            }
+            
+            return {
+              id: uuidv4(),
+              name: isSavingsByName ? "Savings" : isCCPaymentsByName ? "Credit Card Payments" : suggestedCat.name,
+              budgetedAmount: finalBudgetedAmount,
+              subcategories: isSystemByName ? [] : subcategories,
+              isSystemCategory: isSystemByName,
               expenses: [],
             };
-            return newCat;
         });
 
+        // Preserve existing system categories' IDs and expenses if AI suggests them by name, update their budgets
         let currentSystemCategories = editableCategories.filter(c => c.isSystemCategory).map(c => ({...c, expenses: c.expenses || []}));
-        let userDefinedCategories = newAiCategories.filter(aiCat =>
-          !["savings", "credit card payments"].includes(aiCat.name.toLowerCase())
-        );
+        let userDefinedNonSystemCategories = newAiCategories.filter(aiCat => !aiCat.isSystemCategory);
+
 
         // Update or add system categories based on AI suggestions
-        const aiSavings = newAiCategories.find(c => c.name.toLowerCase() === "savings");
-        const aiCCPayments = newAiCategories.find(c => c.name.toLowerCase() === "credit card payments");
+        ["Savings", "Credit Card Payments"].forEach(sysName => {
+            const aiSuggestedSysCat = newAiCategories.find(c => c.name === sysName);
+            const existingSysCatIndex = currentSystemCategories.findIndex(c => c.name === sysName);
 
-        const savingsCatIndex = currentSystemCategories.findIndex(c => c.name.toLowerCase() === "savings");
-        if (aiSavings) {
-          if (savingsCatIndex !== -1) {
-            currentSystemCategories[savingsCatIndex].budgetedAmount = aiSavings.budgetedAmount;
-          } else {
-            currentSystemCategories.push({...aiSavings, isSystemCategory: true, name: "Savings", subcategories: []});
-          }
-        } else if (savingsCatIndex === -1) { // If AI didn't suggest, but it doesn't exist, create it
-            currentSystemCategories.push({ id: uuidv4(), name: "Savings", budgetedAmount: 0, subcategories: [], isSystemCategory: true, expenses: []});
-        }
-
-
-        const ccPaymentsCatIndex = currentSystemCategories.findIndex(c => c.name.toLowerCase() === "credit card payments");
-        if (aiCCPayments) {
-          if (ccPaymentsCatIndex !== -1) {
-            currentSystemCategories[ccPaymentsCatIndex].budgetedAmount = aiCCPayments.budgetedAmount;
-          } else {
-            currentSystemCategories.push({...aiCCPayments, isSystemCategory: true, name: "Credit Card Payments", subcategories: []});
-          }
-        } else if (ccPaymentsCatIndex === -1) { // If AI didn't suggest, but it doesn't exist, create it
-            currentSystemCategories.push({ id: uuidv4(), name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true, expenses: []});
-        }
+            if (aiSuggestedSysCat) { // AI suggested this system category
+                if (existingSysCatIndex !== -1) { // System category already exists
+                    currentSystemCategories[existingSysCatIndex].budgetedAmount = aiSuggestedSysCat.budgetedAmount;
+                } else { // System category doesn't exist, add AI's version
+                    currentSystemCategories.push(aiSuggestedSysCat);
+                }
+            } else if (existingSysCatIndex === -1) { // AI didn't suggest it, and it doesn't exist, create it with 0 budget
+                 currentSystemCategories.push({ 
+                    id: uuidv4(), 
+                    name: sysName, 
+                    budgetedAmount: 0, 
+                    subcategories: [], 
+                    isSystemCategory: true, 
+                    expenses: []
+                });
+            }
+            // If AI didn't suggest it but it exists, its budget is kept as is.
+        });
 
 
-        setEditableCategories([...currentSystemCategories, ...userDefinedCategories]);
+        setEditableCategories([...currentSystemCategories, ...userDefinedNonSystemCategories]);
         toast({ title: "AI Budget Applied", description: "Review the suggested budget structure and amounts.", action: <CheckCircle className="text-green-500"/> });
         handleClearAiSetupFile();
       } else {
@@ -342,12 +358,12 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
   if (!isOpen) {
     return null;
   }
-  if (!isDataLoaded && isOpen) {
+  if (!isDataLoaded && isOpen) { // Ensure we show loader if isOpen but data isn't loaded
      return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
             <DialogContent className="max-w-md sm:max-w-lg md:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-2xl font-semibold">Edit Budget for {getFormattedMonthTitle()}</DialogTitle>
+                    <DialogTitle className="text-2xl font-semibold">Manage Budget for {getFormattedMonthTitle()}</DialogTitle>
                 </DialogHeader>
                 <div className="flex items-center justify-center h-64">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -363,14 +379,14 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCloseModal()}>
       <DialogContent className="max-w-md sm:max-w-lg md:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold">Edit Budget for {getFormattedMonthTitle()}</DialogTitle>
+          <DialogTitle className="text-2xl font-semibold">Manage Budget for {getFormattedMonthTitle()}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] p-1">
           <div className="space-y-6 pr-4">
             {/* AI Budget Setup Section */}
             <div className="p-4 border rounded-lg shadow-sm bg-card/30 space-y-3">
               <h3 className="text-md font-medium flex items-center"><Wand2 className="mr-2 h-5 w-5 text-primary/80" /> AI Budget Setup from File</h3>
-              <p className="text-xs text-muted-foreground">Upload an image or PDF of your current budget. AI will suggest categories and amounts, replacing existing non-system categories. System categories ("Savings", "Credit Card Payments") will be updated if suggested.</p>
+              <p className="text-xs text-muted-foreground">Upload an image or PDF of your current budget. AI will suggest categories and amounts, replacing existing non-system categories. System categories ("Savings", "Credit Card Payments") will be preserved or updated if suggested by AI.</p>
 
               <Input
                   id="ai-budget-upload"
@@ -378,7 +394,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                   accept="image/*,application/pdf"
                   ref={aiSetupFileInputRef}
                   onChange={handleAiSetupFileChange}
-                  className="hidden" // Hidden, triggered by button
+                  className="hidden" 
                   disabled={isAiBudgetProcessing}
               />
               <Button
@@ -506,8 +522,7 @@ export function EditBudgetModal({ isOpen, onClose, monthId }: EditBudgetModalPro
                         type="number"
                         value={parentDisplayBudget.toFixed(2)}
                         onChange={(e) => {
-                           // Allow editing for system categories or non-system categories without subcategories
-                          if (isSystem || !hasSubcategories) {
+                          if (!(hasSubcategories && !isSystem)) { // Editable if system or no subcategories
                             handleCategoryChange(cat.id, "budgetedAmount", e.target.value);
                           }
                         }}

@@ -14,7 +14,7 @@ import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
 import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; 
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
-import { PrepNextMonthModal } from "@/components/budget/PrepNextMonthModal";
+// Removed PrepNextMonthModal import
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -41,7 +41,7 @@ export default function HomePage() {
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
   const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
   const [isMonthEndSummaryModalOpen, setIsMonthEndSummaryModalOpen] = useState(false); 
-  const [isPrepNextMonthModalOpen, setIsPrepNextMonthModalOpen] = useState(false);
+  // Removed isPrepNextMonthModalOpen state
   const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined); 
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
@@ -213,7 +213,6 @@ export default function HomePage() {
               onAddExpense={() => setIsAddExpenseModalOpen(true)}
               onAddIncome={() => setIsAddIncomeModalOpen(true)}
               onFinalizeMonth={() => openMonthEndSummary()}
-              onPrepNextMonth={() => setIsPrepNextMonthModalOpen(true)}
             />
 
             {systemCategories.length > 0 && (
@@ -305,13 +304,7 @@ export default function HomePage() {
               budgetMonth={monthEndSummaryData}
             />
           )}
-          {currentBudgetMonth && (
-            <PrepNextMonthModal
-              isOpen={isPrepNextMonthModalOpen}
-              onClose={() => setIsPrepNextMonthModalOpen(false)}
-              currentMonthData={currentBudgetMonth}
-            />
-          )}
+          {/* PrepNextMonthModal is removed, its functionality will be on a separate page */}
         </>
       )}
     </div>

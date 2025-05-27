@@ -14,11 +14,10 @@ import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
 import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; 
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
-// Removed PrepNextMonthModal import
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +40,6 @@ export default function HomePage() {
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
   const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
   const [isMonthEndSummaryModalOpen, setIsMonthEndSummaryModalOpen] = useState(false); 
-  // Removed isPrepNextMonthModalOpen state
   const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined); 
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
@@ -249,15 +247,15 @@ export default function HomePage() {
             {allCategories.length === 0 && ( 
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
-                  <AlertTriangle className="mx-auto h-10 w-10 text-accent mb-3" />
+                  <XCircle className="mx-auto h-10 w-10 text-accent mb-3" /> {/* Changed icon */}
                   <CardTitle className="text-xl">No Categories Found</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">
-                    You haven't added any categories to your budget for {getFormattedMonthTitle(currentDisplayMonthId)} yet. Use "Manage Budget" to add them or try the AI setup.
+                    You haven't added any categories to your budget for {getFormattedMonthTitle(currentDisplayMonthId)} yet. Use "Manage Budget" to add them or try the AI setup options.
                   </p>
                   <Button variant="outline" onClick={() => setIsEditBudgetModalOpen(true)}>
-                    Add Categories
+                    Manage Budget
                   </Button>
                 </CardContent>
               </Card>
@@ -268,7 +266,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.14 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.15 (Studio Preview)
           </div>
       </footer>
 
@@ -304,11 +302,8 @@ export default function HomePage() {
               budgetMonth={monthEndSummaryData}
             />
           )}
-          {/* PrepNextMonthModal is removed, its functionality will be on a separate page */}
         </>
       )}
     </div>
   );
 }
-
-    

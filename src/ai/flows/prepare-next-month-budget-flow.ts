@@ -35,8 +35,8 @@ const PrepareBudgetInputSchema = z.object({
   userGoals: z.string().describe("A text description of the user's financial goals for the next month (e.g., 'Save $500 for a vacation, reduce dining out by 20%, pay off $200 on credit card X')."),
   currentMonthId: z.string().describe("The ID of the current month (YYYY-MM) from which planning is being done."),
   currentIncome: z.number().describe("The user's total income for the current month."),
-  currentSavingsTotal: z.number().describe("The user's current total accumulated savings amount."),
-  currentCCDebtTotal: z.number().describe("The user's current total outstanding credit card debt."),
+  currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category)."),
+  currentCCDebtTotal: z.number().describe("The user's current total *outstanding* credit card debt (estimated for end of current month)."),
 });
 export type PrepareBudgetInput = z.infer<typeof PrepareBudgetInputSchema>;
 
@@ -60,45 +60,55 @@ const prompt = ai.definePrompt({
   input: {schema: PrepareBudgetInputSchema},
   output: {schema: PrepareBudgetOutputSchema},
   prompt: `You are a friendly, empathetic, and highly skilled financial planning assistant.
-Your task is to help the user prepare a budget for their *next* month and provide actionable advice.
+Your primary goal is to help the user create a realistic and effective budget for their *next* month and provide actionable, supportive financial advice.
 
-User's Current Situation (for context, based on their current month ending '{{currentMonthId}}'):
-- Income this month: \${{currentIncome}}
-- Current total savings: \${{currentSavingsTotal}}
-- Current total credit card debt: \${{currentCCDebtTotal}}
+User's Current Financial Context (based on their current month ending '{{currentMonthId}}'):
+- Income This Month: \${{currentIncome}}
+- Actual Savings Contributed This Month: \${{currentSavingsTotal}}
+- Estimated Total Outstanding Credit Card Debt at end of this month: \${{currentCCDebtTotal}}
 
 User's Financial Goals for Next Month:
 "{{{userGoals}}}"
 
 {{#if statementDataUris}}
-User's Past Spending (from provided statement(s)/document(s)):
+Analysis of User's Past Spending (from provided statement(s)/document(s)):
 {{#each statementDataUris}}
-Document for analysis:
+Document:
 {{media url=this}}
 ---
 {{/each}}
-Analyze these document(s) to understand typical spending patterns.
+Carefully analyze these document(s) to understand the user's typical spending patterns, recurring expenses, and potential areas for optimization.
 {{else}}
-No past spending document(s) were provided. Base your suggestions on their stated goals and general financial best practices.
+No past spending document(s) were provided. Base your budget suggestions primarily on their stated goals, income, and general financial best practices.
 {{/if}}
 
-Based on all the information above, please provide:
+Your Task:
+Based on ALL the information above (goals, income, debt, savings contributions, and past spending if available), provide the following:
+
 1.  'suggestedCategories': A comprehensive suggested budget for the *next* month.
+    -   The budget should be realistic and achievable given the user's income.
     -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation).
-    -   Incorporate categories related to their goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund").
-    -   Include "Savings" and "Credit Card Payments" as top-level categories. Suggest reasonable budgeted amounts for these based on their goals, income, and debt.
-    -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories, but also suggest areas for potential reduction if it aligns with their goals (e.g., reducing dining out).
-    -   Allocate amounts that are realistic for their stated income. The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed their income, or if it does, clearly explain the shortfall in your advice.
-    -   If applicable, suggest subcategories under broader categories (e.g., Groceries > Produce, Dairy).
-2.  'financialAdvice': Actionable financial advice.
-    -   Directly address how the suggested budget helps achieve their stated goals.
-    -   If they have a large purchase goal (e.g., a $5000 PC) and limited current savings, explain how the budget helps them save towards it. Suggest realistic timelines.
-    -   Strongly advise against using high-interest credit card debt for large discretionary purchases. If appropriate, you can mention looking for 0% interest installment plans as a *last resort* if the user insists on acquiring an item sooner than they can save for it, but emphasize that saving first is usually better.
-    -   Provide general tips for improving financial health based on their situation (e.g., building an emergency fund if savings are low, strategies for paying down debt faster if CC debt is high).
-    -   Your tone should be encouraging, supportive, and non-judgmental. Help them feel empowered.
+    -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category compared to past spending (if known) or a reasonable general amount.
+    -   Always include "Savings" and "Credit Card Payments" as top-level categories. Suggest reasonable budgeted amounts for these. For "Savings", align with their goals (e.g., if they want to save $500, budget $500 for Savings). For "Credit Card Payments", suggest an amount that makes meaningful progress on their debt, considering their income and other goals.
+    -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories. However, if their goals require spending cuts, proactively suggest these reductions and explain why.
+    -   The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed their income. If it does, clearly point out the shortfall in your 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
+    -   If applicable, suggest logical subcategories under broader categories (e.g., Groceries > Produce, Dairy; Utilities > Electricity, Water).
+    -   If the user states an urgent need for a large purchase (e.g., "I need a new PC or I can't work"), acknowledge this urgency.
+
+2.  'financialAdvice': Detailed, actionable, and empathetic financial advice.
+    -   Directly address how the 'suggestedCategories' help achieve their stated goals. Explain the connection.
+    -   If they have a large purchase goal (e.g., a $5000 PC with current savings of $2000 and income of $3000/month), explain how the budget helps them save towards it. Suggest realistic timelines. For example: "Based on saving $X per month in your 'New PC Fund', you could reach your $5000 goal in Y months."
+    -   **Debt Management:** If `currentCCDebtTotal` is high, emphasize strategies for paying it down.
+    -   **Large Purchases:**
+        -   Generally, strongly advise saving up for large discretionary purchases rather than incurring new debt.
+        -   If the user expresses *extreme urgency* for an item essential for work or well-being, and saving quickly isn't feasible, you may *cautiously* mention exploring 0% interest installment plans as a *last resort*. Immediately follow this by emphasizing that saving first is always preferable to avoid any potential debt risks. Explicitly advise AGAINST using standard high-interest credit cards for such purchases.
+    -   Provide general tips for improving financial health based on their situation (e.g., building an emergency fund if their "Actual Savings Contributed This Month" is low, strategies for debt reduction).
+    -   If information seems insufficient to make a concrete plan (e.g., vague goals with very low income), state what additional information would be helpful, or make reasonable assumptions and clearly state them.
+    -   Your tone should be encouraging, supportive, and non-judgmental. Help them feel empowered and capable of achieving their financial goals. Avoid overly restrictive or negative language. Focus on positive framing and solutions.
 
 Ensure your 'suggestedCategories' output is well-structured.
-If you cannot reasonably create a budget or provide advice (e.g., conflicting goals, insufficient information and no statement), set an 'aiError'.
+If you cannot reasonably create a budget or provide advice (e.g., conflicting or impossible goals given the income, completely uncooperative user description), set an 'aiError' explaining why.
+Focus on providing practical, step-by-step advice.
 `,
 });
 
@@ -110,15 +120,15 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
   },
   async (input: PrepareBudgetInput) => {
     if (input.statementDataUris && input.statementDataUris.some(uri => !uri.startsWith('data:'))) {
-        return { financialAdvice: "Invalid statement file format.", aiError: 'One or more statement data URIs are invalid.' };
+        return { financialAdvice: "Invalid statement file format provided.", aiError: 'One or more statement data URIs are invalid.' };
     }
 
     try {
       const {output} = await prompt(input);
       if (!output || (!output.suggestedCategories && !output.financialAdvice)) {
-        return { 
-            financialAdvice: "The AI could not generate budget suggestions or advice at this time. Please try rephrasing your goals or providing more details.",
-            aiError: output?.aiError || 'AI processing returned no meaningful output.' 
+        return {
+            financialAdvice: "The AI could not generate budget suggestions or advice at this time. Please try rephrasing your goals or providing more details, or ensure any uploaded statements are clear.",
+            aiError: output?.aiError || 'AI processing returned no meaningful output.'
         };
       }
       // Ensure system categories are well-formed if suggested
@@ -135,12 +145,10 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
       return output;
     } catch (e: any) {
       console.error("Error in prepareNextMonthBudgetFlow:", e);
-      return { 
-        financialAdvice: "An unexpected error occurred while preparing your next month's budget. Please try again.",
-        aiError: e.message || 'An unexpected error occurred during AI processing.' 
+      return {
+        financialAdvice: "An unexpected error occurred while preparing your next month's budget. Please try again later.",
+        aiError: e.message || 'An unexpected error occurred during AI processing.'
       };
     }
   }
 );
-
-    

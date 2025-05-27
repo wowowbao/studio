@@ -41,9 +41,6 @@ export default function PrepareBudgetPage() {
   const [currentActualSavings, setCurrentActualSavings] = useState(0);
   const [currentEstimatedDebt, setCurrentEstimatedDebt] = useState(0);
 
-  const [showSuggestionsView, setShowSuggestionsView] = useState(false);
-
-
   useEffect(() => {
     const sourceMonthId = initialMonthId;
     if (!sourceMonthId) {
@@ -74,11 +71,10 @@ export default function PrepareBudgetPage() {
     setUserGoals("");
     setAiSuggestions(null);
     setAiError(null);
-    setShowSuggestionsView(false); // Ensure input form is shown initially
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
-  }, [initialMonthId]); // Rerun if the source month changes
+  }, [initialMonthId]);
 
   useEffect(() => {
     if (currentMonthData) {
@@ -89,7 +85,6 @@ export default function PrepareBudgetPage() {
       setCurrentIncome(totalIncome);
 
       const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
-      // Actual savings is sum of expenses under "Savings" category
       const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
       setCurrentActualSavings(actualSavingsContribution);
       
@@ -169,7 +164,7 @@ export default function PrepareBudgetPage() {
     }
     setIsLoadingAi(true);
     setAiError(null);
-    setAiSuggestions(null); // Clear previous suggestions
+    setAiSuggestions(null); 
 
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
@@ -187,7 +182,6 @@ export default function PrepareBudgetPage() {
         toast({ title: "AI Suggestion Error", description: result.aiError, variant: "destructive" });
       } else {
         setAiSuggestions(result);
-        setShowSuggestionsView(true); // Switch to suggestions view
         toast({ title: "AI Suggestions Loaded", description: "Review the suggestions and apply them to your next month's budget if you're happy.", duration: 5000 });
       }
     } catch (error: any) {
@@ -219,7 +213,7 @@ export default function PrepareBudgetPage() {
     applyAiGeneratedBudget(
       nextMonthId,
       aiSuggestions.suggestedCategories,
-      currentIncome, // Use current month's income as basis for next month's income plan
+      currentIncome, 
       currentMonthData.startingCreditCardDebt || 0,
       paymentsMadeThisMonth
     );
@@ -271,17 +265,16 @@ export default function PrepareBudgetPage() {
   };
   
   const handleStartOver = () => {
-    // Reset all relevant states to show the input form again
     setStatementFiles([]);
     setStatementPreviewDetails([]);
     setStatementDataUris([]);
     setUserGoals("");
     setAiSuggestions(null);
     setAiError(null);
-    setShowSuggestionsView(false);
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
+    toast({title: "Form Reset", description: "Please enter your goals and upload statements again."});
   };
 
 
@@ -290,11 +283,11 @@ export default function PrepareBudgetPage() {
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between max-w-5xl mx-auto px-4">
-             <Button variant="outline" size="icon" onClick={() => router.back()} aria-label="Go back">
+             <Button variant="outline" size="icon" onClick={() => router.push('/')} aria-label="Go back to dashboard">
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary">AI Budget Prep</h1>
-            <div className="w-8"></div> {/* Placeholder for balance */}
+            <div className="w-8"></div> 
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
@@ -318,137 +311,132 @@ export default function PrepareBudgetPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary truncate px-2">AI Prep for {nextMonthToPrep}</h1>
-            <div className="w-8"></div> {/* Placeholder for balance */}
+            <div className="w-8"></div>
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
         <ScrollArea className="h-full pr-2"> 
           <div className="space-y-8 pb-8">
+              <Card>
+                  <CardHeader>
+                      <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
+                      <CardDescription>Based on your latest data for {getFormattedMonthTitle(currentMonthData.id)}. This info helps the AI.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                          <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
+                          <p className="text-xs text-muted-foreground">Income This Month</p>
+                          <p className="font-semibold text-lg">${currentIncome.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                          <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
+                          <p className="text-xs text-muted-foreground">Actual Savings This Month</p>
+                          <p className="font-semibold text-lg">${currentActualSavings.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                          <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
+                          <p className="text-xs text-muted-foreground">Est. CC Debt End of Month</p>
+                          <p className="font-semibold text-lg">${currentEstimatedDebt.toFixed(2)}</p>
+                      </div>
+                  </CardContent>
+              </Card>
+
+              <Card>
+                  <CardHeader>
+                      <CardTitle className="text-lg">Your Financial Goals for Next Month</CardTitle>
+                      <CardDescription>Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..." The more detail, the better the AI can assist.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <Textarea
+                          id="userGoals"
+                          value={userGoals}
+                          onChange={(e) => setUserGoals(e.target.value)}
+                          placeholder="Be specific about your goals..."
+                          className="min-h-[100px] text-base"
+                          rows={4}
+                          disabled={isLoadingAi}
+                      />
+                  </CardContent>
+              </Card>
+
+              <Card>
+                  <CardHeader>
+                      <CardTitle className="text-lg">Upload Past Bank Statement(s) <span className="text-xs text-muted-foreground">(Optional)</span></CardTitle>
+                      <CardDescription>Provide images or PDFs of recent bank statements or spending summaries for more tailored AI suggestions.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                      <Input
+                          id="statementUpload"
+                          type="file"
+                          accept="image/*,application/pdf"
+                          multiple
+                          ref={statementFileInputRef}
+                          onChange={handleStatementFileChange}
+                          className="hidden"
+                          disabled={isLoadingAi}
+                      />
+                      <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => statementFileInputRef.current?.click()}
+                          disabled={isLoadingAi}
+                          className="w-full"
+                      >
+                          <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File(s)
+                      </Button>
+                      {statementFiles.length > 0 && (
+                          <div className="mt-4 space-y-3">
+                          <div className="flex justify-between items-center">
+                              <Label className="text-sm font-medium">Selected Files ({statementFiles.length}):</Label>
+                              <Button variant="ghost" size="sm" onClick={handleClearStatementFiles} disabled={isLoadingAi} className="text-xs h-7">
+                              <Trash2 className="mr-1 h-3 w-3" /> Clear All
+                              </Button>
+                          </div>
+                          <ScrollArea className="h-40 border rounded-md p-3 bg-muted/20">
+                              <ul className="space-y-2">
+                              {statementPreviewDetails.map((detail, index) => (
+                                  <li key={index} className="flex items-center justify-between text-xs p-2 bg-background rounded-md shadow">
+                                  <div className="flex items-center space-x-2 overflow-hidden flex-1">
+                                      {detail.type.startsWith('image/') && detail.dataUri ? (
+                                      <div className="relative w-12 h-12 border rounded-sm overflow-hidden bg-muted shrink-0">
+                                          <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="bank statement financial"/>
+                                      </div>
+                                      ) : detail.type === 'application/pdf' ? (
+                                      <FileText className="h-8 w-8 text-destructive shrink-0" />
+                                      ) : <Paperclip className="h-6 w-6 text-muted-foreground shrink-0"/> }
+                                      <span className="font-medium truncate flex-grow" title={detail.name}>{detail.name}</span>
+                                  </div>
+                                  <Button variant="ghost" size="icon" onClick={() => handleRemoveStatementFile(index)} disabled={isLoadingAi} className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2">
+                                      <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                  </li>
+                              ))}
+                              </ul>
+                          </ScrollArea>
+                          </div>
+                      )}
+                  </CardContent>
+              </Card>
+              
+              <Button onClick={handleGetAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
+                {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
+                {isLoadingAi ? "Getting Suggestions..." : (aiSuggestions ? "Update AI Suggestions" : "Get AI Budget Suggestions")}
+              </Button>
+
+              {aiError && (
+                <Alert variant="destructive" className="mt-4">
+                    <XCircle className="h-4 w-4"/>
+                    <AlertTitle>AI Error</AlertTitle>
+                    <AlertDescription>{aiError}</AlertDescription>
+                </Alert>
+              )}
             
-            {!showSuggestionsView && (
-              <>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
-                        <CardDescription>Based on your latest data for {getFormattedMonthTitle(currentMonthData.id)}. This info helps the AI.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                            <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
-                            <p className="text-xs text-muted-foreground">Income This Month</p>
-                            <p className="font-semibold text-lg">${currentIncome.toFixed(2)}</p>
-                        </div>
-                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                            <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
-                            <p className="text-xs text-muted-foreground">Actual Savings This Month</p>
-                            <p className="font-semibold text-lg">${currentActualSavings.toFixed(2)}</p>
-                        </div>
-                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                            <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
-                            <p className="text-xs text-muted-foreground">Est. CC Debt End of Month</p>
-                            <p className="font-semibold text-lg">${currentEstimatedDebt.toFixed(2)}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Your Financial Goals for Next Month</CardTitle>
-                        <CardDescription>Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..." The more detail, the better the AI can assist.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Textarea
-                            id="userGoals"
-                            value={userGoals}
-                            onChange={(e) => setUserGoals(e.target.value)}
-                            placeholder="Be specific about your goals..."
-                            className="min-h-[100px] text-base"
-                            rows={4}
-                            disabled={isLoadingAi}
-                        />
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Upload Past Bank Statement(s) <span className="text-xs text-muted-foreground">(Optional)</span></CardTitle>
-                        <CardDescription>Provide images or PDFs of recent bank statements or spending summaries for more tailored AI suggestions.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <Input
-                            id="statementUpload"
-                            type="file"
-                            accept="image/*,application/pdf"
-                            multiple
-                            ref={statementFileInputRef}
-                            onChange={handleStatementFileChange}
-                            className="hidden"
-                            disabled={isLoadingAi}
-                        />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => statementFileInputRef.current?.click()}
-                            disabled={isLoadingAi}
-                            className="w-full"
-                        >
-                            <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File(s)
-                        </Button>
-                        {statementFiles.length > 0 && (
-                            <div className="mt-4 space-y-3">
-                            <div className="flex justify-between items-center">
-                                <Label className="text-sm font-medium">Selected Files ({statementFiles.length}):</Label>
-                                <Button variant="ghost" size="sm" onClick={handleClearStatementFiles} disabled={isLoadingAi} className="text-xs h-7">
-                                <Trash2 className="mr-1 h-3 w-3" /> Clear All
-                                </Button>
-                            </div>
-                            <ScrollArea className="h-40 border rounded-md p-3 bg-muted/20">
-                                <ul className="space-y-2">
-                                {statementPreviewDetails.map((detail, index) => (
-                                    <li key={index} className="flex items-center justify-between text-xs p-2 bg-background rounded-md shadow">
-                                    <div className="flex items-center space-x-2 overflow-hidden flex-1">
-                                        {detail.type.startsWith('image/') && detail.dataUri ? (
-                                        <div className="relative w-12 h-12 border rounded-sm overflow-hidden bg-muted shrink-0">
-                                            <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="bank statement financial"/>
-                                        </div>
-                                        ) : detail.type === 'application/pdf' ? (
-                                        <FileText className="h-8 w-8 text-destructive shrink-0" />
-                                        ) : <Paperclip className="h-6 w-6 text-muted-foreground shrink-0"/> }
-                                        <span className="font-medium truncate flex-grow" title={detail.name}>{detail.name}</span>
-                                    </div>
-                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveStatementFile(index)} disabled={isLoadingAi} className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                    </li>
-                                ))}
-                                </ul>
-                            </ScrollArea>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-                
-                <Button onClick={handleGetAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
-                  {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
-                  {isLoadingAi ? "Getting Suggestions..." : "Get AI Budget Suggestions"}
-                </Button>
-
-                {aiError && (
-                  <Alert variant="destructive" className="mt-4">
-                      <XCircle className="h-4 w-4"/>
-                      <AlertTitle>AI Error</AlertTitle>
-                      <AlertDescription>{aiError}</AlertDescription>
-                  </Alert>
-                )}
-              </>
-            )}
-
-            {showSuggestionsView && aiSuggestions && (
-              <div className="space-y-6">
+            {aiSuggestions && (
+              <div className="space-y-6 pt-6 border-t mt-8">
                 <Card className="shadow-lg border-primary/30">
                   <CardHeader>
                       <CardTitle className="text-xl text-primary">AI Suggestions for {nextMonthToPrep}</CardTitle>
-                      <CardDescription>Review the AI's plan. You can apply it, or start over to refine your inputs.</CardDescription>
+                      <CardDescription>Review the AI's plan. You can adjust your goals/statements above and "Update AI Suggestions", or "Apply" if satisfied, or "Start Over" to clear everything.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                       <div>
@@ -471,7 +459,7 @@ export default function PrepareBudgetPage() {
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                         <Button onClick={handleStartOver} variant="outline" className="py-3 text-base" disabled={isLoadingAi}>
-                            <RotateCcw className="mr-2 h-5 w-5"/> Start Over / Refine Inputs
+                            <RotateCcw className="mr-2 h-5 w-5"/> Start Over (Clear All)
                         </Button>
                         <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -507,3 +495,5 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
+
+    

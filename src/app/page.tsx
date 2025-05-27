@@ -247,7 +247,7 @@ export default function HomePage() {
             {allCategories.length === 0 && ( 
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
-                  <XCircle className="mx-auto h-10 w-10 text-accent mb-3" /> {/* Changed icon */}
+                  <XCircle className="mx-auto h-10 w-10 text-accent mb-3" />
                   <CardTitle className="text-xl">No Categories Found</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -307,3 +307,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

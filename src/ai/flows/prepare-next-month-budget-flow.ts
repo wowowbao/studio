@@ -32,7 +32,7 @@ const PrepareBudgetInputSchema = z.object({
     .describe(
       "Optional: An array of bank statements or spending summaries (images or PDFs), as data URIs. Format for each: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-  userGoals: z.string().describe("A text description of the user's financial goals for the next month (e.g., 'Save $500 for a vacation, reduce dining out by 20%, pay off $200 on credit card X'). This can also include questions about previous suggestions or desired modifications."),
+  userGoals: z.string().describe("A text description of the user's financial goals for the next month. This input may contain their initial goals, or it might include questions about a budget plan previously suggested, or specific requests to change parts of a previously suggested plan. Analyze this input carefully to understand the user's current intent."),
   currentMonthId: z.string().describe("The ID of the current month (YYYY-MM) from which planning is being done."),
   currentIncome: z.number().describe("The user's total income for the current month."),
   currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category)."),
@@ -67,7 +67,7 @@ User's Current Financial Context (based on their current month ending '{{current
 - Actual Savings Contributed This Month: \${{currentSavingsTotal}}
 - Estimated Total Outstanding Credit Card Debt at end of this month: \${{currentCCDebtTotal}}
 
-User's Financial Goals for Next Month (this may include direct requests for changes to a previous suggestion or questions):
+User's Financial Goals for Next Month (this may contain initial goals, or questions/refinements based on a previous suggestion from you):
 "{{{userGoals}}}"
 
 {{#if statementDataUris}}
@@ -155,5 +155,7 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     }
   }
 );
+
+    
 
     

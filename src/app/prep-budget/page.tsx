@@ -34,7 +34,7 @@ export default function PrepareBudgetPage() {
   const [statementDataUris, setStatementDataUris] = useState<string[]>([]);
   const [userGoals, setUserGoals] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
-  const [aiSuggestions, setAiSuggestions] = useState<PrepareBudgetOutput | null>(null);
+  // Removed aiSuggestions state - it will be passed to review page
   const [aiError, setAiError] = useState<string | null>(null);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,7 +42,7 @@ export default function PrepareBudgetPage() {
   const [currentActualSavings, setCurrentActualSavings] = useState(0);
   const [currentEstimatedDebt, setCurrentEstimatedDebt] = useState(0);
   
-  const [inputsUsedForSuggestion, setInputsUsedForSuggestion] = useState<{goals: string, statements: string[]}>({goals: "", statements: []});
+  // Removed inputsUsedForSuggestion state
 
 
   useEffect(() => {
@@ -68,20 +68,14 @@ export default function PrepareBudgetPage() {
   useEffect(() => {
     setIsLoadingAi(false); 
     setAiError(null);
-    
-    // Only reset core form fields if we are truly starting over or no suggestions are present
-    if (!aiSuggestions) {
-        setStatementFiles([]);
-        setStatementPreviewDetails([]);
-        setStatementDataUris([]);
-        setUserGoals("");
-        setInputsUsedForSuggestion({goals: "", statements: []});
-    }
-    
+    setStatementFiles([]);
+    setStatementPreviewDetails([]);
+    setStatementDataUris([]);
+    setUserGoals("");
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
-  }, [initialMonthId, aiSuggestions]); // Depend on aiSuggestions to control reset
+  }, [initialMonthId]); 
 
   useEffect(() => {
     if (currentMonthData) {
@@ -161,7 +155,7 @@ export default function PrepareBudgetPage() {
   };
 
 
-  const handleGetAiSuggestions = async () => {
+  const handleGetInitialAiSuggestions = async () => {
     if (!currentMonthData) {
         setAiError("Source month data is not available.");
         toast({ title: "Data Error", description: "Could not load data for the current month to base suggestions on.", variant: "destructive" });
@@ -174,7 +168,6 @@ export default function PrepareBudgetPage() {
     }
     setIsLoadingAi(true);
     setAiError(null);
-    // setAiSuggestions(null); // Keep previous suggestions if user is just updating
 
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
@@ -191,12 +184,20 @@ export default function PrepareBudgetPage() {
         setAiError(result.aiError);
         toast({ title: "AI Suggestion Error", description: result.aiError, variant: "destructive" });
       } else {
-        setAiSuggestions(result);
-        setInputsUsedForSuggestion({
-            goals: userGoals,
-            statements: statementPreviewDetails.map(f => f.name)
-        });
-        toast({ title: "AI Suggestions Loaded", description: "Review the suggestions. You can refine your inputs and regenerate if needed.", duration: 7000 });
+        // Store results and inputs in sessionStorage for the review page
+        sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
+        sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
+          userGoals,
+          statementFileNames: statementPreviewDetails.map(f => f.name),
+          currentMonthId: currentMonthData.id,
+          currentIncome,
+          currentActualSavings,
+          currentEstimatedDebt,
+          statementDataUris // Pass statement data URIs for re-submission if needed
+        }));
+        
+        toast({ title: "AI Suggestions Ready!", description: "Redirecting to review page...", duration: 3000 });
+        router.push('/prep-budget/review');
       }
     } catch (error: any) {
       const message = error.message || "An unexpected error occurred while getting AI suggestions.";
@@ -206,80 +207,20 @@ export default function PrepareBudgetPage() {
       setIsLoadingAi(false);
     }
   };
-
-  const handleApplyBudget = () => {
-    if (!currentMonthData) {
-        toast({ title: "Error", description: "Source month data is missing for applying the budget.", variant: "destructive" });
-        return;
-    }
-    if (!aiSuggestions?.suggestedCategories || aiSuggestions.suggestedCategories.length === 0) {
-      toast({ title: "No Budget to Apply", description: "AI did not provide budget categories.", variant: "destructive" });
-      return;
-    }
-
-    const currentMonthDate = parseYearMonth(currentMonthData.id);
-    currentMonthDate.setMonth(currentMonthDate.getMonth() + 1);
-    const nextMonthId = getYearMonthFromDate(currentMonthDate);
-    
-    const ccPaymentsCat = currentMonthData.categories.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-    const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-
-    applyAiGeneratedBudget(
-      nextMonthId,
-      aiSuggestions.suggestedCategories,
-      currentIncome, 
-      currentMonthData.startingCreditCardDebt || 0,
-      paymentsMadeThisMonth
-    );
-
-    toast({
-      title: "Budget Applied!",
-      description: `AI-suggested budget has been applied to ${getFormattedMonthTitle(nextMonthId)}. You will be navigated to the new month.`,
-      action: <CheckCircle className="text-green-500" />,
-    });
-    setCurrentDisplayMonthId(nextMonthId);
-    router.push('/'); 
-  };
   
-  const renderSuggestedCategoriesList = (categories: PrepareBudgetOutput['suggestedCategories']) => {
-    if (!categories || categories.length === 0) {
-      return <p className="text-sm text-muted-foreground">No budget categories suggested by AI.</p>;
-    }
-    return (
-      <ul className="space-y-3 text-sm">
-        {categories.map((cat, index) => (
-          <li key={index} className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md transition-shadow">
-            <div className="font-semibold text-base text-primary">{cat.name}: ${cat.budgetedAmount?.toFixed(2) || '0.00'}</div>
-            {cat.subcategories && cat.subcategories.length > 0 && (
-              <ul className="pl-4 mt-2 space-y-1.5 text-xs border-l-2 ml-2 border-border">
-                {cat.subcategories.map((sub, subIndex) => (
-                  <li key={subIndex} className="text-muted-foreground pt-1 border-t border-dashed border-border/50 first:border-t-0 first:pt-0">
-                    {sub.name}: <span className="font-medium text-foreground">${sub.budgetedAmount?.toFixed(2) || '0.00'}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
   const getFormattedMonthTitle = (monthId: string) => {
     if (!monthId) return "";
     const dateObj = parseYearMonth(monthId);
     return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
   };
   
-  const handleClearInputsAndSuggestions = () => {
+  const handleClearInputs = () => {
     setIsLoadingAi(false);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
     setStatementDataUris([]);
     setUserGoals("");
-    setAiSuggestions(null);
     setAiError(null);
-    setInputsUsedForSuggestion({goals: "", statements: []});
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
@@ -320,8 +261,8 @@ export default function PrepareBudgetPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary truncate px-2">AI Prep for {nextMonthToPrep}</h1>
-             <Button variant="outline" size="sm" onClick={handleClearInputsAndSuggestions} disabled={isLoadingAi} aria-label="Start Over">
-                <RotateCcw className="mr-2 h-4 w-4" /> Clear Inputs & Suggestions
+             <Button variant="outline" size="sm" onClick={handleClearInputs} disabled={isLoadingAi} aria-label="Clear Inputs">
+                <RotateCcw className="mr-2 h-4 w-4" /> Clear Inputs
             </Button>
           </div>
         </header>
@@ -329,7 +270,6 @@ export default function PrepareBudgetPage() {
         <ScrollArea className="h-full pr-2"> 
           <div className="space-y-8 pb-8">
               
-              {/* Input Section - Always Visible */}
               <Card>
                   <CardHeader>
                       <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
@@ -359,7 +299,7 @@ export default function PrepareBudgetPage() {
                       <CardTitle className="text-lg">Your Financial Goals for Next Month</CardTitle>
                       <CardDescription>
                           Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..."
-                          The more detail, the better the AI can assist. If suggestions are shown below, you can edit this text to refine them.
+                          The more detail, the better the AI can assist.
                       </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -367,20 +307,11 @@ export default function PrepareBudgetPage() {
                           id="userGoals"
                           value={userGoals}
                           onChange={(e) => setUserGoals(e.target.value)}
-                          placeholder="Be specific about your goals, desired changes, or questions for the AI (e.g., 'Allocate more to Groceries', 'Why is my Dining Out budget so low?', 'I want to save $600 for my emergency fund.'). The AI will consider these comments when generating/updating suggestions."
+                          placeholder="Be specific about your goals. The AI will consider these comments when generating suggestions."
                           className="min-h-[100px] text-base"
                           rows={5}
                           disabled={isLoadingAi}
                       />
-                      {aiSuggestions && (
-                        <Alert variant="default" className="mt-4">
-                            <MessageSquareText className="h-4 w-4" />
-                            <AlertTitle className="font-semibold">Refine Suggestions</AlertTitle>
-                            <AlertDescription className="text-xs">
-                                Review the AI's suggestions below. To request adjustments or ask 'why', refine your goals in the text area above, then click 'Update AI Suggestions'.
-                            </AlertDescription>
-                        </Alert>
-                      )}
                   </CardContent>
               </Card>
 
@@ -444,80 +375,11 @@ export default function PrepareBudgetPage() {
                   </CardContent>
               </Card>
               
-              <Button onClick={handleGetAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
+              <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
                 {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
-                {aiSuggestions ? "Update AI Suggestions" : "Get AI Budget Suggestions"}
+                Get AI Budget Suggestions
               </Button>
             
-              {/* Suggestions Section - Only if aiSuggestions exist */}
-              {aiSuggestions && (
-                <div className="space-y-6 pt-6">
-                  <Separator />
-                  <Card className="shadow-lg border-primary/30">
-                    <CardHeader>
-                        <CardTitle className="text-xl text-primary">AI Suggestions for {nextMonthToPrep}</CardTitle>
-                        <CardDescription>Review the AI's plan. You can edit your inputs above and regenerate, or apply if satisfied.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <Card className="bg-muted/30">
-                          <CardHeader className="pb-2">
-                              <CardTitle className="text-base">Inputs Used for This Suggestion:</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-xs space-y-1">
-                              <p><span className="font-semibold">Goals:</span> {inputsUsedForSuggestion.goals || "Not specified"}</p>
-                              <p><span className="font-semibold">Statements:</span> {inputsUsedForSuggestion.statements.length > 0 ? inputsUsedForSuggestion.statements.join(', ') : "None provided"}</p>
-                          </CardContent>
-                        </Card>
-
-                        <div>
-                            <h4 className="text-lg font-medium flex items-center mb-2"><MessageSquareText className="mr-2 h-5 w-5 text-blue-500"/>Financial Advice & Explanations from AI:</h4>
-                            <ScrollArea className="h-48 p-4 border rounded-lg bg-muted/20 text-sm shadow-inner">
-                                <p className="whitespace-pre-wrap leading-relaxed">{aiSuggestions.financialAdvice}</p>
-                            </ScrollArea>
-                        </div>
-                        <Separator />
-                        <div>
-                            <h4 className="text-lg font-medium mb-2">Suggested Budget Categories:</h4>
-                             <Card>
-                                <CardHeader>
-                                  <CardTitle className="text-base">Budget Categories</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  {renderSuggestedCategoriesList(aiSuggestions.suggestedCategories)}
-                                </CardContent>
-                              </Card>
-                        </div>
-                                              
-                        <div className="mt-6">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button className="w-full py-3 text-base font-semibold" variant="default" size="lg" disabled={!aiSuggestions.suggestedCategories || aiSuggestions.suggestedCategories.length === 0 || isLoadingAi}>
-                                    <CheckCircle className="mr-2 h-5 w-5"/> Apply This Budget
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Confirm Apply Budget</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This will set up the budget for {nextMonthToPrep} 
-                                    using the AI's suggestions. Any existing budget for that month will be overwritten. Are you sure?
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isLoadingAi}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleApplyBudget} disabled={isLoadingAi}>
-                                    {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null }
-                                    Yes, Apply Budget
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
               {aiError && (
                 <Alert variant="destructive" className="mt-4">
                     <XCircle className="h-4 w-4"/>
@@ -525,13 +387,14 @@ export default function PrepareBudgetPage() {
                     <AlertDescription>{aiError}</AlertDescription>
                 </Alert>
               )}
-
           </div>
         </ScrollArea>
         </main>
     </div>
   );
 }
+    
+
     
 
     

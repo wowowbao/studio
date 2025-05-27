@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, Edit3, MessageSquareQuestion } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, Edit3, MessageSquareText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -377,7 +377,7 @@ export default function PrepareBudgetPage() {
                             id="userGoals"
                             value={userGoals}
                             onChange={(e) => setUserGoals(e.target.value)}
-                            placeholder="Be specific about your goals, desired changes, or questions for the AI..."
+                            placeholder="Be specific about your goals, desired changes, or questions for the AI (e.g., 'Allocate more to Groceries', 'Why is my Dining Out budget so low?', 'I want to save $600 for my emergency fund.')..."
                             className="min-h-[100px] text-base"
                             rows={4}
                             disabled={isLoadingAi}
@@ -470,7 +470,7 @@ export default function PrepareBudgetPage() {
                       </Card>
 
                       <div>
-                          <h4 className="text-lg font-medium flex items-center mb-2"><MessageSquareQuestion className="mr-2 h-5 w-5 text-blue-500"/>Financial Advice & Explanations from AI:</h4>
+                          <h4 className="text-lg font-medium flex items-center mb-2"><MessageSquareText className="mr-2 h-5 w-5 text-blue-500"/>Financial Advice & Explanations from AI:</h4>
                           <ScrollArea className="h-48 p-4 border rounded-lg bg-muted/20 text-sm shadow-inner">
                               <p className="whitespace-pre-wrap leading-relaxed">{aiSuggestions.financialAdvice}</p>
                           </ScrollArea>

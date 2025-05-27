@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Added Alert imports
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function PrepareBudgetPage() {
   const { getBudgetForMonth, applyAiGeneratedBudget, setCurrentDisplayMonthId, currentDisplayMonthId: initialMonthId } = useBudget();
@@ -64,7 +64,7 @@ export default function PrepareBudgetPage() {
 
 
   useEffect(() => {
-    setIsLoadingAi(false); 
+    setIsLoadingAi(false);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
     setStatementDataUris([]);
@@ -74,7 +74,7 @@ export default function PrepareBudgetPage() {
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
-  }, [isOpen]); // Assuming isOpen is a prop or state that controls modal visibility if this was a modal. Since it's a page, this runs once on mount.
+  }, []); // Changed dependency array from [isOpen] to []
 
   useEffect(() => {
     if (currentMonthData) {

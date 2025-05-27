@@ -45,8 +45,6 @@ export default function HomePage() {
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
 
-  // This effect ensures that the data for the current display month is loaded or created.
-  // It runs when the currentDisplayMonthId changes, or when auth/budget loading states change.
   useEffect(() => {
     if (!authLoading && currentDisplayMonthId) { 
       ensureMonthExists(currentDisplayMonthId);
@@ -66,10 +64,8 @@ export default function HomePage() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      // Optionally, redirect or clear local non-synced state here if needed
     } catch (error) {
       console.error("Error signing out: ", error);
-      // Handle sign-out errors, e.g., show a toast
     }
   };
 
@@ -79,8 +75,8 @@ export default function HomePage() {
   };
 
   const openMonthEndSummary = () => {
-    const data = getBudgetForMonth(currentDisplayMonthId); // Use getBudgetForMonth for consistency
-    if (data) { // Check if data is defined
+    const data = getBudgetForMonth(currentDisplayMonthId); 
+    if (data) { 
       setMonthEndSummaryData(data);
       setIsMonthEndSummaryModalOpen(true);
     }
@@ -95,7 +91,6 @@ export default function HomePage() {
   };
 
 
-  // Initial loading state for the entire page if no budget data has ever been loaded
   if (isLoading && !Object.keys(budgetMonths).length && !currentBudgetMonth) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
@@ -111,7 +106,6 @@ export default function HomePage() {
     );
   }
   
-  // Prepare categories for display
   const allCategories = currentBudgetMonth?.categories || [];
   const systemCategories: BudgetCategory[] = [];
   const operationalCategories: BudgetCategory[] = [];
@@ -124,11 +118,10 @@ export default function HomePage() {
     }
   });
 
-  // Sort system categories: Savings first, then Credit Card Payments
   systemCategories.sort((a, b) => {
-    if (a.name.toLowerCase() === 'savings') return -1; // Savings comes before anything else
+    if (a.name.toLowerCase() === 'savings') return -1; 
     if (b.name.toLowerCase() === 'savings') return 1;
-    if (a.name.toLowerCase() === 'credit card payments') return -1; // CC Payments comes before other system cats (if any) but after Savings
+    if (a.name.toLowerCase() === 'credit card payments') return -1; 
     if (b.name.toLowerCase() === 'credit card payments') return 1;
     return 0;
   });
@@ -190,7 +183,6 @@ export default function HomePage() {
         
         <MonthNavigator />
         
-        {/* Show skeletons if loading data for an already partially loaded app (budgetMonths has keys) */}
         {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
@@ -204,7 +196,6 @@ export default function HomePage() {
               </div>
             </div>
         ) : !currentBudgetMonth ? (
-          // Display this if currentBudgetMonth is truly undefined (e.g., new user, no data for this month)
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
@@ -220,7 +211,6 @@ export default function HomePage() {
             </CardContent>
           </Card>
         ) : (
-          // Main content when currentBudgetMonth exists
           <>
             <SummaryCards budgetMonth={currentBudgetMonth} />
             <CreditCardDebtSummary budgetMonth={currentBudgetMonth} />
@@ -231,7 +221,6 @@ export default function HomePage() {
               onFinalizeMonth={() => openMonthEndSummary()}
             />
 
-            {/* Display System Categories (Savings, CC Payments) */}
             {systemCategories.length > 0 && (
               <>
                 <h2 className="text-xl font-semibold mt-8 mb-4 text-primary flex items-center">
@@ -245,7 +234,6 @@ export default function HomePage() {
               </>
             )}
 
-            {/* Display Operational Categories */}
             {operationalCategories.length > 0 && (
               <>
                 <h2 className="text-xl font-semibold mt-6 mb-4 text-primary flex items-center">
@@ -259,13 +247,11 @@ export default function HomePage() {
               </>
             )}
             
-            {/* Display Budget Chart only if there are operational categories */}
             {(operationalCategories.length > 0) && ( 
                 <BudgetChart budgetMonth={currentBudgetMonth} />
             )}
 
 
-            {/* Message if no categories (system or operational) exist for the month */}
             {allCategories.length === 0 && ( 
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
@@ -292,8 +278,7 @@ export default function HomePage() {
           </div>
       </footer>
 
-      {/* Modals - Render them conditionally or always, but control visibility with isOpen */}
-      {currentDisplayMonthId && ( // Only render modals if a month is active
+      {currentDisplayMonthId && ( 
         <>
           <EditBudgetModal 
             isOpen={isEditBudgetModalOpen} 
@@ -310,19 +295,16 @@ export default function HomePage() {
             onClose={() => setIsAddIncomeModalOpen(false)}
             monthId={currentDisplayMonthId}
           />
-          {/* Conditionally render MonthEndSummaryModal only when its data is ready */}
           {monthEndSummaryData && (
             <MonthEndSummaryModal
               isOpen={isMonthEndSummaryModalOpen}
               onClose={() => {
                 setIsMonthEndSummaryModalOpen(false);
-                // Re-fetch or update monthEndSummaryData if needed after closing,
-                // e.g., if month status changes.
                 const updatedData = getBudgetForMonth(currentDisplayMonthId);
-                if (updatedData && updatedData.isRolledOver) { // Example: only update if rolled over
+                if (updatedData && updatedData.isRolledOver) { 
                   setMonthEndSummaryData(updatedData);
                 } else {
-                  setMonthEndSummaryData(undefined); // Clear if not relevant
+                  setMonthEndSummaryData(undefined); 
                 }
               }}
               budgetMonth={monthEndSummaryData}

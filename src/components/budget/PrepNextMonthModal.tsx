@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -24,12 +24,12 @@ interface PrepNextMonthModalProps {
 }
 
 export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNextMonthModalProps) {
-  const { applyAiGeneratedBudget, getBudgetForMonth, setCurrentDisplayMonthId } = useBudget();
+  const { applyAiGeneratedBudget, setCurrentDisplayMonthId } = useBudget();
   const { toast } = useToast();
 
-  const [statementFile, setStatementFile] = useState<File | null>(null);
-  const [statementPreviewUrl, setStatementPreviewUrl] = useState<string | null>(null);
-  const [statementDataUri, setStatementDataUri] = useState<string | null>(null);
+  const [statementFiles, setStatementFiles] = useState<File[]>([]);
+  const [statementPreviewDetails, setStatementPreviewDetails] = useState<{ name: string; type: string; dataUri?: string }[]>([]);
+  const [statementDataUris, setStatementDataUris] = useState<string[]>([]);
   const [userGoals, setUserGoals] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
   const [aiSuggestions, setAiSuggestions] = useState<PrepareBudgetOutput | null>(null);
@@ -43,7 +43,6 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
 
   useEffect(() => {
     if (isOpen && currentMonthData) {
-      // Calculate current financial situation for display
       const totalIncome = currentMonthData.incomes.reduce((sum, inc) => sum + inc.amount, 0);
       setCurrentIncome(totalIncome);
 
@@ -55,10 +54,9 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
       const paymentsMade = ccPaymentsCat?.expenses.reduce((sum, exp) => sum + exp.amount, 0) || 0;
       setCurrentEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMade));
 
-      // Reset form state
-      setStatementFile(null);
-      setStatementPreviewUrl(null);
-      setStatementDataUri(null);
+      setStatementFiles([]);
+      setStatementPreviewDetails([]);
+      setStatementDataUris([]);
       setUserGoals("");
       setAiSuggestions(null);
       setAiError(null);
@@ -69,33 +67,58 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
     }
   }, [isOpen, currentMonthData]);
 
-  const handleStatementFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setStatementFile(file);
+  const handleStatementFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const newFilesArray = Array.from(files);
+      setStatementFiles(prev => [...prev, ...newFilesArray]);
       setAiError(null);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setStatementDataUri(reader.result as string);
-        if (file.type.startsWith('image/')) {
-          setStatementPreviewUrl(reader.result as string);
-        } else {
-          setStatementPreviewUrl(null);
+
+      const newPreviewDetails: { name: string; type: string; dataUri?: string }[] = [];
+      const newDataUris: string[] = [];
+
+      for (const file of newFilesArray) {
+        try {
+          const dataUri = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          newDataUris.push(dataUri);
+          newPreviewDetails.push({
+            name: file.name,
+            type: file.type,
+            dataUri: file.type.startsWith('image/') ? dataUri : undefined,
+          });
+        } catch (error) {
+          console.error("Error reading file:", file.name, error);
+          setAiError(`Error processing file: ${file.name}.`);
+          // Optionally skip this file or stop processing
         }
-      };
-      reader.readAsDataURL(file);
+      }
+      setStatementDataUris(prev => [...prev, ...newDataUris]);
+      setStatementPreviewDetails(prev => [...prev, ...newPreviewDetails]);
     }
+    if (event.target) event.target.value = ''; // Clear input for re-selection
   };
 
-  const handleClearStatementFile = () => {
-    setStatementFile(null);
-    setStatementPreviewUrl(null);
-    setStatementDataUri(null);
+  const handleClearStatementFiles = () => {
+    setStatementFiles([]);
+    setStatementPreviewDetails([]);
+    setStatementDataUris([]);
     setAiError(null);
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
   };
+  
+  const handleRemoveStatementFile = (indexToRemove: number) => {
+    setStatementFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+    setStatementPreviewDetails(prev => prev.filter((_, index) => index !== indexToRemove));
+    setStatementDataUris(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
 
   const handleGetAiSuggestions = async () => {
     if (!userGoals.trim()) {
@@ -108,11 +131,11 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
     setAiSuggestions(null);
 
     const input: PrepareBudgetInput = {
-      statementDataUri: statementDataUri || undefined,
+      statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
       userGoals,
       currentMonthId: currentMonthData.id,
       currentIncome: currentIncome,
-      currentSavingsTotal: currentActualSavings, // This is actual accumulated savings, might need context if user wants to *start* saving.
+      currentSavingsTotal: currentActualSavings, 
       currentCCDebtTotal: currentEstimatedDebt,
     };
 
@@ -150,7 +173,7 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
     applyAiGeneratedBudget(
       nextMonthId,
       aiSuggestions.suggestedCategories,
-      currentIncome, // For now, carry over current income as next month's income
+      currentIncome, 
       currentMonthData.startingCreditCardDebt || 0,
       paymentsMadeThisMonth
     );
@@ -237,13 +260,14 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="statementUpload" className="text-base font-medium">
-                Upload Past Bank Statement (Optional - Image or PDF)
+              <Label className="text-base font-medium">
+                Upload Past Bank Statement(s) (Optional - Image or PDF)
               </Label>
               <Input
                 id="statementUpload"
                 type="file"
                 accept="image/*,application/pdf"
+                multiple // Allow multiple files
                 ref={statementFileInputRef}
                 onChange={handleStatementFileChange}
                 className="hidden"
@@ -256,26 +280,37 @@ export function PrepNextMonthModal({ isOpen, onClose, currentMonthData }: PrepNe
                 disabled={isLoadingAi}
                 className="w-full"
               >
-                <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File
+                <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File(s)
               </Button>
-              {statementFile && (
-                <div className="mt-2 space-y-1 p-3 border rounded-md bg-muted/50">
-                  <div className="flex items-center space-x-2">
-                    {statementFile.type.startsWith('image/') && statementPreviewUrl ? (
-                      <div className="relative w-16 h-16 border rounded-md overflow-hidden bg-muted shrink-0">
-                        <Image src={statementPreviewUrl} alt="Statement preview" layout="fill" objectFit="contain" data-ai-hint="bank statement document"/>
-                      </div>
-                    ) : statementFile.type === 'application/pdf' ? (
-                      <FileText className="h-8 w-8 text-destructive shrink-0" />
-                    ) : null}
-                    <div className="flex-grow overflow-hidden">
-                      <p className="text-sm font-medium truncate" title={statementFile.name}>{statementFile.name}</p>
-                      <p className="text-xs text-muted-foreground">{(statementFile.size / 1024).toFixed(1)} KB</p>
-                    </div>
+              {statementFiles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm font-medium">Selected Files ({statementFiles.length}):</Label>
+                    <Button variant="ghost" size="sm" onClick={handleClearStatementFiles} disabled={isLoadingAi} className="text-xs h-7">
+                      <Trash2 className="mr-1 h-3 w-3" /> Clear All
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleClearStatementFile} disabled={isLoadingAi} className="w-full text-xs h-7">
-                    <Trash2 className="mr-1 h-3 w-3" /> Clear Selection
-                  </Button>
+                  <ScrollArea className="h-32 border rounded-md p-2 bg-muted/50">
+                    <ul className="space-y-2">
+                      {statementPreviewDetails.map((detail, index) => (
+                        <li key={index} className="flex items-center justify-between text-xs p-1.5 bg-background rounded shadow-sm">
+                          <div className="flex items-center space-x-2 overflow-hidden">
+                            {detail.type.startsWith('image/') && detail.dataUri ? (
+                              <div className="relative w-10 h-10 border rounded-sm overflow-hidden bg-muted shrink-0">
+                                <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="bank statement document"/>
+                              </div>
+                            ) : detail.type === 'application/pdf' ? (
+                              <FileText className="h-6 w-6 text-destructive shrink-0" />
+                            ) : <Paperclip className="h-5 w-5 text-muted-foreground shrink-0"/> }
+                            <span className="font-medium truncate flex-grow" title={detail.name}>{detail.name}</span>
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveStatementFile(index)} disabled={isLoadingAi} className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
                 </div>
               )}
             </div>

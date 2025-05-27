@@ -26,11 +26,11 @@ const SuggestedCategorySchema = z.object({
 
 
 const PrepareBudgetInputSchema = z.object({
-  statementDataUri: z
-    .string()
+  statementDataUris: z
+    .array(z.string())
     .optional()
     .describe(
-      "An optional bank statement or spending summary (image or PDF), as a data URI. Format: 'data:<mimetype>;base64,<encoded_data>'."
+      "Optional: An array of bank statements or spending summaries (images or PDFs), as data URIs. Format for each: 'data:<mimetype>;base64,<encoded_data>'."
     ),
   userGoals: z.string().describe("A text description of the user's financial goals for the next month (e.g., 'Save $500 for a vacation, reduce dining out by 20%, pay off $200 on credit card X')."),
   currentMonthId: z.string().describe("The ID of the current month (YYYY-MM) from which planning is being done."),
@@ -42,7 +42,7 @@ export type PrepareBudgetInput = z.infer<typeof PrepareBudgetInputSchema>;
 
 const PrepareBudgetOutputSchema = z.object({
   suggestedCategories: z.array(SuggestedCategorySchema).optional().describe("An array of suggested categories for the next month's budget, potentially with nested subcategories and their budgeted amounts. This should be a comprehensive budget proposal."),
-  financialAdvice: z.string().describe("Actionable financial advice to help the user achieve their goals and improve financial health. This should address their stated goals, spending patterns (if a statement was provided), and offer specific, encouraging recommendations. If a large purchase goal is mentioned, advise on saving strategies or low-interest financing rather than high-interest debt."),
+  financialAdvice: z.string().describe("Actionable financial advice to help the user achieve their goals and improve financial health. This should address their stated goals, spending patterns (if statements were provided), and offer specific, encouraging recommendations. If a large purchase goal is mentioned, advise on saving strategies or low-interest financing rather than high-interest debt."),
   aiError: z.string().optional().describe('Any error message if the AI failed to process the request.'),
 });
 export type PrepareBudgetOutput = z.infer<typeof PrepareBudgetOutputSchema>;
@@ -70,12 +70,16 @@ User's Current Situation (for context, based on their current month ending '{{cu
 User's Financial Goals for Next Month:
 "{{{userGoals}}}"
 
-{{#if statementDataUri}}
-User's Past Spending (from provided statement/document):
-{{media url=statementDataUri}}
-Analyze this document to understand typical spending patterns.
+{{#if statementDataUris}}
+User's Past Spending (from provided statement(s)/document(s)):
+{{#each statementDataUris}}
+Document for analysis:
+{{media url=this}}
+---
+{{/each}}
+Analyze these document(s) to understand typical spending patterns.
 {{else}}
-No past spending document was provided. Base your suggestions on their stated goals and general financial best practices.
+No past spending document(s) were provided. Base your suggestions on their stated goals and general financial best practices.
 {{/if}}
 
 Based on all the information above, please provide:
@@ -105,8 +109,8 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     outputSchema: PrepareBudgetOutputSchema,
   },
   async (input: PrepareBudgetInput) => {
-    if (input.statementDataUri && !input.statementDataUri.startsWith('data:')) {
-        return { financialAdvice: "Invalid statement file format.", aiError: 'Invalid statement data URI format.' };
+    if (input.statementDataUris && input.statementDataUris.some(uri => !uri.startsWith('data:'))) {
+        return { financialAdvice: "Invalid statement file format.", aiError: 'One or more statement data URIs are invalid.' };
     }
 
     try {

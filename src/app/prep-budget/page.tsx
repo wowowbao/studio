@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, Edit3 } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, Edit3, MessageSquareQuestion } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -68,7 +68,7 @@ export default function PrepareBudgetPage() {
 
 
   useEffect(() => {
-    // Reset page state when initialMonthId (source month) changes, effectively a page reset
+    // Reset page state when initialMonthId (source month) changes, or when modal would open (though it's a page now)
     setIsLoadingAi(false);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
@@ -81,7 +81,7 @@ export default function PrepareBudgetPage() {
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
-  }, [initialMonthId]);
+  }, [initialMonthId]); 
 
   useEffect(() => {
     if (currentMonthData) {
@@ -370,14 +370,14 @@ export default function PrepareBudgetPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-lg">Your Financial Goals for Next Month</CardTitle>
-                        <CardDescription>Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..." The more detail, the better the AI can assist.</CardDescription>
+                        <CardDescription>Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..." The more detail, the better the AI can assist. You can also ask questions about previous suggestions here.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Textarea
                             id="userGoals"
                             value={userGoals}
                             onChange={(e) => setUserGoals(e.target.value)}
-                            placeholder="Be specific about your goals..."
+                            placeholder="Be specific about your goals, desired changes, or questions for the AI..."
                             className="min-h-[100px] text-base"
                             rows={4}
                             disabled={isLoadingAi}
@@ -470,7 +470,7 @@ export default function PrepareBudgetPage() {
                       </Card>
 
                       <div>
-                          <h4 className="text-lg font-medium flex items-center mb-2"><Info className="mr-2 h-5 w-5 text-blue-500"/>Financial Advice from AI:</h4>
+                          <h4 className="text-lg font-medium flex items-center mb-2"><MessageSquareQuestion className="mr-2 h-5 w-5 text-blue-500"/>Financial Advice & Explanations from AI:</h4>
                           <ScrollArea className="h-48 p-4 border rounded-lg bg-muted/20 text-sm shadow-inner">
                               <p className="whitespace-pre-wrap leading-relaxed">{aiSuggestions.financialAdvice}</p>
                           </ScrollArea>
@@ -483,7 +483,8 @@ export default function PrepareBudgetPage() {
                       <Alert>
                           <Info className="h-4 w-4" />
                           <AlertDescription>
-                              After applying, you can manually adjust this budget for {nextMonthToPrep} using "Manage Budget" on the main dashboard if needed.
+                              Not quite right? Click "Edit Inputs &amp; Regenerate", then update your 'Financial Goals' text with any changes or questions (e.g., "Allocate more to Groceries", "Why is my Dining Out budget so low?"), and get new suggestions.
+                              After applying, you can also manually adjust this budget for {nextMonthToPrep} using "Manage Budget" on the main dashboard.
                           </AlertDescription>
                       </Alert>
                       
@@ -534,3 +535,4 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
+    

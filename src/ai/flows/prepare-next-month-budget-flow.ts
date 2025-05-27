@@ -77,7 +77,7 @@ Document:
 {{media url=this}}
 ---
 {{/each}}
-Carefully analyze these document(s) to understand the user's typical spending patterns, recurring expenses, and potential areas for optimization.
+Carefully analyze these document(s) to understand the user's typical spending patterns, recurring expenses, and potential areas for optimization. Be as detailed as reasonably possible.
 {{else}}
 No past spending document(s) were provided. Base your budget suggestions primarily on their stated goals, income, and general financial best practices.
 {{/if}}
@@ -87,12 +87,12 @@ Based on ALL the information above (goals, income, debt, savings contributions, 
 
 1.  'suggestedCategories': A comprehensive suggested budget for the *next* month.
     -   The budget should be realistic and achievable given the user's income.
-    -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation).
+    -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym).
     -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category compared to past spending (if known) or a reasonable general amount. If the user explicitly asks to change a specific category's budget, try to accommodate this if feasible or explain why it's challenging.
-    -   Always include "Savings" and "Credit Card Payments" as top-level categories. Suggest reasonable budgeted amounts for these. For "Savings", align with their goals (e.g., if they want to save $500, budget $500 for Savings). For "Credit Card Payments", suggest an amount that makes meaningful progress on their debt, considering their income and other goals.
+    -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts for these. For "Savings", align with their goals (e.g., if they want to save $500, budget $500 for Savings). For "Credit Card Payments", suggest an amount that makes meaningful progress on their debt, considering their income and other goals.
     -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories. However, if their goals require spending cuts, proactively suggest these reductions.
-    -   The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed their income. If it does, clearly point out the shortfall in your 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
-    -   If applicable, suggest logical subcategories under broader categories (e.g., Groceries > Produce, Dairy; Utilities > Electricity, Water).
+    -   **The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed their income.** If it does, clearly point out the shortfall in your 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
+    -   If applicable, suggest logical subcategories under broader categories (e.g., Groceries > Produce, Dairy; Utilities > Electricity, Water, Internet; Entertainment > Streaming Services, Movies).
     -   If the user states an urgent need for a large purchase (e.g., "I need a new PC or I can't work"), acknowledge this urgency.
 
 2.  'financialAdvice': Detailed, actionable, empathetic financial advice, and **explanations for your budget choices**.

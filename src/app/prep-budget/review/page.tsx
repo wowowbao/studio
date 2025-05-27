@@ -1,13 +1,13 @@
 
 "use client";
 import { useState, useEffect, useRef } from "react";
-import type { BudgetMonth } from "@/types/budget";
+import type { BudgetMonth, BudgetCategory as BudgetCategoryType } from "@/types/budget"; // Renamed to avoid conflict
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks } from "lucide-react";
+import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks, FileText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { prepareNextMonthBudget, type PrepareBudgetInput, type PrepareBudgetOutput } from "@/ai/flows/prepare-next-month-budget-flow";
@@ -25,7 +25,7 @@ interface StoredAIPrepData {
     currentIncome: number;
     currentActualSavings: number;
     currentEstimatedDebt: number;
-    statementDataUris?: string[]; // Keep this for re-submission
+    statementDataUris?: string[]; 
 }
 
 export default function PrepareBudgetReviewPage() {
@@ -73,7 +73,7 @@ export default function PrepareBudgetReviewPage() {
     const updatedUserGoals = `${initialInputs.userGoals}\n\n--- Refinement Request ---\n${refinementText}`;
 
     const input: PrepareBudgetInput = {
-      statementDataUris: initialInputs.statementDataUris, // Use original statements
+      statementDataUris: initialInputs.statementDataUris, 
       userGoals: updatedUserGoals,
       currentMonthId: initialInputs.currentMonthId,
       currentIncome: initialInputs.currentIncome,
@@ -88,14 +88,12 @@ export default function PrepareBudgetReviewPage() {
         toast({ title: "AI Suggestion Error", description: result.aiError, variant: "destructive" });
       } else {
         setCurrentSuggestions(result);
-        // Optionally clear refinement text after submission or keep it for further edits
         setRefinementText(""); 
         toast({ title: "AI Suggestions Updated", description: "Review the updated plan.", duration: 5000 });
-         // Update sessionStorage with the new suggestions and refined goals
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
             ...initialInputs,
-            userGoals: updatedUserGoals // Store the combined goals
+            userGoals: updatedUserGoals 
         }));
 
       }
@@ -122,15 +120,22 @@ export default function PrepareBudgetReviewPage() {
     currentMonthDate.setMonth(currentMonthDate.getMonth() + 1);
     const nextMonthId = getYearMonthFromDate(currentMonthDate);
     
+    const ccPaymentsCategory = currentSuggestions.suggestedCategories.find(c => c.name.toLowerCase() === "credit card payments");
+    const aiSuggestedCCPayment = ccPaymentsCategory?.budgetedAmount || 0;
+    // For applyAiGeneratedBudget, ccPaymentsMadeInCurrentMonth should be ACTUAL payments from CURRENT month.
+    // This info isn't directly available in initialInputs which has *estimated* debt.
+    // For simplicity, we'll pass the AI's suggested CC payment for *next* month.
+    // The useBudgetCore hook's applyAi... will need to correctly calculate next month's starting debt.
+    // This is a point of potential refinement for debt carryover accuracy.
+    
     applyAiGeneratedBudget(
       nextMonthId,
       currentSuggestions.suggestedCategories,
       initialInputs.currentIncome, 
-      initialInputs.currentEstimatedDebt, // This should be the debt at the start of the *current* month
-      initialInputs.currentActualSavings // This is actual savings, we need CC payments from current month
-                                        // TODO: This part of applyAiGeneratedBudget might need refinement to correctly calculate next month's starting debt
-                                        // For now, this might miscalculate next month's starting debt if actualCCPayments isn't passed correctly from *current* month data.
-                                        // The flow needs `ccPaymentsMadeInCurrentMonth`
+      initialInputs.currentEstimatedDebt, 
+      aiSuggestedCCPayment // Passing AI's suggested payment for next month.
+                           // Actual previous month's payment needs to be fetched or calculated.
+                           // `useBudgetCore` `applyAiGeneratedBudget` should use `initialInputs.currentEstimatedDebt` as the starting debt for next month for now.
     );
 
     toast({
@@ -151,8 +156,6 @@ export default function PrepareBudgetReviewPage() {
   };
 
   const handleGoBackToInputs = () => {
-    sessionStorage.removeItem('aiPrepInitialSuggestions'); // Clear suggestions as we are going back
-    // initialInputs are kept in session storage to pre-fill if user comes back
     router.push('/prep-budget');
   };
   
@@ -182,6 +185,27 @@ export default function PrepareBudgetReviewPage() {
     );
   };
 
+  const calculateBudgetSummary = () => {
+    if (!currentSuggestions?.suggestedCategories || !initialInputs) {
+        return { totalBudgeted: 0, balance: 0, projectedIncome: 0 };
+    }
+    let totalBudgeted = 0;
+    currentSuggestions.suggestedCategories.forEach(cat => {
+        if (cat.subcategories && cat.subcategories.length > 0) {
+            cat.subcategories.forEach(sub => {
+                totalBudgeted += sub.budgetedAmount || 0;
+            });
+        } else {
+            totalBudgeted += cat.budgetedAmount || 0;
+        }
+    });
+    const projectedIncome = initialInputs.currentIncome;
+    const balance = projectedIncome - totalBudgeted;
+    return { totalBudgeted, balance, projectedIncome };
+  };
+
+  const budgetSummary = calculateBudgetSummary();
+
   if (pageIsLoading || !initialInputs || !currentSuggestions) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -210,7 +234,7 @@ export default function PrepareBudgetReviewPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary truncate px-2">Review & Refine for {nextMonthToPrep}</h1>
-            <div className="w-8"></div> {/* Placeholder for balance */}
+            <div className="w-8"></div> 
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
@@ -227,7 +251,7 @@ export default function PrepareBudgetReviewPage() {
                               <CardTitle className="text-base">Inputs Used for Current Suggestion:</CardTitle>
                           </CardHeader>
                           <CardContent className="text-xs space-y-1">
-                              <p><span className="font-semibold">Original Goals:</span> {initialInputs.userGoals || "Not specified"}</p>
+                              <p className="whitespace-pre-wrap"><span className="font-semibold">Your Goals:</span> {initialInputs.userGoals || "Not specified"}</p>
                               <p><span className="font-semibold">Statements:</span> {initialInputs.statementFileNames.length > 0 ? initialInputs.statementFileNames.join(', ') : "None provided"}</p>
                           </CardContent>
                         </Card>
@@ -243,6 +267,24 @@ export default function PrepareBudgetReviewPage() {
                             <h4 className="text-lg font-medium flex items-center mb-2"><ListChecks className="mr-2 h-5 w-5 text-green-500"/>Suggested Budget Categories:</h4>
                             {renderSuggestedCategoriesList(currentSuggestions.suggestedCategories)}
                         </div>
+
+                        <Separator className="my-6"/>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">AI Budget Overview</CardTitle>
+                                <CardDescription>Summary of the AI's suggested plan against your income.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                                <div className="flex justify-between"><span>Projected Income:</span> <span className="font-semibold">${budgetSummary.projectedIncome.toFixed(2)}</span></div>
+                                <div className="flex justify-between"><span>Total Suggested Budget:</span> <span className="font-semibold">${budgetSummary.totalBudgeted.toFixed(2)}</span></div>
+                                <div className={`flex justify-between font-semibold ${budgetSummary.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+                                    <span>{budgetSummary.balance >= 0 ? 'Remaining Unbudgeted:' : 'Shortfall:'}</span> 
+                                    <span>${Math.abs(budgetSummary.balance).toFixed(2)}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
 
                         <Separator className="my-6"/>
                         

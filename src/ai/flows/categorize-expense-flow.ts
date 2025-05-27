@@ -28,16 +28,19 @@ const CategorizeExpenseInputSchema = z.object({
 });
 export type CategorizeExpenseInput = z.infer<typeof CategorizeExpenseInputSchema>;
 
+const SuggestedExpenseItemSchema = z.object({
+    suggestedCategoryId: z.string().optional().describe("The ID of the suggested category or subcategory for this expense item. MUST be one of the IDs from the availableCategories list. If no suitable category is found, leave this field blank."),
+    suggestedAmount: z.number().optional().describe("The monetary amount for this specific expense item extracted from the receipt. If unsure, leave blank."),
+    suggestedDescription: z.string().optional().describe("A very concise description (1-3 words) for this expense item (e.g., store name if it's the main item, or a specific product). Keep it short and to the point. If unsure, leave blank."),
+});
+
 const CategorizeExpenseOutputSchema = z.object({
-  suggestedCategoryId: z.string().optional().describe("The ID of the suggested category or subcategory for the expense. MUST be one of the IDs from the availableCategories list. If no suitable category is found, leave this field blank."),
-  suggestedAmount: z.number().optional().describe("The final total monetary amount of the expense extracted from the receipt. Look for labels like 'Total', 'Grand Total', or 'Amount Due'. If multiple numbers are present, prioritize the final sum paid. If unsure, leave blank."),
-  suggestedDescription: z.string().optional().describe("A very concise description (1-3 words) for the expense (e.g., store name or main item). Keep it short and to the point. If unsure, leave blank."),
-  aiError: z.string().optional().describe('Any error message if the AI failed to process the request.'),
+  suggestedExpenses: z.array(SuggestedExpenseItemSchema).optional().describe("An array of suggested expense items found on the receipt. If the receipt contains multiple distinct items that should be categorized separately, list them here. If it's a single total expense, provide one item. If no items can be clearly identified, this can be empty or undefined."),
+  aiError: z.string().optional().describe('Any error message if the AI failed to process the request or if the document is not suitable.'),
 });
 export type CategorizeExpenseOutput = z.infer<typeof CategorizeExpenseOutputSchema>;
 
 export async function categorizeExpenseFromImage(input: CategorizeExpenseInput): Promise<CategorizeExpenseOutput> {
-  // Ensure there are categories to choose from
   if (!input.availableCategories || input.availableCategories.length === 0) {
     return {
       aiError: "No categories available to suggest from. Please add categories to your budget first."
@@ -55,12 +58,16 @@ Analyze the provided receipt image.
 The user has the following available budget categories/subcategories (with their IDs and names):
 {{{json availableCategories}}}
 
-Based on the image content:
-1.  Determine the most appropriate category/subcategory for this expense and set 'suggestedCategoryId'. You MUST select an ID from the 'availableCategories' list provided. Do not invent new categories or IDs. If no suitable category is found, leave this field blank.
-2.  Identify and extract the final total monetary amount of the expense from the receipt. This is usually labeled as 'Total', 'Grand Total', or 'Amount Due'. If there are multiple potential amounts, prioritize the one that represents the final sum paid. Set 'suggestedAmount' to this numeric value. If the total amount cannot be confidently determined from the image, leave this field blank.
-3.  Create a very concise description for the expense (e.g., store name, or main item if clear, like "Starbucks" or "Groceries"). Keep it short and to the point, ideally 1-3 words. Set 'suggestedDescription'.
+Based on the image content, identify one or more expense items. For each item:
+1.  Determine the most appropriate category/subcategory for this expense item and set 'suggestedCategoryId'. You MUST select an ID from the 'availableCategories' list provided. Do not invent new categories or IDs. If no suitable category is found for an item, leave this field blank for that item.
+2.  Identify and extract the monetary amount for this specific expense item. If the receipt shows a single total, use that. If it shows multiple line items, try to extract individual item amounts if they are clear. Set 'suggestedAmount' to this numeric value. If the amount for an item cannot be confidently determined from the image, leave this field blank for that item.
+3.  Create a very concise description for this expense item (e.g., store name, or main product if clear, like "Starbucks" or "Milk"). Keep it short and to the point, ideally 1-3 words. Set 'suggestedDescription'.
 
-If you cannot confidently determine any of these, leave the respective field blank in the output.
+Return a list of these suggested expense items in the 'suggestedExpenses' array.
+If you identify a single overall expense (e.g., a restaurant bill with one total), return a single item in the array.
+If the receipt clearly lists multiple distinct items that could be categorized differently (e.g., a supermarket receipt), return multiple items in the array.
+If you cannot confidently determine any of these details for an item, leave the respective field blank for that item.
+If no expense items can be clearly identified, you can return an empty 'suggestedExpenses' array.
 If there's a clear error in processing (e.g., image is not a receipt), set 'aiError'.
 
 Image of the receipt:
@@ -74,7 +81,6 @@ const categorizeExpenseFlow = ai.defineFlow(
     outputSchema: CategorizeExpenseOutputSchema,
   },
   async (input: CategorizeExpenseInput) => {
-    // Basic validation
     if (!input.imageDataUri.startsWith('data:image/')) {
         return { aiError: 'Invalid image data URI format.' };
     }
@@ -84,10 +90,19 @@ const categorizeExpenseFlow = ai.defineFlow(
 
     try {
       const {output} = await prompt(input);
-      return output || { aiError: 'AI processing returned no output.' };
+      // Ensure output is structured, even if AI returns null/undefined for suggestedExpenses
+      const finalOutput: CategorizeExpenseOutput = {
+        suggestedExpenses: output?.suggestedExpenses || [],
+        aiError: output?.aiError
+      };
+      if (!finalOutput.suggestedExpenses && !finalOutput.aiError) {
+         finalOutput.aiError = 'AI processing returned no meaningful output or identifiable expense items.';
+      }
+      return finalOutput;
     } catch (e: any) {
       console.error("Error in categorizeExpenseFlow:", e);
       return { aiError: e.message || 'An unexpected error occurred during AI processing.' };
     }
   }
 );
+

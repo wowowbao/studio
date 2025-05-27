@@ -34,6 +34,7 @@ interface CategoryOption {
   parentCategoryId?: string;
 }
 
+// Using a local SVG for AlertTriangle to avoid potential issues with lucide-react in some environments
 const LocalAlertTriangle = ({ className }: { className?: string }) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -91,10 +92,15 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
     setImageDataUri(null);
     setAiSuggestionError(null);
     setIsAiProcessing(false);
-    setMode('idle');
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
+    if (mode !== 'cameraView') { // Don't reset camera related things if just submitting form
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        setCameraStream(null);
+      }
+      setMode('idle');
+      // setHasCameraPermission(null); // Do not reset this, as user might have granted it.
+      setAvailableCameras([]);
+      setSelectedCameraId(undefined);
     }
   };
   
@@ -148,18 +154,25 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   }, [cameraStream]);
 
 
-  const getCameraPermissionAndStream = async (deviceId?: string): Promise<MediaStream | null> => {
-    if (cameraStream && videoRef.current && videoRef.current.srcObject) {
+  const stopCurrentStream = () => {
+    if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
-      if (videoRef.current) videoRef.current.srcObject = null;
+      setCameraStream(null);
     }
-    setCameraStream(null);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const startStream = async (deviceId?: string) => {
+    stopCurrentStream(); // Ensure previous stream is stopped
 
     try {
       const constraints: MediaStreamConstraints = { video: {} };
       if (deviceId) {
         (constraints.video as MediaTrackConstraints).deviceId = { exact: deviceId };
       } else {
+        // Prefer rear camera if no specific device ID is given
         (constraints.video as MediaTrackConstraints).facingMode = { ideal: "environment" };
       }
 
@@ -169,74 +182,80 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        try {
-          await videoRef.current.play();
-        } catch (e: any) {
+        await videoRef.current.play().catch(e => {
           console.error("Video play failed:", e);
           toast({
             variant: 'destructive',
             title: 'Camera Playback Error',
             description: `Could not start camera preview. Error: ${e.message || 'Please try again.'}`,
           });
-          stream.getTracks().forEach(track => track.stop());
-          setCameraStream(null);
+          stopCurrentStream(); // Stop stream if play fails
           setHasCameraPermission(false);
-          return null;
-        }
+          throw e; // Re-throw to be caught by caller
+        });
       }
-
+      
+      // Enumerate devices again to update availableCameras and selectedCameraId
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(d => d.kind === 'videoinput');
       setAvailableCameras(videoDevices);
 
       const currentStreamDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
-
-      if (!deviceId && videoDevices.length > 0) { 
-        const rearCamera = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
-        if (rearCamera && currentStreamDeviceId !== rearCamera.deviceId) {
-          stream.getTracks().forEach(track => track.stop()); 
-          setSelectedCameraId(rearCamera.deviceId); 
-          return getCameraPermissionAndStream(rearCamera.deviceId); 
-        } else if (currentStreamDeviceId) {
-          setSelectedCameraId(currentStreamDeviceId);
-        } else { 
-          setSelectedCameraId(videoDevices[0]?.deviceId);
-        }
-      } else if (deviceId) { 
-        setSelectedCameraId(deviceId);
+      if (currentStreamDeviceId) {
+        setSelectedCameraId(currentStreamDeviceId);
+      } else if (videoDevices.length > 0) {
+        setSelectedCameraId(videoDevices[0].deviceId); // Fallback to first device if current one not identifiable
       }
-      
+
+      setMode('cameraView');
       return stream;
 
     } catch (error: any) {
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
-      setCameraStream(null);
+      stopCurrentStream();
+      let description = `Failed to initialize camera. ${error.name || 'Error'}: ${error.message || 'Please check browser permissions and ensure no other app is using it.'}`;
+      if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        description = 'No camera found on this device. Please connect a camera or try another device.';
+      } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        description = 'Camera access was denied. Please enable camera permissions in your browser settings.';
+      }
       toast({
         variant: 'destructive',
         title: 'Camera Access Error',
-        description: `Failed to initialize camera. ${error.name || 'Error'}: ${error.message || 'Please check browser permissions and ensure no other app is using it.'}`,
+        description: description,
       });
+      setMode('idle'); // Revert to idle mode on error
       return null; 
     }
   };
 
+
   const handleEnableCamera = async () => {
-    setIsAiProcessing(true); // Using this as a general "operation in progress" flag
-    const stream = await getCameraPermissionAndStream(selectedCameraId); 
-    setIsAiProcessing(false);
-    if (stream) {
-      setMode('cameraView');
-    } else {
-      setMode('idle');
-      // Specific toast is shown in getCameraPermissionAndStream, fallback if needed
-      // toast({
-      //   variant: 'destructive',
-      //   title: 'Camera Access Failed',
-      //   description: 'Could not access camera. Please check permissions and ensure no other app is using it.',
-      // });
+    setIsAiProcessing(true);
+    let targetDeviceId = selectedCameraId;
+
+    if (!targetDeviceId && availableCameras.length === 0) { // First time, or no cameras enumerated yet
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            setAvailableCameras(videoDevices);
+            if (videoDevices.length > 0) {
+                const rearCamera = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
+                targetDeviceId = rearCamera ? rearCamera.deviceId : videoDevices[0].deviceId;
+                setSelectedCameraId(targetDeviceId);
+            }
+        } catch (err) {
+            console.error("Error enumerating devices:", err);
+            toast({ variant: "destructive", title: "Device Error", description: "Could not list camera devices." });
+            setIsAiProcessing(false);
+            return;
+        }
     }
+    await startStream(targetDeviceId);
+    setIsAiProcessing(false);
   };
+
 
   const handleSwitchCamera = async () => {
     if (availableCameras.length > 1 && selectedCameraId) {
@@ -245,42 +264,12 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       const nextCameraId = availableCameras[nextIndex].deviceId;
       
       setIsAiProcessing(true);
-      const stream = await getCameraPermissionAndStream(nextCameraId);
+      await startStream(nextCameraId); // This will update selectedCameraId internally
       setIsAiProcessing(false);
-
-      if (stream) {
-        setSelectedCameraId(nextCameraId); 
-        setMode('cameraView');
-      } else {
-         // Specific toast is shown in getCameraPermissionAndStream
-        // toast({ variant: "destructive", title: "Camera Switch Failed", description: "Could not switch to the selected camera."});
-      }
+    } else if (availableCameras.length <= 1) {
+        toast({ title: "Camera Info", description: "No other cameras available to switch to." });
     }
   };
-  
-  useEffect(() => {
-    const enumerateAndSetCameras = async () => {
-      if (hasCameraPermission === true && availableCameras.length === 0) {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const videoDevices = devices.filter(device => device.kind === 'videoinput');
-          setAvailableCameras(videoDevices);
-          if (videoDevices.length > 0 && !selectedCameraId) {
-            const rearCamera = videoDevices.find(d => 
-              d.label.toLowerCase().includes('back') || 
-              d.label.toLowerCase().includes('environment')
-            );
-            const initialCameraId = rearCamera ? rearCamera.deviceId : videoDevices[0].deviceId;
-            setSelectedCameraId(initialCameraId);
-          }
-        } catch (err) {
-          console.error("Error enumerating devices after permission grant:", err);
-        }
-      }
-    };
-    enumerateAndSetCameras();
-  }, [hasCameraPermission, availableCameras.length, selectedCameraId]);
-
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -325,10 +314,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         setImageDataUri(dataUri);
         setSelectedImageFile(null); 
         setMode('preview');
-        if (cameraStream) {
-          cameraStream.getTracks().forEach(track => track.stop());
-          setCameraStream(null);
-        }
+        stopCurrentStream(); // Stop stream after capture
       }
     } else {
         toast({ variant: "destructive", title: "Camera Error", description: "Camera not ready or video dimensions not available. Please try again."});
@@ -355,23 +341,32 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       if (result.aiError) {
         setAiSuggestionError(result.aiError);
         toast({ title: "AI Suggestion Error", description: result.aiError, variant: "destructive" });
-      } else {
-        if (result.suggestedCategoryId) {
-          const foundOption = categoryOptions.find(opt => opt.value === result.suggestedCategoryId);
+      } else if (result.suggestedExpenses && result.suggestedExpenses.length > 0) {
+        const firstSuggestion = result.suggestedExpenses[0];
+        if (firstSuggestion.suggestedCategoryId) {
+          const foundOption = categoryOptions.find(opt => opt.value === firstSuggestion.suggestedCategoryId);
           if (foundOption) {
             setSelectedTargetId(foundOption.value);
             setIsTargetSubcategory(foundOption.isSubcategory);
           } else {
-             setAiSuggestionError(`AI suggested category ID '${result.suggestedCategoryId}' not found.`);
+             setAiSuggestionError(`AI suggested category ID '${firstSuggestion.suggestedCategoryId}' not found for the first item.`);
           }
         }
-        if (result.suggestedAmount !== undefined && result.suggestedAmount !== null) {
-          setAmount(String(result.suggestedAmount.toFixed(2)));
+        if (firstSuggestion.suggestedAmount !== undefined && firstSuggestion.suggestedAmount !== null) {
+          setAmount(String(firstSuggestion.suggestedAmount.toFixed(2)));
         }
-        if (result.suggestedDescription) {
-          setDescription(result.suggestedDescription);
+        if (firstSuggestion.suggestedDescription) {
+          setDescription(firstSuggestion.suggestedDescription);
         }
-        toast({ title: "AI Suggestions Applied", description: "Review and confirm the expense details.", action: <CheckCircle className="text-green-500"/> });
+        
+        let toastMessage = "AI suggestions applied for the first item found.";
+        if (result.suggestedExpenses.length > 1) {
+            toastMessage += ` AI found ${result.suggestedExpenses.length} items in total. Full multiple-item support coming soon!`;
+        }
+        toast({ title: "AI Suggestions Applied", description: toastMessage, duration: 7000, action: <CheckCircle className="text-green-500"/> });
+
+      } else {
+        toast({ title: "AI Suggestion", description: "AI could not find any specific expense items in the image.", variant: "default" });
       }
     } catch (error: any) {
       console.error("Error calling AI flow:", error);
@@ -384,11 +379,11 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   };
   
   useEffect(() => {
-    if (imageDataUri && categoryOptions.length > 0 && mode === 'preview' && !isAiProcessing) { 
+    if (imageDataUri && categoryOptions.length > 0 && mode === 'preview' && !isAiProcessing && !aiSuggestionError) { 
       handleAiCategorize();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageDataUri, mode]); 
+  }, [imageDataUri, mode]); // Removed categoryOptions and aiSuggestionError to prevent re-triggering on error clear
 
   const handleSubmit = () => {
     const numericAmount = parseFloat(amount);
@@ -419,7 +414,13 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   };
   
   const onCloseModal = () => {
-    resetFormFields();
+    resetFormFields(); // Resets form fields, image previews, and AI errors
+    // Keep camera related state like `hasCameraPermission`, `availableCameras` as they are user/device specific and persist.
+    // Stop stream if modal is closed while camera is active
+    if (mode === 'cameraView') {
+      stopCurrentStream();
+      setMode('idle'); // Ensure mode resets to idle
+    }
     onClose();
   };
 
@@ -440,17 +441,19 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
           <DialogTitle className="text-2xl font-semibold">Add Expense for {monthId}</DialogTitle>
         </DialogHeader>
         
+        {/* Video element always rendered but visibility controlled by mode */}
         <video 
             ref={videoRef} 
             className={cn(
                 "w-full rounded-md bg-muted", 
-                mode === 'cameraView' ? 'block h-[70vh] max-h-[500px] object-contain' : 'hidden aspect-video'
+                mode === 'cameraView' ? 'block h-[70vh] max-h-[500px] object-contain' : 'hidden'
             )} 
             autoPlay 
             muted 
             playsInline 
         />
         <canvas ref={canvasRef} className="hidden"></canvas>
+
         <ScrollArea className="max-h-[70vh] pr-4"> 
           <div className="grid gap-4 py-4"> 
             {mode === 'idle' && (
@@ -490,12 +493,12 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                           Take Picture
                       </Button>
                   </div>
-                  {hasCameraPermission === false && (
+                  {hasCameraPermission === false && ( // Show if explicitly denied or failed
                       <Alert variant="destructive" className="mt-2 w-full">
                           <LocalAlertTriangle className="h-4 w-4" />
-                          <AlertTitle>Camera Access Denied</AlertTitle>
+                          <AlertTitle>Camera Access Issue</AlertTitle>
                           <AlertDescription>
-                              Please enable camera permissions in your browser settings and try again. You might need to refresh the page after changing permissions.
+                              Camera access was denied or is unavailable. Please check browser permissions and ensure a camera is connected. You might need to refresh the page after changing permissions.
                           </AlertDescription>
                       </Alert>
                   )}
@@ -516,10 +519,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
                       )}
                   </div>
                   <Button variant="outline" onClick={() => {
-                          if (cameraStream) {
-                              cameraStream.getTracks().forEach(track => track.stop());
-                              setCameraStream(null);
-                            }
+                          stopCurrentStream();
                           setMode('idle');
                       }} className="w-full" disabled={isAiProcessing}>
                           <XCircle className="mr-2 h-4 w-4" /> Back to Options
@@ -548,7 +548,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
               {isAiProcessing && (
                 <div className="flex items-center text-sm text-muted-foreground mt-2">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {imageDataUri ? "AI is analyzing your receipt..." : "Accessing camera..."}
+                  {imageDataUri ? "AI is analyzing your receipt..." : (mode === 'cameraView' ? "Initializing camera..." : "Processing...")}
                 </div>
               )}
               {aiSuggestionError && (
@@ -657,8 +657,8 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
             </Button>
           </DialogClose>
           <Button onClick={handleSubmit} disabled={budgetLoading || categoryOptions.length === 0 || isAiProcessing} className="w-full sm:w-auto">
-            {isAiProcessing && !imageDataUri && mode !== 'cameraView' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-            {isAiProcessing && !imageDataUri && mode !== 'cameraView' ? "Processing..." : (isAiProcessing ? "Processing..." : "Add Expense")}
+            {(isAiProcessing && mode !== 'cameraView') ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+            {(isAiProcessing && mode !== 'cameraView') ? "Processing..." : "Add Expense"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -670,3 +670,4 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   
 
     
+

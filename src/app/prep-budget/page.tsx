@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Added Alert imports
 
 export default function PrepareBudgetPage() {
   const { getBudgetForMonth, applyAiGeneratedBudget, setCurrentDisplayMonthId, currentDisplayMonthId: initialMonthId } = useBudget();
@@ -44,14 +45,18 @@ export default function PrepareBudgetPage() {
   useEffect(() => {
     // Use initialMonthId from useBudget hook as the source month for prep.
     const sourceMonthId = initialMonthId;
+    if (!sourceMonthId) {
+      toast({ title: "Error", description: "Current month ID is not available. Please return to the dashboard.", variant: "destructive" });
+      router.push('/');
+      setIsLoadingPageData(false);
+      return;
+    }
     const data = getBudgetForMonth(sourceMonthId);
     if (data) {
       setCurrentMonthData(data);
       setIsLoadingPageData(false);
     } else {
-      // Handle case where source month data might not be loaded yet or doesn't exist
-      // This might indicate a need to ensure useBudget hook has loaded its initial state
-      toast({ title: "Error", description: `Could not load data for month ${sourceMonthId}. Please ensure the month exists.`, variant: "destructive" });
+      toast({ title: "Error", description: `Could not load data for month ${getFormattedMonthTitle(sourceMonthId) || sourceMonthId}. Please ensure the month exists.`, variant: "destructive" });
       router.push('/'); // Redirect if data is missing
       setIsLoadingPageData(false);
     }
@@ -59,7 +64,7 @@ export default function PrepareBudgetPage() {
 
 
   useEffect(() => {
-    setIsLoadingAi(false); // Always ensure AI loading is reset when component mounts or dependencies change
+    setIsLoadingAi(false); 
     setStatementFiles([]);
     setStatementPreviewDetails([]);
     setStatementDataUris([]);
@@ -69,7 +74,7 @@ export default function PrepareBudgetPage() {
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
-  }, []); // Runs once on mount
+  }, [isOpen]); // Assuming isOpen is a prop or state that controls modal visibility if this was a modal. Since it's a page, this runs once on mount.
 
   useEffect(() => {
     if (currentMonthData) {

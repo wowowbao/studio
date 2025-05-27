@@ -1,3 +1,4 @@
+
 "use client";
 import { useState, useEffect, useRef } from "react";
 import type { BudgetMonth } from "@/types/budget";
@@ -32,7 +33,7 @@ export default function PrepareBudgetPage() {
 
   const [statementFiles, setStatementFiles] = useState<File[]>([]);
   const [statementPreviewDetails, setStatementPreviewDetails] = useState<{ name: string; type: string; dataUri?: string }[]>([]);
-  const [statementDataUris, setStatementDataUris = useState<string[]>([]);
+  const [statementDataUris, setStatementDataUris] = useState<string[]>([]);
   const [userGoals, setUserGoals] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
   const [aiSuggestions, setAiSuggestions] = useState<PrepareBudgetOutput | null>(null);

@@ -100,32 +100,32 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   
   useEffect(() => {
     if (isOpen && monthId && !budgetLoading) {
-      resetFormFields(); // Call reset here to ensure state is clean on open
+      resetFormFields(); 
 
       const budgetData = getBudgetForMonth(monthId);
       const options: CategoryOption[] = [];
       if (budgetData) {
         budgetData.categories.forEach(cat => {
-          if (cat.isSystemCategory) { // Always add system categories as direct targets
+          if (cat.isSystemCategory) { 
             options.push({ value: cat.id, label: cat.name, isSubcategory: false });
-          } else if (!cat.subcategories || cat.subcategories.length === 0) { // Non-system without subs
+          } else if (!cat.subcategories || cat.subcategories.length === 0) { 
             options.push({ value: cat.id, label: cat.name, isSubcategory: false });
           }
           (cat.subcategories || []).forEach(sub => {
-             if (!cat.isSystemCategory) { // Ensure parent is not system category for subcategories
+             if (!cat.isSystemCategory) { 
                 options.push({ value: sub.id, label: `${cat.name} > ${sub.name}`, isSubcategory: true, parentCategoryId: cat.id });
              }
           });
         });
       }
-      // Sort options: System categories first, then others alphabetically
+      
       options.sort((a, b) => {
         const aIsSystem = budgetData?.categories.find(c => c.id === (a.parentCategoryId || a.value))?.isSystemCategory || budgetData?.categories.find(c => c.id === a.value)?.isSystemCategory || false;
         const bIsSystem = budgetData?.categories.find(c => c.id === (b.parentCategoryId || b.value))?.isSystemCategory || budgetData?.categories.find(c => c.id === b.value)?.isSystemCategory || false;
 
         if (aIsSystem && !bIsSystem) return -1;
         if (!aIsSystem && bIsSystem) return 1;
-        if (aIsSystem && bIsSystem) { // Specific order for system categories
+        if (aIsSystem && bIsSystem) { 
             if (a.label.toLowerCase().includes("savings")) return -1;
             if (b.label.toLowerCase().includes("savings")) return 1;
             if (a.label.toLowerCase().includes("credit card payments")) return -1; 
@@ -134,12 +134,18 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         return a.label.localeCompare(b.label);
       });
       setCategoryOptions(options);
-    } else if (!isOpen && cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, monthId, budgetLoading]);
+  }, [isOpen, monthId, budgetLoading, getBudgetForMonth]);
+
+  useEffect(() => {
+    // Cleanup camera stream on unmount or when modal closes
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
 
 
   const getCameraPermissionAndStream = async (deviceId?: string): Promise<MediaStream | null> => {
@@ -163,7 +169,20 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(e => console.error("Video play failed:", e));
+        try {
+          await videoRef.current.play();
+        } catch (e: any) {
+          console.error("Video play failed:", e);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Playback Error',
+            description: `Could not start camera preview. Error: ${e.message || 'Please try again.'}`,
+          });
+          stream.getTracks().forEach(track => track.stop());
+          setCameraStream(null);
+          setHasCameraPermission(false);
+          return null;
+        }
       }
 
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -189,27 +208,33 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
       
       return stream;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
       setCameraStream(null);
+      toast({
+        variant: 'destructive',
+        title: 'Camera Access Error',
+        description: `Failed to initialize camera. ${error.name || 'Error'}: ${error.message || 'Please check browser permissions and ensure no other app is using it.'}`,
+      });
       return null; 
     }
   };
 
   const handleEnableCamera = async () => {
-    setIsAiProcessing(true);
+    setIsAiProcessing(true); // Using this as a general "operation in progress" flag
     const stream = await getCameraPermissionAndStream(selectedCameraId); 
     setIsAiProcessing(false);
     if (stream) {
       setMode('cameraView');
     } else {
       setMode('idle');
-      toast({
-        variant: 'destructive',
-        title: 'Camera Access Failed',
-        description: 'Could not access camera. Please check permissions and ensure no other app is using it.',
-      });
+      // Specific toast is shown in getCameraPermissionAndStream, fallback if needed
+      // toast({
+      //   variant: 'destructive',
+      //   title: 'Camera Access Failed',
+      //   description: 'Could not access camera. Please check permissions and ensure no other app is using it.',
+      // });
     }
   };
 
@@ -227,7 +252,8 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         setSelectedCameraId(nextCameraId); 
         setMode('cameraView');
       } else {
-        toast({ variant: "destructive", title: "Camera Switch Failed", description: "Could not switch to the selected camera."});
+         // Specific toast is shown in getCameraPermissionAndStream
+        // toast({ variant: "destructive", title: "Camera Switch Failed", description: "Could not switch to the selected camera."});
       }
     }
   };
@@ -284,7 +310,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   };
   
   const handleCapturePhoto = () => {
-    if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
+    if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA && videoRef.current.videoWidth > 0) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
@@ -305,7 +331,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
         }
       }
     } else {
-        toast({ variant: "destructive", title: "Camera Error", description: "Camera not ready. Please try again."});
+        toast({ variant: "destructive", title: "Camera Error", description: "Camera not ready or video dimensions not available. Please try again."});
     }
   };
 
@@ -425,8 +451,8 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
             playsInline 
         />
         <canvas ref={canvasRef} className="hidden"></canvas>
-        <ScrollArea className="max-h-[70vh] pr-4"> {/* Added ScrollArea and padding for scrollbar */}
-          <div className="grid gap-4 py-4"> {/* This div is now inside ScrollArea */}
+        <ScrollArea className="max-h-[70vh] pr-4"> 
+          <div className="grid gap-4 py-4"> 
             {mode === 'idle' && (
               <div className="flex flex-col items-center space-y-3 py-4 border rounded-lg p-4 bg-muted/20">
                   <p className="text-base font-medium">Add Receipt Image (Optional)</p>
@@ -624,7 +650,7 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
             )}
           </div>
         </ScrollArea>
-        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-0 pt-4 border-t"> {/* Added pt-4 and border-t for separation */}
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-0 pt-4 border-t"> 
           <DialogClose asChild>
             <Button variant="outline" onClick={onCloseModal} disabled={isAiProcessing} className="w-full sm:w-auto">
               <XCircle className="mr-2 h-4 w-4" /> Cancel
@@ -644,4 +670,3 @@ export function AddExpenseModal({ isOpen, onClose, monthId }: AddExpenseModalPro
   
 
     
-

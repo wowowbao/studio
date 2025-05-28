@@ -386,263 +386,249 @@ export default function PrepareBudgetPage() {
     setIsLoadingAi(false); 
   };
 
-  if (isLoadingPageData) { 
-    return (
+  return (
+    <>
+      {/* Main Container for the Page */}
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between max-w-5xl mx-auto px-4">
-             <Button variant="outline" size="icon" onClick={() => router.push('/')} aria-label="Go back to dashboard">
+            <Button variant="outline" size="icon" onClick={() => router.push('/')} aria-label="Go back to dashboard">
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary">Let's Create Your Financial Plan!</h1>
-            <div className="w-10"></div> 
+            <div className="w-10"></div>
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
-            <Skeleton className="h-12 w-1/2 mb-6" />
-            <Skeleton className="h-32 w-full mb-4" />
-            <Skeleton className="h-20 w-full mb-4" />
-            <Skeleton className="h-40 w-full mb-4" />
-            <Skeleton className="h-10 w-full" />
-        </main>
-      </div>
-    );
-  }
+          {isLoadingPageData ? (
+              // Loading State Skeleton
+              <div className="space-y-6">
+                  <Skeleton className="h-12 w-1/2" />
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-40 w-full" />
+                  <Skeleton className="h-10 w-full" />
+              </div>
+          ) : (
+              // Main Content
+              <ScrollArea className="h-full pr-2">
+                <div className="space-y-8 pb-8">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
+                            <CardDescription>
+                              This snapshot helps us set a baseline for your new financial plan. Feel free to adjust these numbers to best reflect your starting point for the plan we're about to create for <span className="font-semibold">{getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(currentMonthData?.id || initialMonthId || getYearMonthFromDate(new Date())).setMonth(parseYearMonth(currentMonthData?.id || initialMonthId || getYearMonthFromDate(new Date())).getMonth() + 1))))}</span>.
+                              <span className="block mt-1 text-xs text-muted-foreground">For a completely fresh AI plan, you can set these values to 0 or your new desired baseline.</span>
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <Label htmlFor="editableCurrentIncome" className="text-xs text-muted-foreground flex items-center"><DollarSign className="h-4 w-4 mr-1 text-green-500"/>Income This Month (App Data)</Label>
+                                <Input id="editableCurrentIncome" type="number" value={editableCurrentIncome} onChange={(e) => setEditableCurrentIncome(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
+                            </div>
+                            <div>
+                                <Label htmlFor="editableActualSavings" className="text-xs text-muted-foreground flex items-center"><PiggyBank className="h-4 w-4 mr-1 text-blue-500"/>Actual Savings This Month (App Data)</Label>
+                                <Input id="editableActualSavings" type="number" value={editableActualSavings} onChange={(e) => setEditableActualSavings(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
+                            </div>
+                            <div>
+                                <Label htmlFor="editableEstimatedDebt" className="text-xs text-muted-foreground flex items-center"><CreditCard className="h-4 w-4 mr-1 text-red-500"/>Est. CC Debt End of Month (App Data)</Label>
+                                <Input id="editableEstimatedDebt" type="number" value={editableEstimatedDebt} onChange={(e) => setEditableEstimatedDebt(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    {isInitialOnboarding && (
+                      <Alert>
+                          <Sparkles className="h-4 w-4" />
+                          <AlertTitle>Welcome to AI Financial Planning!</AlertTitle>
+                          <AlertDescription>
+                            Since this looks like your first time creating a plan, the snapshot above might be zero.
+                            Please fill in your income for the new plan below, and tell me about your goals.
+                            I'll then help create your first budget!
+                          </AlertDescription>
+                        </Alert>
+                    )}
 
-  const sourceMonthForSnapshot = currentMonthData?.id || initialMonthId || getYearMonthFromDate(new Date());
-  const nextMonthToPrepFor = getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(sourceMonthForSnapshot).setMonth(parseYearMonth(sourceMonthForSnapshot).getMonth() + 1))));
+                      <Card>
+                          <CardHeader>
+                              <CardTitle className="text-lg">About Your Income & Timing for This Plan</CardTitle>
+                              <CardDescription>Let's set the stage for your new budget.</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                              <div>
+                                  <Label htmlFor="planIncome">What's your approximate monthly income we'll be working with for this plan? (Required if snapshot income is 0)</Label>
+                                  <Input id="planIncome" type="number" placeholder="e.g., 4000" value={granularGoals.planIncome} onChange={(e) => handleGranularGoalChange('planIncome', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
+                                  <p className="text-xs text-muted-foreground mt-1">If this is for a new plan, enter the income you want me to use. Otherwise, I'll use the snapshot income if this is blank.</p>
+                              </div>
+                              <div>
+                                  <Label htmlFor="planStartMonth">When would you ideally like this new financial chapter to begin?</Label>
+                                  <Input id="planStartMonth" placeholder="e.g., next month, or August 2025" value={granularGoals.planStartMonth} onChange={(e) => handleGranularGoalChange('planStartMonth', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
+                              </div>
+                              <div>
+                                  <Label htmlFor="familySize" className="flex items-center">
+                                    <Users className="mr-2 h-4 w-4 text-muted-foreground"/>
+                                    How many people (including yourself!) are we budgeting for in your household? (Optional)
+                                  </Label>
+                                  <Input id="familySize" type="number" placeholder="e.g., 1, 2, 4" value={granularGoals.familySize} onChange={(e) => handleGranularGoalChange('familySize', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
+                              </div>
+                          </CardContent>
+                      </Card>
 
-  return (
-    <div className="flex flex-col min-h-screen bg-background">
-       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-16 items-center justify-between max-w-5xl mx-auto px-4">
-            <Button variant="outline" size="icon" onClick={() => router.push('/')} aria-label="Back to dashboard">
-                <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-xl font-bold text-primary truncate px-2">
-             Let's Create Your Financial Plan!
-            </h1>
-             <Button variant="outline" size="sm" onClick={handleClearAllAndRestart} disabled={isLoadingAi} aria-label="Clear Inputs & Suggestions">
-                <RotateCcw className="mr-2 h-4 w-4" /> Clear All
-            </Button>
-          </div>
-        </header>
-        <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
-        <ScrollArea className="h-full pr-2">
-          <div className="space-y-8 pb-8">
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
-                      <CardDescription>
-                        This snapshot helps us set a baseline for your new financial plan. Feel free to adjust these numbers to best reflect your starting point for the plan we're about to create for <span className="font-semibold">{nextMonthToPrepFor}</span>.
-                        <span className="block mt-1 text-xs text-muted-foreground">For a completely fresh AI plan, you can set these values to 0 or your new desired baseline.</span>
-                      </CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                      <div>
-                          <Label htmlFor="editableCurrentIncome" className="text-xs text-muted-foreground flex items-center"><DollarSign className="h-4 w-4 mr-1 text-green-500"/>Income This Month (App Data)</Label>
-                          <Input id="editableCurrentIncome" type="number" value={editableCurrentIncome} onChange={(e) => setEditableCurrentIncome(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
-                      </div>
-                      <div>
-                          <Label htmlFor="editableActualSavings" className="text-xs text-muted-foreground flex items-center"><PiggyBank className="h-4 w-4 mr-1 text-blue-500"/>Actual Savings This Month (App Data)</Label>
-                          <Input id="editableActualSavings" type="number" value={editableActualSavings} onChange={(e) => setEditableActualSavings(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
-                      </div>
-                      <div>
-                          <Label htmlFor="editableEstimatedDebt" className="text-xs text-muted-foreground flex items-center"><CreditCard className="h-4 w-4 mr-1 text-red-500"/>Est. CC Debt End of Month (App Data)</Label>
-                          <Input id="editableEstimatedDebt" type="number" value={editableEstimatedDebt} onChange={(e) => setEditableEstimatedDebt(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
-                      </div>
-                  </CardContent>
-              </Card>
-              {isInitialOnboarding && (
-                 <Alert>
-                    <Sparkles className="h-4 w-4" />
-                    <AlertTitle>Welcome to AI Financial Planning!</AlertTitle>
-                    <AlertDescription>
-                      Since this looks like your first time creating a plan, the snapshot above might be zero.
-                      Please fill in your income for the new plan below, and tell me about your goals.
-                      I'll then help create your first budget!
-                    </AlertDescription>
-                  </Alert>
-              )}
-
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="text-lg">About Your Income & Timing for This Plan</CardTitle>
-                      <CardDescription>Let's set the stage for your new budget.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                      <div>
-                          <Label htmlFor="planIncome">What's your approximate monthly income we'll be working with for this plan? (Required if snapshot income is 0)</Label>
-                          <Input id="planIncome" type="number" placeholder="e.g., 4000" value={granularGoals.planIncome} onChange={(e) => handleGranularGoalChange('planIncome', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
-                          <p className="text-xs text-muted-foreground mt-1">If this is for a new plan, enter the income you want me to use. Otherwise, I'll use the snapshot income if this is blank.</p>
-                      </div>
-                      <div>
-                          <Label htmlFor="planStartMonth">When would you ideally like this new financial chapter to begin?</Label>
-                          <Input id="planStartMonth" placeholder="e.g., next month, or August 2025" value={granularGoals.planStartMonth} onChange={(e) => handleGranularGoalChange('planStartMonth', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
-                      </div>
-                      <div>
-                          <Label htmlFor="familySize" className="flex items-center">
-                            <Users className="mr-2 h-4 w-4 text-muted-foreground"/>
-                            How many people (including yourself!) are we budgeting for in your household? (Optional)
-                          </Label>
-                          <Input id="familySize" type="number" placeholder="e.g., 1, 2, 4" value={granularGoals.familySize} onChange={(e) => handleGranularGoalChange('familySize', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
-                      </div>
-                  </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">What Are Your Financial Dreams & Priorities?</CardTitle>
-                    <CardDescription>Thinking about your goals helps us build a plan that truly works for you. Select common goals or specify your own.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div>
-                        <Label className="text-base font-medium mb-2 block">What are you aiming to save for?</Label>
-                        <div className="space-y-2">
-                            {SAVINGS_GOAL_PRESETS.map(goal => (
-                                <div key={goal.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={`savings-${goal.id}`}
-                                    checked={granularGoals.savingsGoalOptions.includes(goal.label)}
-                                    onCheckedChange={() => handleCheckboxChange('savingsGoalOptions', goal.label)}
-                                    disabled={isLoadingAi}
-                                />
-                                <Label htmlFor={`savings-${goal.id}`} className="text-sm font-normal">
-                                    {goal.label}
-                                </Label>
+                      <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">What Are Your Financial Dreams & Priorities?</CardTitle>
+                            <CardDescription>Thinking about your goals helps us build a plan that truly works for you. Select common goals or specify your own.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div>
+                                <Label className="text-base font-medium mb-2 block">What are you aiming to save for?</Label>
+                                <div className="space-y-2">
+                                    {SAVINGS_GOAL_PRESETS.map(goal => (
+                                        <div key={goal.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`savings-${goal.id}`}
+                                            checked={granularGoals.savingsGoalOptions.includes(goal.label)}
+                                            onCheckedChange={() => handleCheckboxChange('savingsGoalOptions', goal.label)}
+                                            disabled={isLoadingAi}
+                                        />
+                                        <Label htmlFor={`savings-${goal.id}`} className="text-sm font-normal">
+                                            {goal.label}
+                                        </Label>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                        <Textarea 
-                            id="savingsGoalOtherText" 
-                            placeholder="Other savings goals or specific details (e.g., 'Save $2000 for a trip to Italy in December')" 
-                            value={granularGoals.savingsGoalOtherText} 
-                            onChange={(e) => handleGranularGoalChange('savingsGoalOtherText', e.target.value)} 
-                            disabled={isLoadingAi} 
-                            className="mt-3" 
-                            rows={2}
-                        />
-                    </div>
-                    
-                    <div>
-                        <Label htmlFor="debtGoalText" className="text-base font-medium">Are there any debts you're focused on reducing or paying off?</Label>
-                        <Textarea id="debtGoalText" placeholder="e.g., Pay an extra $100 on my Visa card (balance $3000). Or, pay off student loan in 5 years." value={granularGoals.debtGoalText} onChange={(e) => handleGranularGoalChange('debtGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
-                    </div>
-                    <div>
-                        <Label htmlFor="purchaseGoalText" className="text-base font-medium">Any significant purchases or financial milestones on your mind?</Label>
-                        <Textarea id="purchaseGoalText" placeholder="e.g., Save for a new computer, $1500 in 6 months. Or, plan for a car down payment of $5000 in 2 years." value={granularGoals.purchaseGoalText} onChange={(e) => handleGranularGoalChange('purchaseGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
-                    </div>
-
-                    <div>
-                        <Label className="text-base font-medium mb-2 block">Are there specific areas where you'd like to try and reduce spending?</Label>
-                        <div className="space-y-2">
-                            {CUTBACK_AREA_PRESETS.map(area => (
-                                <div key={area.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={`cutback-${area.id}`}
-                                    checked={granularGoals.cutbackGoalOptions.includes(area.label)}
-                                    onCheckedChange={() => handleCheckboxChange('cutbackGoalOptions', area.label)}
+                                <Textarea
+                                    id="savingsGoalOtherText"
+                                    placeholder="Other savings goals or specific details (e.g., 'Save $2000 for a trip to Italy in December')"
+                                    value={granularGoals.savingsGoalOtherText}
+                                    onChange={(e) => handleGranularGoalChange('savingsGoalOtherText', e.target.value)}
                                     disabled={isLoadingAi}
+                                    className="mt-3"
+                                    rows={2}
                                 />
-                                <Label htmlFor={`cutback-${area.id}`} className="text-sm font-normal">
-                                    {area.label}
-                                </Label>
+                            </div>
+
+                            <div>
+                                <Label htmlFor="debtGoalText" className="text-base font-medium">Are there any debts you're focused on reducing or paying off?</Label>
+                                <Textarea id="debtGoalText" placeholder="e.g., Pay an extra $100 on my Visa card (balance $3000). Or, pay off student loan in 5 years." value={granularGoals.debtGoalText} onChange={(e) => handleGranularGoalChange('debtGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
+                            </div>
+                            <div>
+                                <Label htmlFor="purchaseGoalText" className="text-base font-medium">Any significant purchases or financial milestones on your mind?</Label>
+                                <Textarea id="purchaseGoalText" placeholder="e.g., Save for a new computer, $1500 in 6 months. Or, plan for a car down payment of $5000 in 2 years." value={granularGoals.purchaseGoalText} onChange={(e) => handleGranularGoalChange('purchaseGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
+                            </div>
+
+                            <div>
+                                <Label className="text-base font-medium mb-2 block">Are there specific areas where you'd like to try and reduce spending?</Label>
+                                <div className="space-y-2">
+                                    {CUTBACK_AREA_PRESETS.map(area => (
+                                        <div key={area.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`cutback-${area.id}`}
+                                            checked={granularGoals.cutbackGoalOptions.includes(area.label)}
+                                            onCheckedChange={() => handleCheckboxChange('cutbackGoalOptions', area.label)}
+                                            disabled={isLoadingAi}
+                                        />
+                                        <Label htmlFor={`cutback-${area.id}`} className="text-sm font-normal">
+                                            {area.label}
+                                        </Label>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                         <Textarea 
-                            id="cutbackGoalOtherText" 
-                            placeholder="Other areas to cut back or specific details (e.g., 'Reduce coffee shop visits to once a week')" 
-                            value={granularGoals.cutbackGoalOtherText} 
-                            onChange={(e) => handleGranularGoalChange('cutbackGoalOtherText', e.target.value)} 
-                            disabled={isLoadingAi} 
-                            className="mt-3" 
-                            rows={2}
-                        />
-                    </div>
+                                 <Textarea
+                                    id="cutbackGoalOtherText"
+                                    placeholder="Other areas to cut back or specific details (e.g., 'Reduce coffee shop visits to once a week')"
+                                    value={granularGoals.cutbackGoalOtherText}
+                                    onChange={(e) => handleGranularGoalChange('cutbackGoalOtherText', e.target.value)}
+                                    disabled={isLoadingAi}
+                                    className="mt-3"
+                                    rows={2}
+                                />
+                            </div>
 
-                    <div>
-                        <Label htmlFor="otherGoalText" className="text-base font-medium">Anything else important for your financial plan?</Label>
-                        <Textarea id="otherGoalText" placeholder="e.g., 'My previous month's budget felt too strict.' or 'Can we increase travel to $Y?' or 'Help me understand why X is suggested.'" value={granularGoals.otherGoalText} onChange={(e) => handleGranularGoalChange('otherGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={3}/>
-                    </div>
-                </CardContent>
-              </Card>
+                            <div>
+                                <Label htmlFor="otherGoalText" className="text-base font-medium">Anything else important for your financial plan?</Label>
+                                <Textarea id="otherGoalText" placeholder="e.g., 'My previous month's budget felt too strict.' or 'Can we increase travel to $Y?' or 'Help me understand why X is suggested.'" value={granularGoals.otherGoalText} onChange={(e) => handleGranularGoalChange('otherGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={3}/>
+                            </div>
+                        </CardContent>
+                      </Card>
 
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="text-lg">Want Even More Personalized Advice? <span className="text-xs text-muted-foreground">(Optional, Max 5 Files)</span></CardTitle>
-                      <CardDescription>If you have recent bank statements or spending summaries (images or PDFs), sharing them helps me understand your current habits to give smarter suggestions.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                      <Input
-                          id="statementUpload"
-                          type="file"
-                          accept="image/*,application/pdf"
-                          multiple
-                          ref={statementFileInputRef}
-                          onChange={handleStatementFileChange}
-                          className="hidden"
-                          disabled={isLoadingAi || statementFiles.length >= 5}
-                      />
-                      <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => statementFileInputRef.current?.click()}
-                          disabled={isLoadingAi || statementFiles.length >= 5}
-                          className="w-full"
-                      >
-                          <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File(s)
-                      </Button>
-                      {statementFiles.length >= 5 && <p className="text-xs text-destructive text-center">Maximum of 5 files reached.</p>}
-                      {statementFiles.length > 0 && (
-                          <div className="mt-4 space-y-3">
-                          <div className="flex justify-between items-center">
-                              <Label className="text-sm font-medium">Selected Files ({statementFiles.length}):</Label>
-                              <Button variant="ghost" size="sm" onClick={handleClearAllStatementFiles} disabled={isLoadingAi} className="text-xs h-7">
-                              <Trash2 className="mr-1 h-3 w-3" /> Clear All
+                      <Card>
+                          <CardHeader>
+                              <CardTitle className="text-lg">Want Even More Personalized Advice? <span className="text-xs text-muted-foreground">(Optional, Max 5 Files)</span></CardTitle>
+                              <CardDescription>If you have recent bank statements or spending summaries (images or PDFs), sharing them helps me understand your current habits to give smarter suggestions.</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                              <Input
+                                  id="statementUpload"
+                                  type="file"
+                                  accept="image/*,application/pdf"
+                                  multiple
+                                  ref={statementFileInputRef}
+                                  onChange={handleStatementFileChange}
+                                  className="hidden"
+                                  disabled={isLoadingAi || statementFiles.length >= 5}
+                              />
+                              <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => statementFileInputRef.current?.click()}
+                                  disabled={isLoadingAi || statementFiles.length >= 5}
+                                  className="w-full"
+                              >
+                                  <UploadCloud className="mr-2 h-4 w-4" /> Select Statement File(s)
                               </Button>
-                          </div>
-                          <ScrollArea className="h-40 border rounded-md p-3 bg-muted/20">
-                              <ul className="space-y-2">
-                              {statementPreviewDetails.map((detail, index) => (
-                                  <li key={index} className="flex items-center justify-between text-xs p-2 bg-background rounded-md shadow">
-                                  <div className="flex items-center space-x-2 overflow-hidden flex-1">
-                                      {detail.type.startsWith('image/') && detail.dataUri ? (
-                                      <div className="relative w-12 h-12 border rounded-sm overflow-hidden bg-muted shrink-0">
-                                          <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="financial document"/>
-                                      </div>
-                                      ) : detail.type === 'application/pdf' ? (
-                                      <FileText className="h-8 w-8 text-destructive shrink-0" />
-                                      ) : <Paperclip className="h-6 w-6 text-muted-foreground shrink-0"/> }
-                                      <span className="font-medium truncate flex-grow" title={detail.name}>{detail.name}</span>
+                              {statementFiles.length >= 5 && <p className="text-xs text-destructive text-center">Maximum of 5 files reached.</p>}
+                              {statementFiles.length > 0 && (
+                                  <div className="mt-4 space-y-3">
+                                  <div className="flex justify-between items-center">
+                                      <Label className="text-sm font-medium">Selected Files ({statementFiles.length}):</Label>
+                                      <Button variant="ghost" size="sm" onClick={handleClearAllStatementFiles} disabled={isLoadingAi} className="text-xs h-7">
+                                      <Trash2 className="mr-1 h-3 w-3" /> Clear All
+                                      </Button>
                                   </div>
-                                  <Button variant="ghost" size="icon" onClick={() => handleRemoveStatementFile(index)} disabled={isLoadingAi} className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2">
-                                      <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                  </li>
-                              ))}
-                              </ul>
-                          </ScrollArea>
-                          </div>
+                                  <ScrollArea className="h-40 border rounded-md p-3 bg-muted/20">
+                                      <ul className="space-y-2">
+                                      {statementPreviewDetails.map((detail, index) => (
+                                          <li key={index} className="flex items-center justify-between text-xs p-2 bg-background rounded-md shadow">
+                                          <div className="flex items-center space-x-2 overflow-hidden flex-1">
+                                              {detail.type.startsWith('image/') && detail.dataUri ? (
+                                              <div className="relative w-12 h-12 border rounded-sm overflow-hidden bg-muted shrink-0">
+                                                  <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="financial document"/>
+                                              </div>
+                                              ) : detail.type === 'application/pdf' ? (
+                                              <FileText className="h-8 w-8 text-destructive shrink-0" />
+                                              ) : <Paperclip className="h-6 w-6 text-muted-foreground shrink-0"/> }
+                                              <span className="font-medium truncate flex-grow" title={detail.name}>{detail.name}</span>
+                                          </div>
+                                          <Button variant="ghost" size="icon" onClick={() => handleRemoveStatementFile(index)} disabled={isLoadingAi} className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 shrink-0 ml-2">
+                                              <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                          </li>
+                                      ))}
+                                      </ul>
+                                  </ScrollArea>
+                                  </div>
+                              )}
+                          </CardContent>
+                      </Card>
+
+                      <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || (!granularGoals.planIncome.trim() && parseFloat(editableCurrentIncome) === 0))} className="w-full py-3 text-base font-semibold">
+                        {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
+                        Get AI Budget Suggestions
+                      </Button>
+
+                      {aiError && (
+                        <Alert variant="destructive" className="mt-4">
+                            <XCircle className="h-4 w-4"/>
+                            <AlertTitle>AI Error</AlertTitle>
+                            <AlertDescription>{aiError}</AlertDescription>
+                        </Alert>
                       )}
-                  </CardContent>
-              </Card>
-
-              <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || (!granularGoals.planIncome.trim() && parseFloat(editableCurrentIncome) === 0))} className="w-full py-3 text-base font-semibold">
-                {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
-                Get AI Budget Suggestions
-              </Button>
-
-              {aiError && (
-                <Alert variant="destructive" className="mt-4">
-                    <XCircle className="h-4 w-4"/>
-                    <AlertTitle>AI Error</AlertTitle>
-                    <AlertDescription>{aiError}</AlertDescription>
-                </Alert>
-              )}
-          </div>
-        </ScrollArea>
-        </main>
-    </div>
+                  </div>
+                </ScrollArea>
+                )}
+          </main>
+        </div>
+      {/* End of Main Container */}
+    </>
   );
 }

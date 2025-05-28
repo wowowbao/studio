@@ -113,7 +113,7 @@ Based on ALL the information above (goals, income context, debt, savings contrib
     -   If the user states an urgent need for a large purchase (e.g., "I need a new PC or I can't work"), acknowledge this urgency.
 
 2.  'financialAdvice': Detailed, actionable, empathetic financial advice, and **explanations for your budget choices**.
-    -   **Explain Key Budget Decisions:** For significant categories, or where the budget might differ from what a user might expect, briefly explain the reasoning. For example, "Your 'Dining Out' budget is suggested at $X to help you meet your goal of saving $Y this month, while still allowing for some enjoyment. This is based on your income of $Z, household size of {{familySize | default:1}}, and past spending patterns (if available)."
+    -   **Explain Key Budget Decisions:** For significant categories, or where the budget might differ from what a user might expect, briefly explain the reasoning. For example, "Your 'Dining Out' budget is suggested at $X to help you meet your goal of saving $Y this month, while still allowing for some enjoyment. This is based on your income of $Z, household size of {{#if familySize}}{{familySize}}{{else}}1{{/if}}, and past spending patterns (if available)."
     -   **Address User's Questions/Refinements:** If 'userGoals' text contains explicit questions about previous suggestions or requests for changes, address these directly. Explain the impact of requested changes on the overall budget and other goals.
     -   Directly address how 'suggestedCategories' help achieve their stated goals.
     -   If they have a large purchase goal, explain how the budget helps save towards it. Suggest realistic timelines.
@@ -184,6 +184,8 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
       }
       
       if (output.incomeBasisForBudget === undefined || output.incomeBasisForBudget === null) {
+          // If AI didn't set incomeBasisForBudget, default to the currentIncome provided as input
+          // This ensures the review page always has an income to display for calculations
           output.incomeBasisForBudget = input.currentIncome; 
       }
 
@@ -192,12 +194,9 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
       console.error("Error in prepareNextMonthBudgetFlow:", e);
       return {
         financialAdvice: "An unexpected error occurred while preparing your budget. Please try again later.",
-        incomeBasisForBudget: input.currentIncome, 
+        incomeBasisForBudget: input.currentIncome, // Fallback income basis
         aiError: e.message || 'An unexpected error occurred during AI processing.'
       };
     }
   }
 );
-
-
-

@@ -57,9 +57,9 @@ export default function PrepareBudgetPage() {
   const [aiError, setAiError] = useState<string | null>(null);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [currentIncomeForDisplay, setCurrentIncomeForDisplay] = useState(0);
-  const [currentActualSavingsForDisplay, setCurrentActualSavingsForDisplay] = useState(0);
-  const [currentEstimatedDebtForDisplay, setCurrentEstimatedDebtForDisplay] = useState(0);
+  const [editableCurrentIncome, setEditableCurrentIncome] = useState<string>("0");
+  const [editableActualSavings, setEditableActualSavings] = useState<string>("0");
+  const [editableEstimatedDebt, setEditableEstimatedDebt] = useState<string>("0");
 
   const isInitialOnboarding = !currentMonthData || Object.keys(currentMonthData).length === 0;
 
@@ -77,6 +77,7 @@ export default function PrepareBudgetPage() {
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
   useEffect(() => {
+    // Reset form fields when the page effectively loads or is reset
     setIsLoadingAi(false); 
     setAiError(null);
     setStatementFiles([]);
@@ -94,8 +95,6 @@ export default function PrepareBudgetPage() {
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
-  // This effect should run when the page initially loads or when explicitly cleared.
-  // It doesn't need a dependency on initialMonthId if we want the form cleared when user navigates to this page.
   }, []); 
 
   useEffect(() => {
@@ -104,19 +103,19 @@ export default function PrepareBudgetPage() {
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
 
       const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
-      setCurrentIncomeForDisplay(totalIncome);
+      setEditableCurrentIncome(totalIncome.toFixed(2));
 
       const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
       const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-      setCurrentActualSavingsForDisplay(actualSavingsContribution);
+      setEditableActualSavings(actualSavingsContribution.toFixed(2));
       
       const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
       const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-      setCurrentEstimatedDebtForDisplay(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
+      setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
     } else { 
-      setCurrentIncomeForDisplay(0);
-      setCurrentActualSavingsForDisplay(0);
-      setCurrentEstimatedDebtForDisplay(0);
+      setEditableCurrentIncome("0");
+      setEditableActualSavings("0");
+      setEditableEstimatedDebt("0");
     }
   }, [currentMonthData]);
 
@@ -200,7 +199,7 @@ export default function PrepareBudgetPage() {
 
   const handleGetInitialAiSuggestions = async () => {
     const userGoalsString = constructUserGoalsString();
-    if (!granularGoals.planIncome.trim() && isInitialOnboarding) { // Only strictly require income if it's the very first onboarding
+    if (!granularGoals.planIncome.trim() && isInitialOnboarding) { 
       setAiError("Please provide your approximate monthly income for the new plan.");
       toast({ title: "Income Required", description: "Please provide your planned income to get started.", variant: "destructive" });
       return;
@@ -210,15 +209,15 @@ export default function PrepareBudgetPage() {
 
     let baseMonthIdForAI = initialMonthId || getYearMonthFromDate(new Date());
     
-    let incomeForAI = currentIncomeForDisplay; // Default to display income (app data for current month)
-    let savingsForAI = currentActualSavingsForDisplay;
-    let debtForAI = currentEstimatedDebtForDisplay;
+    const incomeForAI = parseFloat(editableCurrentIncome) || 0;
+    const savingsForAI = parseFloat(editableActualSavings) || 0;
+    const debtForAI = parseFloat(editableEstimatedDebt) || 0;
     
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
-      userGoals: userGoalsString, // This string now contains the planned income if provided by user
+      userGoals: userGoalsString,
       currentMonthId: baseMonthIdForAI,
-      currentIncome: incomeForAI, // This is income from current month's APP DATA
+      currentIncome: incomeForAI, 
       currentSavingsTotal: savingsForAI, 
       currentCCDebtTotal: debtForAI,
     };
@@ -234,7 +233,6 @@ export default function PrepareBudgetPage() {
           granularGoals, 
           statementFileNames: statementPreviewDetails.map(f => f.name),
           currentMonthId: baseMonthIdForAI,
-          // These are from app data for the SOURCE month, AI output 'incomeBasisForBudget' will be used on review.
           currentIncome: incomeForAI, 
           currentActualSavings: savingsForAI,
           currentEstimatedDebt: debtForAI,
@@ -274,6 +272,23 @@ export default function PrepareBudgetPage() {
     setAiError(null);
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
+    }
+    // Re-initialize editable snapshot from currentMonthData or to 0
+    if (currentMonthData) {
+        const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
+        const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+        const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
+        setEditableCurrentIncome(totalIncome.toFixed(2));
+        const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+        const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+        setEditableActualSavings(actualSavingsContribution.toFixed(2));
+        const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+        const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+        setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
+    } else {
+        setEditableCurrentIncome("0");
+        setEditableActualSavings("0");
+        setEditableEstimatedDebt("0");
     }
     toast({title: "Form Reset", description: "Please enter your goals and upload statements again."});
   };
@@ -324,38 +339,36 @@ export default function PrepareBudgetPage() {
         <ScrollArea className="h-full pr-2"> 
           <div className="space-y-8 pb-8">
               
-              {!isInitialOnboarding && currentMonthData && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
-                        <CardDescription>This read-only snapshot from {getFormattedMonthTitle(currentMonthData.id)} helps me plan for {nextMonthToPrepFor}. If your situation will differ, please note it in the goals section below (e.g., 'My income for the new plan will be $XXXX').</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                            <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
-                            <p className="text-xs text-muted-foreground">Income This Month (App Data)</p>
-                            <p className="font-semibold text-lg">${currentIncomeForDisplay.toFixed(2)}</p>
-                        </div>
-                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                            <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
-                            <p className="text-xs text-muted-foreground">Actual Savings This Month (App Data)</p>
-                            <p className="font-semibold text-lg">${currentActualSavingsForDisplay.toFixed(2)}</p>
-                        </div>
-                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                            <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
-                            <p className="text-xs text-muted-foreground">Est. CC Debt End of Month (App Data)</p>
-                            <p className="font-semibold text-lg">${currentEstimatedDebtForDisplay.toFixed(2)}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-              )}
-              {isInitialOnboarding && (
+              <Card>
+                  <CardHeader>
+                      <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
+                      <CardDescription>
+                        This snapshot from {currentMonthData ? getFormattedMonthTitle(currentMonthData.id) : 'your current situation'} helps the AI plan for {nextMonthToPrepFor}. 
+                        Adjust these figures if they don't reflect your true starting point for the plan. If this is your first time, these might be 0.
+                      </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                      <div>
+                          <Label htmlFor="editableCurrentIncome" className="text-xs text-muted-foreground flex items-center"><DollarSign className="h-4 w-4 mr-1 text-green-500"/>Income This Month</Label>
+                          <Input id="editableCurrentIncome" type="number" value={editableCurrentIncome} onChange={(e) => setEditableCurrentIncome(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
+                      </div>
+                      <div>
+                          <Label htmlFor="editableActualSavings" className="text-xs text-muted-foreground flex items-center"><PiggyBank className="h-4 w-4 mr-1 text-blue-500"/>Actual Savings This Month</Label>
+                          <Input id="editableActualSavings" type="number" value={editableActualSavings} onChange={(e) => setEditableActualSavings(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
+                      </div>
+                      <div>
+                          <Label htmlFor="editableEstimatedDebt" className="text-xs text-muted-foreground flex items-center"><CreditCard className="h-4 w-4 mr-1 text-red-500"/>Est. CC Debt End of Month</Label>
+                          <Input id="editableEstimatedDebt" type="number" value={editableEstimatedDebt} onChange={(e) => setEditableEstimatedDebt(e.target.value)} disabled={isLoadingAi} className="mt-1 font-semibold text-base"/>
+                      </div>
+                  </CardContent>
+              </Card>
+              {isInitialOnboarding && !currentMonthData && (
                  <Alert>
                     <Info className="h-4 w-4" />
                     <AlertTitle>Welcome to AI Financial Planning!</AlertTitle>
                     <AlertDescription>
-                      To get started, please answer the questions below. 
-                      Optionally, upload past bank statements for more tailored suggestions.
+                      Since this is your first time, the snapshot above is likely zero. Please fill in your income for the new plan below, and share your goals. 
+                      The AI will then help create your first budget!
                     </AlertDescription>
                   </Alert>
               )}
@@ -469,7 +482,7 @@ export default function PrepareBudgetPage() {
                   </CardContent>
               </Card>
               
-              <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || (!granularGoals.planIncome.trim() && isInitialOnboarding)} className="w-full py-3 text-base font-semibold">
+              <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || (!granularGoals.planIncome.trim() && isInitialOnboarding && !currentMonthData)} className="w-full py-3 text-base font-semibold">
                 {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
                 Get AI Budget Suggestions
               </Button>

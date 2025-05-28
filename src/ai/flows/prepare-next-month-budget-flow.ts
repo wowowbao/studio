@@ -66,7 +66,7 @@ User's Current Financial Context (based on their current month ending '{{current
 - Actual Savings Contributed This Month (Source Data): \${{currentSavingsTotal}}
 - Estimated Total Outstanding Credit Card Debt at end of this month (Source Data): \${{currentCCDebtTotal}}
 {{#if familySize~}}
-- Household Size: {{familySize}} {{pluralize familySize "person" "people"}}. Consider this when suggesting amounts for categories like Groceries, Utilities, or Entertainment.
+- Household Size: {{familySize}}. (If this number is 1, it means one person; otherwise, it means multiple people). Consider this when suggesting amounts for categories like Groceries, Utilities, or Entertainment.
 {{/if~}}
 
 {{#if previousMonthFeedback}}
@@ -200,3 +200,6 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     }
   }
 );
+
+
+    

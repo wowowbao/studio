@@ -1,13 +1,13 @@
 
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { BudgetMonth, BudgetCategory as BudgetCategoryType } from "@/types/budget"; 
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks, FileText, Edit3, Users } from "lucide-react";
+import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks, FileText, Edit3, Users, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { prepareNextMonthBudget, type PrepareBudgetInput, type PrepareBudgetOutput } from "@/ai/flows/prepare-next-month-budget-flow";
@@ -23,10 +23,12 @@ type GranularGoalsForReview = {
     planIncome: string;
     planStartMonth: string;
     familySize: string; 
-    savingsGoalText: string;
+    savingsGoalOptions: string[];
+    savingsGoalOtherText: string;
     debtGoalText: string;
     purchaseGoalText: string;
-    cutbackGoalText: string;
+    cutbackGoalOptions: string[];
+    cutbackGoalOtherText: string;
     otherGoalText: string;
 };
 
@@ -74,26 +76,49 @@ export default function PrepareBudgetReviewPage() {
     setPageIsLoading(false);
   }, [router, toast]);
 
-  const constructUserGoalsStringFromGranular = (granular: GranularGoalsForReview | undefined, additionalRefinement?: string): string => {
+  const constructUserGoalsStringFromGranular = useCallback((granular: GranularGoalsForReview | undefined, additionalRefinement?: string): string => {
     let goals = "";
     if (granular) {
         if (granular.planIncome.trim()) goals += `My income for this plan will be $${granular.planIncome}. `;
         if (granular.planStartMonth.trim()) goals += `I want to start this plan in ${granular.planStartMonth}. `;
         if (granular.familySize.trim()) goals += `This budget is for a household of ${granular.familySize} people. `;
-        if (granular.savingsGoalText.trim()) goals += `Savings goal: ${granular.savingsGoalText}. `;
-        if (granular.debtGoalText.trim()) goals += `Debt repayment goal: ${granular.debtGoalText}. `;
-        if (granular.purchaseGoalText.trim()) goals += `Major purchase goal: ${granular.purchaseGoalText}. `;
-        if (granular.cutbackGoalText.trim()) goals += `I'd like to cut back on: ${granular.cutbackGoalText}. `;
-        if (granular.otherGoalText.trim()) goals += `Other notes: ${granular.otherGoalText}.`;
+        
+        if (granular.savingsGoalOptions && granular.savingsGoalOptions.length > 0) {
+          goals += `Primary savings goals: ${granular.savingsGoalOptions.join(', ')}. `;
+        }
+        if (granular.savingsGoalOtherText && granular.savingsGoalOtherText.trim()) {
+          goals += `Other savings details: ${granular.savingsGoalOtherText}. `;
+        }
+
+        if (granular.debtGoalText && granular.debtGoalText.trim()) goals += `Debt repayment goal: ${granular.debtGoalText}. `;
+        if (granular.purchaseGoalText && granular.purchaseGoalText.trim()) goals += `Major purchase goal: ${granular.purchaseGoalText}. `;
+
+        if (granular.cutbackGoalOptions && granular.cutbackGoalOptions.length > 0) {
+          goals += `I'd like to cut back on: ${granular.cutbackGoalOptions.join(', ')}. `;
+        }
+        if (granular.cutbackGoalOtherText && granular.cutbackGoalOtherText.trim()) {
+          goals += `Other cutback details: ${granular.cutbackGoalOtherText}. `;
+        }
+
+        if (granular.otherGoalText && granular.otherGoalText.trim()) goals += `Other notes or questions: ${granular.otherGoalText}.`;
     }
     if (additionalRefinement && additionalRefinement.trim()) {
         goals += `\n\n--- User Refinement Request/Question for Current Plan ---\n${additionalRefinement.trim()}`;
     }
-    if (goals.length === 0) {
+    if (goals.length === 0 || (granular &&
+        !granular.savingsGoalOptions.length && 
+        !granular.savingsGoalOtherText.trim() &&
+        !granular.debtGoalText.trim() && 
+        !granular.purchaseGoalText.trim() && 
+        !granular.cutbackGoalOptions.length &&
+        !granular.cutbackGoalOtherText.trim() &&
+        !granular.otherGoalText.trim() &&
+        !additionalRefinement?.trim()
+    )) {
         goals = "User has not provided specific financial goals for this refinement.";
     }
     return goals.trim();
-  };
+  }, []);
 
 
   const handleUpdateSuggestions = async () => {
@@ -257,20 +282,22 @@ export default function PrepareBudgetReviewPage() {
 
   const renderGranularGoals = (goals: GranularGoalsForReview | undefined) => {
     if (!goals) return <p className="text-xs italic">No granular goals provided.</p>;
-    const goalItems: {label: string, value: string | number | undefined}[] = [ 
+    const goalItems: {label: string, value: string | number | undefined | string[]}[] = [ 
         {label: "Planned Income for New Plan", value: goals.planIncome ? `$${goals.planIncome}` : "Not specified"},
         {label: "Desired Start Month", value: goals.planStartMonth || "Not specified"},
         {label: "Household Size", value: goals.familySize || (initialInputs?.familySize ? String(initialInputs.familySize) : "Not specified") }, 
-        {label: "Savings Goals", value: goals.savingsGoalText || "Not specified"},
+        {label: "Primary Savings Goals", value: goals.savingsGoalOptions && goals.savingsGoalOptions.length > 0 ? goals.savingsGoalOptions.join(', ') : "Not specified"},
+        {label: "Other Savings Details", value: goals.savingsGoalOtherText || "Not specified"},
         {label: "Debt Repayment Goals", value: goals.debtGoalText || "Not specified"},
         {label: "Major Purchase Goals", value: goals.purchaseGoalText || "Not specified"},
-        {label: "Areas to Cut Back Spending", value: goals.cutbackGoalText || "Not specified"},
+        {label: "Areas to Cut Back Spending", value: goals.cutbackGoalOptions && goals.cutbackGoalOptions.length > 0 ? goals.cutbackGoalOptions.join(', ') : "Not specified"},
+        {label: "Other Cutback Details", value: goals.cutbackGoalOtherText || "Not specified"},
         {label: "Other Notes/General Goals", value: goals.otherGoalText || "Not specified"},
     ];
     return (
         <ul className="space-y-1">
-            {goalItems.filter(item => item.value !== "Not specified" && item.value !== undefined && String(item.value).trim() !== "").map(item => (
-                <li key={item.label}><span className="font-semibold">{item.label}:</span> {item.value}</li>
+            {goalItems.filter(item => item.value && (Array.isArray(item.value) ? item.value.length > 0 : String(item.value).trim() !== "" && item.value !== "Not specified")).map(item => (
+                <li key={item.label}><span className="font-semibold">{item.label}:</span> {Array.isArray(item.value) ? item.value.join(', ') : item.value}</li>
             ))}
         </ul>
     );
@@ -294,7 +321,7 @@ export default function PrepareBudgetReviewPage() {
           <div className="space-y-8 pb-8">
                 <Card className="shadow-lg border-primary/30">
                     <CardHeader>
-                        <CardTitle className="text-xl text-primary">My AI Financial Advisor's Plan for {nextMonthToPrep}</CardTitle>
+                        <CardTitle className="text-xl text-primary flex items-center"><Sparkles className="mr-2 h-6 w-6 text-amber-500" /> My AI Financial Advisor's Plan for {nextMonthToPrep}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <Card className="bg-muted/30">
@@ -414,5 +441,3 @@ export default function PrepareBudgetReviewPage() {
     </div>
   );
 }
-
-    

@@ -37,7 +37,7 @@ export default function HomePage() {
     budgetMonths,
     getBudgetForMonth,
     saveMonthEndFeedback,
-    ensureMonthExists, 
+    // ensureMonthExists, // Removed as per previous fix for infinite loop
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -221,7 +221,7 @@ export default function HomePage() {
 
         <MonthNavigator />
 
-        {!isLoading && !hasAnyBudgetData && !isUserAuthenticated && ( 
+        {!isLoading && !hasAnyBudgetData && ( 
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />

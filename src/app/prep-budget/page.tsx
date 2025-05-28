@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox"; // New import
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, Users, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, XCircle } from "lucide-react"; // Added XCircle
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, Users, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, XCircle, Info, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 import { prepareNextMonthBudget, type PrepareBudgetInput } from "@/ai/flows/prepare-next-month-budget-flow";
@@ -17,19 +18,36 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
 
 // Define specific goal input states
 type GranularGoals = {
   planIncome: string;
   planStartMonth: string;
   familySize: string;
-  savingsGoalText: string;
+  savingsGoalOptions: string[]; // Changed
+  savingsGoalOtherText: string; // New
   debtGoalText: string;
   purchaseGoalText: string;
-  cutbackGoalText: string;
+  cutbackGoalOptions: string[]; // Changed
+  cutbackGoalOtherText: string; // New
   otherGoalText: string;
 };
+
+const SAVINGS_GOAL_PRESETS = [
+  { id: "emergency_fund", label: "Build an Emergency Fund" },
+  { id: "vacation", label: "Save for a Vacation" },
+  { id: "down_payment", label: "Save for a Down Payment (e.g., house, car)" },
+  { id: "large_purchase", label: "Plan a Large Purchase (e.g., electronics, furniture)" },
+  { id: "retirement", label: "Invest for Retirement" },
+];
+
+const CUTBACK_AREA_PRESETS = [
+  { id: "dining_out", label: "Dining Out / Takeaways" },
+  { id: "subscriptions", label: "Subscriptions (e.g., streaming, apps)" },
+  { id: "shopping_non_essential", label: "Shopping (non-essential clothes, gadgets)" },
+  { id: "entertainment_outings", label: "Entertainment (outings, events, hobbies)" },
+];
+
 
 export default function PrepareBudgetPage() {
   const { getBudgetForMonth, currentDisplayMonthId: initialMonthId } = useBudget();
@@ -47,10 +65,12 @@ export default function PrepareBudgetPage() {
     planIncome: "",
     planStartMonth: "next month",
     familySize: "",
-    savingsGoalText: "",
+    savingsGoalOptions: [],
+    savingsGoalOtherText: "",
     debtGoalText: "",
     purchaseGoalText: "",
-    cutbackGoalText: "",
+    cutbackGoalOptions: [],
+    cutbackGoalOtherText: "",
     otherGoalText: "",
   });
 
@@ -78,28 +98,28 @@ export default function PrepareBudgetPage() {
     setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
-  useEffect(() => {
-    // This effect ensures the form is reset when the component mounts or if it's an initial onboarding scenario.
+  const resetFormAndSnapshot = useCallback(() => {
     setIsLoadingAi(false);
     setAiError(null);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
     setStatementDataUris([]);
     setGranularGoals({
-        planIncome: "",
-        planStartMonth: "next month",
-        familySize: "",
-        savingsGoalText: "",
-        debtGoalText: "",
-        purchaseGoalText: "",
-        cutbackGoalText: "",
-        otherGoalText: "",
+      planIncome: "",
+      planStartMonth: "next month",
+      familySize: "",
+      savingsGoalOptions: [],
+      savingsGoalOtherText: "",
+      debtGoalText: "",
+      purchaseGoalText: "",
+      cutbackGoalOptions: [],
+      cutbackGoalOtherText: "",
+      otherGoalText: "",
     });
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
 
-    // Initialize editable snapshot based on currentMonthData
     if (currentMonthData) {
       const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
@@ -119,11 +139,27 @@ export default function PrepareBudgetPage() {
       setEditableEstimatedDebt("0");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMonthData]); // Rerun if currentMonthData changes, effectively resetting form with new baseline if navigating months then coming here
+  }, [currentMonthData]); // Dependency on currentMonthData for snapshot reset
 
-  const handleGranularGoalChange = (field: keyof GranularGoals, value: string) => {
+  useEffect(() => {
+    resetFormAndSnapshot();
+  }, [resetFormAndSnapshot]);
+
+
+  const handleGranularGoalChange = (field: keyof GranularGoals, value: string | string[]) => {
     setGranularGoals(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleCheckboxChange = (field: 'savingsGoalOptions' | 'cutbackGoalOptions', checkedValue: string) => {
+    setGranularGoals(prev => {
+      const currentOptions = prev[field] || [];
+      const newOptions = currentOptions.includes(checkedValue)
+        ? currentOptions.filter(v => v !== checkedValue)
+        : [...currentOptions, checkedValue];
+      return { ...prev, [field]: newOptions };
+    });
+  };
+
 
   const handleStatementFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -136,9 +172,8 @@ export default function PrepareBudgetPage() {
       const newPreviewDetailsAccumulator: { name: string; type: string; dataUri?: string }[] = [];
       const newDataUrisAccumulator: string[] = [];
 
-      // Process existing files first for previews/URIs if they were somehow missed
       for (const file of statementFiles) {
-          if (!statementDataUris[statementFiles.indexOf(file)]) { // Only process if URI is missing
+          if (!statementDataUris[statementFiles.indexOf(file)]) { 
             try {
                 const dataUri = await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader();
@@ -155,16 +190,15 @@ export default function PrepareBudgetPage() {
             } catch (error) {
                 console.error("Error reading existing file:", file.name, error);
             }
-          } else { // URI exists, keep existing details
+          } else { 
              const existingDetail = statementPreviewDetails[statementFiles.indexOf(file)];
              if (existingDetail) newPreviewDetailsAccumulator.push(existingDetail);
              const existingUri = statementDataUris[statementFiles.indexOf(file)];
              if (existingUri) newDataUrisAccumulator.push(existingUri);
           }
       }
-      // Process newly added files
       for (const file of newFilesArray) {
-        if (newDataUrisAccumulator.length < 5) { // Check against overall limit
+        if (newDataUrisAccumulator.length < 5) { 
             try {
             const dataUri = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
@@ -221,13 +255,34 @@ export default function PrepareBudgetPage() {
 
     if (granularGoals.familySize.trim()) goals += `This budget is for a household of ${granularGoals.familySize} people. `;
 
-    if (granularGoals.savingsGoalText.trim()) goals += `Savings goal: ${granularGoals.savingsGoalText}. `;
+    if (granularGoals.savingsGoalOptions.length > 0) {
+      goals += `Savings goals: ${granularGoals.savingsGoalOptions.join(', ')}. `;
+    }
+    if (granularGoals.savingsGoalOtherText.trim()) {
+      goals += `Other savings details: ${granularGoals.savingsGoalOtherText}. `;
+    }
+
     if (granularGoals.debtGoalText.trim()) goals += `Debt repayment goal: ${granularGoals.debtGoalText}. `;
     if (granularGoals.purchaseGoalText.trim()) goals += `Major purchase goal: ${granularGoals.purchaseGoalText}. `;
-    if (granularGoals.cutbackGoalText.trim()) goals += `I'd like to cut back on: ${granularGoals.cutbackGoalText}. `;
-    if (granularGoals.otherGoalText.trim()) goals += `Other notes: ${granularGoals.otherGoalText}.`;
 
-    if (goals.length === 0 || (!granularGoals.savingsGoalText.trim() && !granularGoals.debtGoalText.trim() && !granularGoals.purchaseGoalText.trim() && !granularGoals.cutbackGoalText.trim() && !granularGoals.otherGoalText.trim())) {
+    if (granularGoals.cutbackGoalOptions.length > 0) {
+      goals += `I'd like to cut back on: ${granularGoals.cutbackGoalOptions.join(', ')}. `;
+    }
+    if (granularGoals.cutbackGoalOtherText.trim()) {
+      goals += `Other cutback details: ${granularGoals.cutbackGoalOtherText}. `;
+    }
+
+    if (granularGoals.otherGoalText.trim()) goals += `Other notes or questions: ${granularGoals.otherGoalText}.`;
+
+    if (goals.length === 0 || (
+        !granularGoals.savingsGoalOptions.length && 
+        !granularGoals.savingsGoalOtherText.trim() &&
+        !granularGoals.debtGoalText.trim() && 
+        !granularGoals.purchaseGoalText.trim() && 
+        !granularGoals.cutbackGoalOptions.length &&
+        !granularGoals.cutbackGoalOtherText.trim() &&
+        !granularGoals.otherGoalText.trim()
+    )) {
         goals += "User has not provided specific financial goals beyond potentially their income, start month, and family size. Provide general, foundational budgeting advice and suggestions."
     }
     return goals.trim();
@@ -235,8 +290,6 @@ export default function PrepareBudgetPage() {
 
   const handleGetInitialAiSuggestions = async () => {
     const userGoalsString = constructUserGoalsString();
-    // Use editableCurrentIncome for the current month's income context for the AI, if the user hasn't specified a planIncome.
-    // If planIncome IS specified, it will take precedence in the userGoalsString and the AI will pick it up.
     if (!granularGoals.planIncome.trim() && parseFloat(editableCurrentIncome) === 0) {
       setAiError("Please provide your approximate monthly income for the new plan (in the 'About Your Income...' section), or ensure your current month's income snapshot above is set if that's what you intend to use.");
       toast({ title: "Income Required", description: "Please provide your planned income or ensure current income is reflected in the snapshot.", variant: "destructive" });
@@ -246,8 +299,7 @@ export default function PrepareBudgetPage() {
     setAiError(null);
 
     const baseMonthIdForAI = currentMonthData?.id || initialMonthId || getYearMonthFromDate(new Date());
-
-    const incomeForAIContext = parseFloat(editableCurrentIncome) || 0; // This is context from current month
+    const incomeForAIContext = parseFloat(editableCurrentIncome) || 0;
     const savingsForAIContext = parseFloat(editableActualSavings) || 0;
     const debtForAIContext = parseFloat(editableEstimatedDebt) || 0;
     const familySizeForAI = granularGoals.familySize.trim() ? parseInt(granularGoals.familySize, 10) : undefined;
@@ -263,9 +315,9 @@ export default function PrepareBudgetPage() {
 
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
-      userGoals: userGoalsString, // This string now potentially contains the planIncome
+      userGoals: userGoalsString,
       currentMonthId: baseMonthIdForAI,
-      currentIncome: incomeForAIContext, // Income from current month for context
+      currentIncome: incomeForAIContext,
       currentSavingsTotal: savingsForAIContext,
       currentCCDebtTotal: debtForAIContext,
       previousMonthFeedback: previousMonthFeedbackFromSource,
@@ -280,13 +332,13 @@ export default function PrepareBudgetPage() {
       } else {
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
-          granularGoals, // Store the granular goals
+          granularGoals,
           statementFileNames: statementPreviewDetails.map(f => f.name),
           currentMonthId: baseMonthIdForAI,
-          currentIncome: incomeForAIContext, // This is the SOURCE month income
+          currentIncome: incomeForAIContext,
           currentActualSavings: savingsForAIContext,
           currentEstimatedDebt: debtForAIContext,
-          statementDataUris, // Pass the actual URIs for reprocessing if needed
+          statementDataUris,
           previousMonthFeedback: previousMonthFeedbackFromSource,
           familySize: familySizeForAI,
         }));
@@ -308,46 +360,11 @@ export default function PrepareBudgetPage() {
   };
 
   const handleClearAllAndRestart = () => {
-    setIsLoadingAi(false);
-    setStatementFiles([]);
-    setStatementPreviewDetails([]);
-    setStatementDataUris([]);
-    setGranularGoals({
-        planIncome: "",
-        planStartMonth: "next month",
-        familySize: "",
-        savingsGoalText: "",
-        debtGoalText: "",
-        purchaseGoalText: "",
-        cutbackGoalText: "",
-        otherGoalText: "",
-    });
-    setAiError(null);
-    if (statementFileInputRef.current) {
-      statementFileInputRef.current.value = "";
-    }
-
-    // Reset editable snapshot based on currentMonthData
-    if (currentMonthData) {
-        const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
-        const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
-        const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
-        setEditableCurrentIncome(totalIncome.toFixed(2));
-        const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
-        const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-        setEditableActualSavings(actualSavingsContribution.toFixed(2));
-        const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-        const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-        setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
-    } else {
-        setEditableCurrentIncome("0");
-        setEditableActualSavings("0");
-        setEditableEstimatedDebt("0");
-    }
+    resetFormAndSnapshot(); // Use the consolidated reset function
     toast({title: "Form Reset", description: "All inputs cleared. Please enter your goals and upload statements again."});
   };
 
-  if (isLoadingPageData) {
+  if (isLoadingPageData && !currentMonthData) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -395,8 +412,7 @@ export default function PrepareBudgetPage() {
                   <CardHeader>
                       <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
                       <CardDescription>
-                        This is a read-only snapshot from <span className="font-semibold">{getFormattedMonthTitle(sourceMonthForSnapshot)}</span> to help plan for <span className="font-semibold">{nextMonthToPrepFor}</span>.
-                        Adjust these numbers if your starting point for the new plan will be different.
+                        This snapshot helps us set a baseline for your new financial plan. Feel free to adjust these numbers to best reflect your starting point for the plan we're about to create for <span className="font-semibold">{nextMonthToPrepFor}</span>.
                         <span className="block mt-1 text-xs text-muted-foreground">For a completely fresh AI plan, you can set these values to 0 or your new desired baseline.</span>
                       </CardDescription>
                   </CardHeader>
@@ -417,7 +433,7 @@ export default function PrepareBudgetPage() {
               </Card>
               {isInitialOnboarding && (
                  <Alert>
-                    <Info className="h-4 w-4" />
+                    <Sparkles className="h-4 w-4" />
                     <AlertTitle>Welcome to AI Financial Planning!</AlertTitle>
                     <AlertDescription>
                       Since this looks like your first time creating a plan, the snapshot above might be zero.
@@ -454,27 +470,76 @@ export default function PrepareBudgetPage() {
               <Card>
                 <CardHeader>
                     <CardTitle className="text-lg">What Are Your Financial Dreams & Priorities?</CardTitle>
-                    <CardDescription>Thinking about your goals helps us build a plan that truly works for you. No goal is too big or too small! Tell me as much as you can.</CardDescription>
+                    <CardDescription>Thinking about your goals helps us build a plan that truly works for you. Select common goals or specify your own.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                     <div>
-                        <Label htmlFor="savingsGoalText">What are you aiming to save for? (e.g., emergency fund, vacation, down payment? How much, by when?)</Label>
-                        <Textarea id="savingsGoalText" placeholder="e.g., Save $500/month for an emergency fund of $3000. Or, save for a $2000 vacation in 1 year." value={granularGoals.savingsGoalText} onChange={(e) => handleGranularGoalChange('savingsGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
+                        <Label className="text-base font-medium mb-2 block">What are you aiming to save for?</Label>
+                        <div className="space-y-2">
+                            {SAVINGS_GOAL_PRESETS.map(goal => (
+                                <div key={goal.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`savings-${goal.id}`}
+                                    checked={granularGoals.savingsGoalOptions.includes(goal.label)}
+                                    onCheckedChange={() => handleCheckboxChange('savingsGoalOptions', goal.label)}
+                                    disabled={isLoadingAi}
+                                />
+                                <Label htmlFor={`savings-${goal.id}`} className="text-sm font-normal">
+                                    {goal.label}
+                                </Label>
+                                </div>
+                            ))}
+                        </div>
+                        <Textarea 
+                            id="savingsGoalOtherText" 
+                            placeholder="Other savings goals or specific details (e.g., 'Save $2000 for a trip to Italy in December')" 
+                            value={granularGoals.savingsGoalOtherText} 
+                            onChange={(e) => handleGranularGoalChange('savingsGoalOtherText', e.target.value)} 
+                            disabled={isLoadingAi} 
+                            className="mt-3" 
+                            rows={2}
+                        />
                     </div>
+                    
                     <div>
-                        <Label htmlFor="debtGoalText">Are there any debts you're focused on reducing or paying off? (e.g., specific credit card, student loan? Target payment amount?)</Label>
+                        <Label htmlFor="debtGoalText" className="text-base font-medium">Are there any debts you're focused on reducing or paying off?</Label>
                         <Textarea id="debtGoalText" placeholder="e.g., Pay an extra $100 on my Visa card (balance $3000). Or, pay off student loan in 5 years." value={granularGoals.debtGoalText} onChange={(e) => handleGranularGoalChange('debtGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
                     </div>
                     <div>
-                        <Label htmlFor="purchaseGoalText">Any significant purchases or financial milestones on your mind? (e.g., new computer, car, home improvements? Target cost and timeline?)</Label>
+                        <Label htmlFor="purchaseGoalText" className="text-base font-medium">Any significant purchases or financial milestones on your mind?</Label>
                         <Textarea id="purchaseGoalText" placeholder="e.g., Save for a new computer, $1500 in 6 months. Or, plan for a car down payment of $5000 in 2 years." value={granularGoals.purchaseGoalText} onChange={(e) => handleGranularGoalChange('purchaseGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
                     </div>
+
                     <div>
-                        <Label htmlFor="cutbackGoalText">Are there specific areas where you'd like to try and reduce spending?</Label>
-                        <Textarea id="cutbackGoalText" placeholder="e.g., Dining out less, cancel unused subscriptions, reduce online shopping." value={granularGoals.cutbackGoalText} onChange={(e) => handleGranularGoalChange('cutbackGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
+                        <Label className="text-base font-medium mb-2 block">Are there specific areas where you'd like to try and reduce spending?</Label>
+                        <div className="space-y-2">
+                            {CUTBACK_AREA_PRESETS.map(area => (
+                                <div key={area.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`cutback-${area.id}`}
+                                    checked={granularGoals.cutbackGoalOptions.includes(area.label)}
+                                    onCheckedChange={() => handleCheckboxChange('cutbackGoalOptions', area.label)}
+                                    disabled={isLoadingAi}
+                                />
+                                <Label htmlFor={`cutback-${area.id}`} className="text-sm font-normal">
+                                    {area.label}
+                                </Label>
+                                </div>
+                            ))}
+                        </div>
+                         <Textarea 
+                            id="cutbackGoalOtherText" 
+                            placeholder="Other areas to cut back or specific details (e.g., 'Reduce coffee shop visits to once a week')" 
+                            value={granularGoals.cutbackGoalOtherText} 
+                            onChange={(e) => handleGranularGoalChange('cutbackGoalOtherText', e.target.value)} 
+                            disabled={isLoadingAi} 
+                            className="mt-3" 
+                            rows={2}
+                        />
                     </div>
+
                     <div>
-                        <Label htmlFor="otherGoalText">Anything else important for your financial plan? (e.g., questions for the AI, preferred budgeting style, changes from a previous AI plan)</Label>
+                        <Label htmlFor="otherGoalText" className="text-base font-medium">Anything else important for your financial plan?</Label>
                         <Textarea id="otherGoalText" placeholder="e.g., 'My previous month's budget felt too strict.' or 'Can we increase travel to $Y?' or 'Help me understand why X is suggested.'" value={granularGoals.otherGoalText} onChange={(e) => handleGranularGoalChange('otherGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={3}/>
                     </div>
                 </CardContent>
@@ -558,6 +623,3 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
-
-
-    

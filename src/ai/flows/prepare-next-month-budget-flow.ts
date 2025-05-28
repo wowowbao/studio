@@ -35,6 +35,7 @@ const PrepareBudgetInputSchema = z.object({
   currentIncome: z.number().describe("The user's total income for the *current* month from app data. If userGoals specifies a different income for the *next* month or for an initial plan, prioritize that for budgeting and report it in incomeBasisForBudget output. Do NOT create an 'Income' category in your suggestions."),
   currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category). For an initial setup, this might be 0 if no app data exists."),
   currentCCDebtTotal: z.number().describe("The user's current total *outstanding* credit card debt (estimated for end of current month). For an initial setup, this might be 0 or a figure provided in userGoals."),
+  previousMonthFeedback: z.string().optional().describe("Optional: User's feedback on how the previous month's budget felt (e.g., 'too_strict', 'just_right', 'easy'). Use this to adjust the tone/flexibility of the new budget."),
 });
 export type PrepareBudgetInput = z.infer<typeof PrepareBudgetInputSchema>;
 
@@ -65,6 +66,14 @@ User's Current Financial Context (based on their current month ending '{{current
 - Actual Savings Contributed This Month (Source Data): \${{currentSavingsTotal}}
 - Estimated Total Outstanding Credit Card Debt at end of this month (Source Data): \${{currentCCDebtTotal}}
 
+{{#if previousMonthFeedback}}
+User's Feedback on Last Month's Budget: "{{previousMonthFeedback}}"
+- If feedback was 'too_strict', try to build in a bit more flexibility or slightly increase discretionary spending, if possible, while still aiming for their goals.
+- If feedback was 'easy', consider suggesting slightly more aggressive savings or debt repayment, if their goals align.
+- If 'just_right', maintain a similar balance.
+Acknowledge this feedback in your financial advice.
+{{/if}}
+
 User's Financial Goals and Context (this may contain initial goals for a new plan including income and desired start, or questions/refinements based on a previous suggestion from you):
 "{{{userGoals}}}"
 
@@ -81,7 +90,7 @@ No past spending document(s) were provided. Base your budget suggestions primari
 {{/if}}
 
 Your Task:
-Based on ALL the information above (goals, income context, debt, savings contributions, past spending if available, and any specific questions or change requests embedded in their 'userGoals'), provide the following:
+Based on ALL the information above (goals, income context, debt, savings contributions, past spending if available, previous month's feedback if available, and any specific questions or change requests embedded in their 'userGoals'), provide the following:
 
 0.  'incomeBasisForBudget': Determine the income basis for the plan.
     -   If 'userGoals' explicitly state a target income for the plan (e.g., "My income next month will be $X", "My income is $Y", "Plan for an income of $Z"), prioritize that stated income. Report this value in 'incomeBasisForBudget'.
@@ -94,7 +103,7 @@ Based on ALL the information above (goals, income context, debt, savings contrib
     -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym). If userGoals mention specific needs like "rent payment", ensure "Housing" or "Rent" is a category.
     -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category. If the user explicitly asks to change a specific category's budget, try to accommodate this if feasible or explain why it's challenging.
     -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments", suggest meaningful progress on debt, considering 'incomeBasisForBudget' and other goals. If currentCCDebtTotal is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise.
-    -   **Include reasonable allocations for some discretionary spending** (e.g., "Entertainment," "Hobbies," "Personal Care," or a general "Fun Money" category) unless the user *explicitly* states they want to eliminate these or income is extremely constrained. A budget that is too restrictive is hard to maintain.
+    -   **Include reasonable allocations for some discretionary spending** (e.g., "Entertainment," "Hobbies," "Personal Care," or a general "Fun Money" category) unless the user *explicitly* states they want to eliminate these or income is extremely constrained. A budget that is too restrictive is hard to maintain. Consider `previousMonthFeedback` when setting these.
     -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories. However, if their goals require spending cuts, proactively suggest these reductions while still aiming for sustainability.
     -   **The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed 'incomeBasisForBudget'.** If it does, clearly point out the shortfall in 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
     -   If applicable, suggest logical subcategories under broader categories (e.g., Groceries > Produce, Dairy; Utilities > Electricity, Water, Internet; Entertainment > Streaming Services, Movies).
@@ -147,30 +156,25 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
         // Ensure "Savings" and "Credit Card Payments" are consistently named if AI suggests them
         output.suggestedCategories = output.suggestedCategories.map(cat => {
           const nameLower = cat.name.toLowerCase();
-          if (nameLower.includes("savings")) { // More flexible matching
+          if (nameLower.includes("savings")) { 
             return { ...cat, name: "Savings", isSystemCategory: true, subcategories: cat.subcategories || [] }; 
           }
-          if (nameLower.includes("credit card payment")) { // More flexible matching
+          if (nameLower.includes("credit card payment")) { 
             return { ...cat, name: "Credit Card Payments", isSystemCategory: true, subcategories: cat.subcategories || [] };
           }
-          // Ensure non-system categories are explicitly marked
           return { ...cat, isSystemCategory: false, subcategories: cat.subcategories || [] };
         });
 
-        // Ensure system categories are present if not suggested by AI but relevant (e.g., if debt exists)
         const hasSavings = output.suggestedCategories.some(c => c.name === "Savings");
         const hasCCPayments = output.suggestedCategories.some(c => c.name === "Credit Card Payments");
 
         if (!hasSavings) {
             output.suggestedCategories.unshift({ name: "Savings", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
         }
-        if (!hasCCPayments && input.currentCCDebtTotal > 0) { // Only add CC payments if there's debt
-             output.suggestedCategories.push({ name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
-        } else if (!hasCCPayments) { // Always add it, even if budget is 0, for consistency
+        if (!hasCCPayments) { 
              output.suggestedCategories.push({ name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
         }
       } else {
-        // If AI suggests nothing, at least provide system categories as a base
         output.suggestedCategories = [
             { name: "Savings", budgetedAmount: 0, subcategories: [], isSystemCategory: true },
             { name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true }

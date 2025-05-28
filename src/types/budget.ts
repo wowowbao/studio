@@ -37,16 +37,18 @@ export interface BudgetMonth {
   categories: BudgetCategory[];
   isRolledOver?: boolean; // Flag to indicate if unspent budget has been rolled over
   startingCreditCardDebt?: number; // Debt at the start of the month
+  monthEndFeedback?: 'too_strict' | 'just_right' | 'easy' | string; // New field for feedback
 }
 
-export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver' | 'incomes'>> & {
+export type BudgetUpdatePayload = Partial<Omit<BudgetMonth, 'id' | 'year' | 'month' | 'categories' | 'isRolledOver' | 'incomes' | 'monthEndFeedback'>> & {
   categories?: Array<Omit<BudgetCategory, 'id' | 'expenses' > & { id?: string; subcategories?: Array<Omit<SubCategory, 'id' | 'expenses'> & { id?: string; expenses?: SubCategory['expenses'] }>; expenses?: BudgetCategory['expenses'] }>;
   startingCreditCardDebt?: number;
+  monthEndFeedback?: BudgetMonth['monthEndFeedback'];
 };
 
 // Default categories are now only system categories that should exist.
-// User categories will be added by the user or AI setup.
 export const DEFAULT_CATEGORIES: Array<Partial<BudgetCategory>> = [
-  { name: "Savings", isSystemCategory: true, budgetedAmount: 0, expenses: [], subcategories: [] },
-  { name: "Credit Card Payments", isSystemCategory: true, budgetedAmount: 0, expenses: [], subcategories: [] },
+  // User categories will be added by the user or AI setup.
+  // System categories "Savings" and "Credit Card Payments" are handled by ensureSystemCategoryFlags
 ];
+

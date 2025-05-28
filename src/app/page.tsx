@@ -33,7 +33,8 @@ export default function HomePage() {
     currentDisplayMonthId, 
     isLoading: budgetLoading, 
     budgetMonths,
-    getBudgetForMonth, 
+    getBudgetForMonth,
+    saveMonthEndFeedback, // New from useBudget
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -73,6 +74,21 @@ export default function HomePage() {
       setIsMonthEndSummaryModalOpen(true);
     }
   };
+
+  const handleCloseMonthEndSummary = (feedback?: string) => {
+    setIsMonthEndSummaryModalOpen(false);
+    if (feedback && monthEndSummaryData) {
+      saveMonthEndFeedback(monthEndSummaryData.id, feedback);
+    }
+    // Refresh monthEndSummaryData if month was rolled over to reflect feedback saved
+    const updatedData = getBudgetForMonth(currentDisplayMonthId);
+    if (updatedData) { 
+        setMonthEndSummaryData(updatedData);
+    } else {
+        setMonthEndSummaryData(undefined); 
+    }
+  };
+
 
   const isLoading = authLoading || budgetLoading;
 
@@ -314,15 +330,7 @@ export default function HomePage() {
           {monthEndSummaryData && (
             <MonthEndSummaryModal
               isOpen={isMonthEndSummaryModalOpen}
-              onClose={() => {
-                setIsMonthEndSummaryModalOpen(false);
-                const updatedData = getBudgetForMonth(currentDisplayMonthId);
-                if (updatedData && updatedData.isRolledOver) { 
-                  setMonthEndSummaryData(updatedData);
-                } else {
-                  setMonthEndSummaryData(undefined); 
-                }
-              }}
+              onClose={handleCloseMonthEndSummary}
               budgetMonth={monthEndSummaryData}
             />
           )}

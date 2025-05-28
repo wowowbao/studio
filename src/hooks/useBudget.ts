@@ -1,7 +1,7 @@
 
 "use client";
 import type { BudgetMonth, BudgetCategory, BudgetUpdatePayload, SubCategory, IncomeEntry } from '@/types/budget';
-import type { PrepareBudgetOutput } from '@/ai/flows/prepare-next-month-budget-flow'; // New import
+import type { PrepareBudgetOutput } from '@/ai/flows/prepare-next-month-budget-flow'; 
 import { useContext, createContext } from 'react';
 
 interface BudgetContextType {
@@ -23,6 +23,7 @@ interface BudgetContextType {
   updateCategoryInMonth: (yearMonthId: string, categoryId: string, updatedCategoryData: Partial<Omit<BudgetCategory, 'subcategories' | 'isSystemCategory' | 'id' | 'expenses'>>) => void;
   deleteCategoryFromMonth: (yearMonthId: string, categoryId: string) => void;
   rolloverUnspentBudget: (yearMonthId: string) => { success: boolean; message: string };
+  saveMonthEndFeedback: (yearMonthId: string, feedback: string) => void; // New function
   addSubCategory: (monthId: string, parentCategoryId: string, subCategoryName: string, subCategoryBudget: number) => void;
   updateSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string, newName: string, newBudget: number) => void;
   deleteSubCategory: (monthId: string, parentCategoryId: string, subCategoryId: string) => void;
@@ -30,9 +31,8 @@ interface BudgetContextType {
     targetMonthId: string, 
     suggestedBudgetCategories: PrepareBudgetOutput['suggestedCategories'],
     incomeForTargetMonth: number,
-    startingCCDebtForCurrentMonth: number,
-    ccPaymentsMadeInCurrentMonth: number
-  ) => void; // New function
+    startingCCDebtForTargetMonth: number
+  ) => void; 
 }
 
 export const BudgetContext = createContext<BudgetContextType | undefined>(undefined);

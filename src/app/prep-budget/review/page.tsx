@@ -30,17 +30,18 @@ type GranularGoalsForReview = {
 };
 
 interface StoredAIPrepData {
-    granularGoals: GranularGoalsForReview; // Updated to store granular goals
+    granularGoals: GranularGoalsForReview; 
     statementFileNames: string[];
     currentMonthId: string;
-    currentIncome: number; // Income from app data for the source month
-    currentActualSavings: number; // Actual savings from app data for the source month
-    currentEstimatedDebt: number; // Estimated debt from app data for the source month
-    statementDataUris?: string[]; 
+    currentIncome: number; 
+    currentActualSavings: number; 
+    currentEstimatedDebt: number; 
+    statementDataUris?: string[];
+    previousMonthFeedback?: string; // Added to store this context
 }
 
 export default function PrepareBudgetReviewPage() {
-  const { applyAiGeneratedBudget, setCurrentDisplayMonthId } = useBudget();
+  const { applyAiGeneratedBudget, setCurrentDisplayMonthId, getBudgetForMonth } = useBudget();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -71,18 +72,26 @@ export default function PrepareBudgetReviewPage() {
     setPageIsLoading(false);
   }, [router, toast]);
 
-  const constructUserGoalsStringFromGranular = (granular: GranularGoalsForReview | undefined): string => {
-    if (!granular) return "User did not provide detailed goals for this refinement.";
+  const constructUserGoalsStringFromGranular = (granular: GranularGoalsForReview | undefined, additionalRefinement?: string): string => {
     let goals = "";
-    if (granular.planIncome.trim()) goals += `My income for this plan will be $${granular.planIncome}. `;
-    if (granular.planStartMonth.trim()) goals += `I want to start this plan in ${granular.planStartMonth}. `;
-    if (granular.savingsGoalText.trim()) goals += `Savings goal: ${granular.savingsGoalText}. `;
-    if (granular.debtGoalText.trim()) goals += `Debt repayment goal: ${granular.debtGoalText}. `;
-    if (granular.purchaseGoalText.trim()) goals += `Major purchase goal: ${granular.purchaseGoalText}. `;
-    if (granular.cutbackGoalText.trim()) goals += `I'd like to cut back on: ${granular.cutbackGoalText}. `;
-    if (granular.otherGoalText.trim()) goals += `Other notes: ${granular.otherGoalText}.`;
+    if (granular) {
+        if (granular.planIncome.trim()) goals += `My income for this plan will be $${granular.planIncome}. `;
+        if (granular.planStartMonth.trim()) goals += `I want to start this plan in ${granular.planStartMonth}. `;
+        if (granular.savingsGoalText.trim()) goals += `Savings goal: ${granular.savingsGoalText}. `;
+        if (granular.debtGoalText.trim()) goals += `Debt repayment goal: ${granular.debtGoalText}. `;
+        if (granular.purchaseGoalText.trim()) goals += `Major purchase goal: ${granular.purchaseGoalText}. `;
+        if (granular.cutbackGoalText.trim()) goals += `I'd like to cut back on: ${granular.cutbackGoalText}. `;
+        if (granular.otherGoalText.trim()) goals += `Other notes: ${granular.otherGoalText}.`;
+    }
+    if (additionalRefinement && additionalRefinement.trim()) {
+        goals += `\n\n--- User Refinement Request/Question for Current Plan ---\n${additionalRefinement.trim()}`;
+    }
+    if (goals.length === 0) {
+        goals = "User has not provided specific financial goals for this refinement.";
+    }
     return goals.trim();
   };
+
 
   const handleUpdateSuggestions = async () => {
     if (!initialInputs) {
@@ -98,16 +107,16 @@ export default function PrepareBudgetReviewPage() {
     setAiError(null);
 
     // Combine original granular goals with the new refinement text
-    const originalGoalsString = constructUserGoalsStringFromGranular(initialInputs.granularGoals);
-    const updatedUserGoalsForAI = `${originalGoalsString}\n\n--- User Refinement Request for Current Plan ---\n${refinementText}`;
+    const updatedUserGoalsForAI = constructUserGoalsStringFromGranular(initialInputs.granularGoals, refinementText);
 
     const input: PrepareBudgetInput = {
       statementDataUris: initialInputs.statementDataUris, 
-      userGoals: updatedUserGoalsForAI, // Send the combined goals string
+      userGoals: updatedUserGoalsForAI, 
       currentMonthId: initialInputs.currentMonthId,
       currentIncome: initialInputs.currentIncome, 
       currentSavingsTotal: initialInputs.currentActualSavings,
       currentCCDebtTotal: initialInputs.currentEstimatedDebt,
+      previousMonthFeedback: initialInputs.previousMonthFeedback, // Pass original previous month feedback
     };
 
     try {
@@ -150,7 +159,7 @@ export default function PrepareBudgetReviewPage() {
       nextMonthId,
       currentSuggestions.suggestedCategories,
       currentSuggestions.incomeBasisForBudget, 
-      initialInputs.currentEstimatedDebt
+      initialInputs.currentEstimatedDebt // This is the debt at end of SOURCE month
     );
 
     toast({
@@ -245,7 +254,8 @@ export default function PrepareBudgetReviewPage() {
 
   const nextMonthToPrep = getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(initialInputs.currentMonthId).setMonth(parseYearMonth(initialInputs.currentMonthId).getMonth() + 1))));
 
-  const renderGranularGoals = (goals: GranularGoalsForReview) => {
+  const renderGranularGoals = (goals: GranularGoalsForReview | undefined) => {
+    if (!goals) return <p className="text-xs italic">No granular goals provided.</p>;
     const goalItems: {label: string, value: string}[] = [
         {label: "Planned Income for New Plan", value: goals.planIncome ? `$${goals.planIncome}` : "Not specified"},
         {label: "Desired Start Month", value: goals.planStartMonth || "Not specified"},
@@ -298,6 +308,7 @@ export default function PrepareBudgetReviewPage() {
                                <p><span className="font-semibold">Source Month Income (App Data):</span> ${initialInputs.currentIncome.toFixed(2)}</p>
                                <p><span className="font-semibold">Source Month Actual Savings (App Data):</span> ${initialInputs.currentActualSavings.toFixed(2)}</p>
                                <p><span className="font-semibold">Source Month Est. CC Debt (App Data):</span> ${initialInputs.currentEstimatedDebt.toFixed(2)}</p>
+                               {initialInputs.previousMonthFeedback && <p><span className="font-semibold">Your Feedback on Source Month:</span> {initialInputs.previousMonthFeedback}</p>}
                           </CardContent>
                         </Card>
 

@@ -213,6 +213,10 @@ export default function PrepareBudgetPage() {
     const savingsForAI = parseFloat(editableActualSavings) || 0;
     const debtForAI = parseFloat(editableEstimatedDebt) || 0;
     
+    // Fetch the source month's feedback to pass to the AI
+    const sourceMonthData = getBudgetForMonth(baseMonthIdForAI);
+    const previousMonthFeedbackFromSource = sourceMonthData?.monthEndFeedback;
+
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
       userGoals: userGoalsString,
@@ -220,6 +224,7 @@ export default function PrepareBudgetPage() {
       currentIncome: incomeForAI, 
       currentSavingsTotal: savingsForAI, 
       currentCCDebtTotal: debtForAI,
+      previousMonthFeedback: previousMonthFeedbackFromSource, // Pass feedback from source month
     };
 
     try {
@@ -236,7 +241,8 @@ export default function PrepareBudgetPage() {
           currentIncome: incomeForAI, 
           currentActualSavings: savingsForAI,
           currentEstimatedDebt: debtForAI,
-          statementDataUris 
+          statementDataUris,
+          previousMonthFeedback: previousMonthFeedbackFromSource, // Store it for the review page
         }));
         router.push('/prep-budget/review');
       }
@@ -416,7 +422,7 @@ export default function PrepareBudgetPage() {
                     </div>
                     <div>
                         <Label htmlFor="otherGoalText">Any other financial notes, questions you have for me, or specific changes to a previous suggestion?</Label>
-                        <Textarea id="otherGoalText" placeholder="e.g., 'Why is my dining out budget $X?', 'Can we increase travel to $Y?'" value={granularGoals.otherGoalText} onChange={(e) => handleGranularGoalChange('otherGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={3}/>
+                        <Textarea id="otherGoalText" placeholder="e.g., 'My previous month's budget felt too strict.' or 'Can we increase travel to $Y?'" value={granularGoals.otherGoalText} onChange={(e) => handleGranularGoalChange('otherGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={3}/>
                     </div>
                 </CardContent>
               </Card>

@@ -9,17 +9,25 @@ import { cn } from "@/lib/utils";
 import { parseYearMonth } from "@/hooks/useBudgetCore";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
 
 interface MonthEndSummaryModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (feedback?: 'too_strict' | 'just_right' | 'easy' | string) => void; // Updated to pass feedback
   budgetMonth: BudgetMonth | undefined;
 }
 
 export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndSummaryModalProps) {
-  const [budgetFeel, setBudgetFeel] = useState<string | undefined>(undefined);
+  const [selectedFeedback, setSelectedFeedback] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (isOpen && budgetMonth) {
+      setSelectedFeedback(budgetMonth.monthEndFeedback);
+    } else if (!isOpen) {
+      setSelectedFeedback(undefined); // Reset when modal closes
+    }
+  }, [isOpen, budgetMonth]);
 
   if (!isOpen || !budgetMonth) {
     return null;
@@ -76,12 +84,15 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
     return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
   };
 
+  const handleDone = () => {
+    onClose(selectedFeedback);
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
         if (!open) {
-            setBudgetFeel(undefined); // Reset feedback on close
-            onClose();
+           handleDone(); // Pass feedback even if closed via overlay click or X
         }
     }}>
       <DialogContent className="sm:max-w-md md:max-w-lg">
@@ -143,12 +154,12 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
               <Label htmlFor="budgetFeel" className="text-sm font-normal text-muted-foreground mb-2 block">How did this month's budget feel?</Label>
               <RadioGroup
                 id="budgetFeel"
-                value={budgetFeel}
-                onValueChange={setBudgetFeel}
+                value={selectedFeedback}
+                onValueChange={(value) => setSelectedFeedback(value as 'too_strict' | 'just_right' | 'easy')}
                 className="flex flex-col sm:flex-row sm:justify-around gap-2 sm:gap-4"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="strict" id="feel-strict" />
+                  <RadioGroupItem value="too_strict" id="feel-strict" />
                   <Label htmlFor="feel-strict" className="text-sm font-normal">Too Strict</Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -160,7 +171,7 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
                   <Label htmlFor="feel-easy" className="text-sm font-normal">A Bit Easy</Label>
                 </div>
               </RadioGroup>
-              {budgetFeel && (
+              {selectedFeedback && (
                 <p className="text-xs text-muted-foreground italic mt-3 text-center">Thanks for your feedback! This can help you plan for next month.</p>
               )}
             </div>
@@ -172,10 +183,7 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
         </ScrollArea>
         <DialogFooter className="mt-6">
           <DialogClose asChild>
-            <Button variant="default" onClick={() => {
-                setBudgetFeel(undefined); // Reset feedback on close
-                onClose();
-            }}>
+            <Button variant="default" onClick={handleDone}>
               <CheckCircle className="mr-2 h-4 w-4" /> Done
             </Button>
           </DialogClose>

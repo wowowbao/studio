@@ -73,7 +73,7 @@ export default function PrepareBudgetPage() {
     otherGoalText: "",
   });
 
-  const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false); // Start as false
+  const [isLoadingAi, setIsLoadingAi] = useState<boolean>(true); // Start as true
   const [aiError, setAiError] = useState<string | null>(null);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -90,16 +90,19 @@ export default function PrepareBudgetPage() {
       toast({ title: "Error", description: "Current month ID is not available. Please return to the dashboard.", variant: "destructive" });
       router.push('/');
       setIsLoadingPageData(false);
+      setIsLoadingAi(false); // Also ensure AI loading is false if we error out early
       return;
     }
     const data = getBudgetForMonth(sourceMonthId);
-    setCurrentMonthData(data || null);
+    setCurrentMonthData(data || null); // This will trigger the next useEffect
     setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
   // Effect to reset form fields and populate snapshot when currentMonthData is set/updated
   useEffect(() => {
-    setIsLoadingAi(false); // Ensure AI loading is false when page/data initializes
+    // This effect runs when currentMonthData is available or changes.
+    // It resets the form, populates the snapshot, and importantly, enables inputs.
+    
     setAiError(null);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
@@ -107,7 +110,7 @@ export default function PrepareBudgetPage() {
     setGranularGoals({
       planIncome: "",
       planStartMonth: "next month",
-      familySize: "",
+      familySize: "", // Ensure familySize is reset here
       savingsGoalOptions: [],
       savingsGoalOtherText: "",
       debtGoalText: "",
@@ -120,10 +123,10 @@ export default function PrepareBudgetPage() {
       statementFileInputRef.current.value = "";
     }
 
-    // Populate snapshot based on currentMonthData
     if (currentMonthData) {
       const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+      
       const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
       setEditableCurrentIncome(totalIncome.toFixed(2));
 
@@ -139,6 +142,10 @@ export default function PrepareBudgetPage() {
       setEditableActualSavings("0");
       setEditableEstimatedDebt("0");
     }
+    
+    // Crucially, set isLoadingAi to false here, enabling the inputs.
+    setIsLoadingAi(false); 
+
   }, [currentMonthData]); // This effect runs when currentMonthData is set/updated.
 
   const handleGranularGoalChange = (field: keyof GranularGoals, value: string | string[]) => {
@@ -160,15 +167,23 @@ export default function PrepareBudgetPage() {
     const files = event.target.files;
     if (files && files.length > 0) {
       const newFilesArray = Array.from(files);
-      const combinedFiles = [...statementFiles, ...newFilesArray].slice(0, 5);
+      const combinedFiles = [...statementFiles, ...newFilesArray].slice(0, 5); // Limit to 5 files total
       setStatementFiles(combinedFiles);
       setAiError(null);
 
       const newPreviewDetailsAccumulator: { name: string; type: string; dataUri?: string }[] = [];
       const newDataUrisAccumulator: string[] = [];
 
-      for (const file of statementFiles) {
-          if (!statementDataUris[statementFiles.indexOf(file)]) { 
+      // Process already selected files first to maintain their order and dataUris
+      for (let i = 0; i < statementFiles.length; i++) {
+        const file = statementFiles[i];
+        const existingUri = statementDataUris[i];
+        const existingDetail = statementPreviewDetails[i];
+
+        if (existingUri && existingDetail) {
+            newDataUrisAccumulator.push(existingUri);
+            newPreviewDetailsAccumulator.push(existingDetail);
+        } else { // Fallback if details are missing (should not happen if state is consistent)
             try {
                 const dataUri = await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader();
@@ -183,17 +198,14 @@ export default function PrepareBudgetPage() {
                     dataUri: file.type.startsWith('image/') ? dataUri : undefined,
                 });
             } catch (error) {
-                console.error("Error reading existing file:", file.name, error);
+                console.error("Error re-reading existing file:", file.name, error);
             }
-          } else { 
-             const existingDetail = statementPreviewDetails[statementFiles.indexOf(file)];
-             if (existingDetail) newPreviewDetailsAccumulator.push(existingDetail);
-             const existingUri = statementDataUris[statementFiles.indexOf(file)];
-             if (existingUri) newDataUrisAccumulator.push(existingUri);
-          }
+        }
       }
+      
+      // Process newly added files
       for (const file of newFilesArray) {
-        if (newDataUrisAccumulator.length < 5) { 
+        if (newDataUrisAccumulator.length < 5) { // Ensure we don't exceed 5
             try {
             const dataUri = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
@@ -216,12 +228,13 @@ export default function PrepareBudgetPage() {
 
       setStatementDataUris(newDataUrisAccumulator.slice(0,5));
       setStatementPreviewDetails(newPreviewDetailsAccumulator.slice(0,5));
+      setStatementFiles(combinedFiles.slice(0,5)); // Update statementFiles to match the processed ones
 
       if (Array.from(files).length + statementFiles.length > 5 && statementFiles.length < 5) {
           toast({title: "File Limit Reached", description: "Maximum of 5 statement files allowed. Some files were not added.", variant: "default"});
       }
     }
-    if (event.target) event.target.value = '';
+    if (event.target) event.target.value = ''; // Reset file input
   };
 
   const handleClearAllStatementFiles = () => {
@@ -355,8 +368,8 @@ export default function PrepareBudgetPage() {
   };
 
   const handleClearAllAndRestart = () => {
-    // Reset form fields
-    setIsLoadingAi(false);
+    setIsLoadingAi(true); // Temporarily disable inputs while resetting
+
     setAiError(null);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
@@ -377,7 +390,6 @@ export default function PrepareBudgetPage() {
       statementFileInputRef.current.value = "";
     }
 
-    // Re-populate snapshot from currentMonthData or defaults
     if (currentMonthData) {
       const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
@@ -398,9 +410,10 @@ export default function PrepareBudgetPage() {
     }
     
     toast({title: "Form Reset", description: "All inputs cleared. Please enter your goals and upload statements again."});
+    setIsLoadingAi(false); // Re-enable inputs
   };
 
-  if (isLoadingPageData) { // Simplified loading check
+  if (isLoadingPageData) { 
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -409,7 +422,7 @@ export default function PrepareBudgetPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary">Let's Create Your Financial Plan!</h1>
-            <div className="w-10"></div> {/* Spacer */}
+            <div className="w-10"></div> 
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
@@ -642,7 +655,7 @@ export default function PrepareBudgetPage() {
                   </CardContent>
               </Card>
 
-              <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || (!granularGoals.planIncome.trim() && (!currentMonthData || parseFloat(editableCurrentIncome) === 0))} className="w-full py-3 text-base font-semibold">
+              <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || (!granularGoals.planIncome.trim() && parseFloat(editableCurrentIncome) === 0))} className="w-full py-3 text-base font-semibold">
                 {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
                 Get AI Budget Suggestions
               </Button>
@@ -660,5 +673,6 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
+
 
     

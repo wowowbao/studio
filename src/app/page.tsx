@@ -16,7 +16,7 @@ import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle, Landmark } from 'lucide-react'; // Added Landmark
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle, Landmark } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +37,7 @@ export default function HomePage() {
     budgetMonths,
     getBudgetForMonth,
     saveMonthEndFeedback,
+    ensureMonthExists, 
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -49,7 +50,7 @@ export default function HomePage() {
 
   const hasAnyBudgetData = Object.keys(budgetMonths).length > 0 && 
                          Object.values(budgetMonths).some(month => 
-                           (month.categories && month.categories.length > 0) || 
+                           (month.categories && month.categories.length > 0 && month.categories.some(c => c.budgetedAmount > 0 || c.expenses.length > 0)) || 
                            (month.incomes && month.incomes.length > 0) ||
                            month.startingCreditCardDebt > 0
                          );

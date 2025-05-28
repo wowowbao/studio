@@ -18,13 +18,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+// Match the granular goals structure from the input page
+type GranularGoalsForReview = {
+    planIncome: string;
+    planStartMonth: string;
+    savingsGoalText: string;
+    debtGoalText: string;
+    purchaseGoalText: string;
+    cutbackGoalText: string;
+    otherGoalText: string;
+};
+
 interface StoredAIPrepData {
-    userGoals: string;
+    granularGoals: GranularGoalsForReview; // Updated to store granular goals
     statementFileNames: string[];
     currentMonthId: string;
-    currentIncome: number;
-    currentActualSavings: number;
-    currentEstimatedDebt: number;
+    currentIncome: number; // Income from app data for the source month
+    currentActualSavings: number; // Actual savings from app data for the source month
+    currentEstimatedDebt: number; // Estimated debt from app data for the source month
     statementDataUris?: string[]; 
 }
 
@@ -60,6 +71,19 @@ export default function PrepareBudgetReviewPage() {
     setPageIsLoading(false);
   }, [router, toast]);
 
+  const constructUserGoalsStringFromGranular = (granular: GranularGoalsForReview | undefined): string => {
+    if (!granular) return "User did not provide detailed goals for this refinement.";
+    let goals = "";
+    if (granular.planIncome.trim()) goals += `My income for this plan will be $${granular.planIncome}. `;
+    if (granular.planStartMonth.trim()) goals += `I want to start this plan in ${granular.planStartMonth}. `;
+    if (granular.savingsGoalText.trim()) goals += `Savings goal: ${granular.savingsGoalText}. `;
+    if (granular.debtGoalText.trim()) goals += `Debt repayment goal: ${granular.debtGoalText}. `;
+    if (granular.purchaseGoalText.trim()) goals += `Major purchase goal: ${granular.purchaseGoalText}. `;
+    if (granular.cutbackGoalText.trim()) goals += `I'd like to cut back on: ${granular.cutbackGoalText}. `;
+    if (granular.otherGoalText.trim()) goals += `Other notes: ${granular.otherGoalText}.`;
+    return goals.trim();
+  };
+
   const handleUpdateSuggestions = async () => {
     if (!initialInputs) {
       setAiError("Initial input data is missing. Cannot refine.");
@@ -73,11 +97,13 @@ export default function PrepareBudgetReviewPage() {
     setIsLoadingAi(true);
     setAiError(null);
 
-    const updatedUserGoals = `${initialInputs.userGoals}\n\n--- User Refinement Request ---\n${refinementText}`;
+    // Combine original granular goals with the new refinement text
+    const originalGoalsString = constructUserGoalsStringFromGranular(initialInputs.granularGoals);
+    const updatedUserGoalsForAI = `${originalGoalsString}\n\n--- User Refinement Request for Current Plan ---\n${refinementText}`;
 
     const input: PrepareBudgetInput = {
       statementDataUris: initialInputs.statementDataUris, 
-      userGoals: updatedUserGoals,
+      userGoals: updatedUserGoalsForAI, // Send the combined goals string
       currentMonthId: initialInputs.currentMonthId,
       currentIncome: initialInputs.currentIncome, 
       currentSavingsTotal: initialInputs.currentActualSavings,
@@ -94,13 +120,8 @@ export default function PrepareBudgetReviewPage() {
         setRefinementText(""); 
         toast({ title: "AI Suggestions Updated!", description: "Review the updated plan below.", duration: 5000 });
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
-        // Update the userGoals in sessionStorage to reflect the refinement
-        setInitialInputs(prev => prev ? ({...prev, userGoals: updatedUserGoals}) : null); // Update local state too
-        sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
-            ...initialInputs, // Spread existing initialInputs
-            userGoals: updatedUserGoals // Only update the userGoals part for the next refinement
-        }));
-
+        // The granularGoals in initialInputs remain the same unless user goes back to edit them directly
+        // The 'userGoals' property passed to AI is a dynamic combination.
       }
     } catch (error: any) {
       const message = error.message || "An unexpected error occurred while updating AI suggestions.";
@@ -150,9 +171,6 @@ export default function PrepareBudgetReviewPage() {
   };
 
   const handleGoBackToInputs = () => {
-    // Clear session storage related to review, so /prep-budget starts fresh
-    // but keep the original userGoals and statement files potentially pre-filled if desired
-    // For now, just navigate. /prep-budget's useEffect will handle reset if needed.
     router.push('/prep-budget');
   };
   
@@ -187,7 +205,7 @@ export default function PrepareBudgetReviewPage() {
         return { totalBudgeted: 0, balance: 0, projectedIncome: 0 };
     }
     let totalBudgeted = 0;
-    currentSuggestions.suggestedCategories.forEach(cat => {
+    (currentSuggestions.suggestedCategories || []).forEach(cat => {
         if (cat.subcategories && cat.subcategories.length > 0) {
             cat.subcategories.forEach(sub => {
                 totalBudgeted += sub.budgetedAmount || 0;
@@ -196,11 +214,9 @@ export default function PrepareBudgetReviewPage() {
             totalBudgeted += cat.budgetedAmount || 0;
         }
     });
-    const projectedIncome = typeof currentSuggestions.incomeBasisForBudget === 'number' 
-                            ? currentSuggestions.incomeBasisForBudget 
-                            : initialInputs.currentIncome; // Fallback just in case
-    const balance = projectedIncome - totalBudgeted;
-    return { totalBudgeted, balance, projectedIncome };
+    const incomeForCalculation = currentSuggestions.incomeBasisForBudget ?? initialInputs.currentIncome;
+    const balance = incomeForCalculation - totalBudgeted;
+    return { totalBudgeted, balance, projectedIncome: incomeForCalculation };
   };
 
   const budgetSummary = calculateBudgetSummary();
@@ -229,6 +245,25 @@ export default function PrepareBudgetReviewPage() {
 
   const nextMonthToPrep = getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(initialInputs.currentMonthId).setMonth(parseYearMonth(initialInputs.currentMonthId).getMonth() + 1))));
 
+  const renderGranularGoals = (goals: GranularGoalsForReview) => {
+    const goalItems: {label: string, value: string}[] = [
+        {label: "Planned Income for New Plan", value: goals.planIncome ? `$${goals.planIncome}` : "Not specified"},
+        {label: "Desired Start Month", value: goals.planStartMonth || "Not specified"},
+        {label: "Savings Goals", value: goals.savingsGoalText || "Not specified"},
+        {label: "Debt Repayment Goals", value: goals.debtGoalText || "Not specified"},
+        {label: "Major Purchase Goals", value: goals.purchaseGoalText || "Not specified"},
+        {label: "Areas to Cut Back Spending", value: goals.cutbackGoalText || "Not specified"},
+        {label: "Other Notes/General Goals", value: goals.otherGoalText || "Not specified"},
+    ];
+    return (
+        <ul className="space-y-1">
+            {goalItems.filter(item => item.value !== "Not specified").map(item => (
+                <li key={item.label}><span className="font-semibold">{item.label}:</span> {item.value}</li>
+            ))}
+        </ul>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -248,19 +283,21 @@ export default function PrepareBudgetReviewPage() {
                 <Card className="shadow-lg border-primary/30">
                     <CardHeader>
                         <CardTitle className="text-xl text-primary">My AI Financial Advisor's Plan for {nextMonthToPrep}</CardTitle>
-                        <CardDescription>Review the plan below. If you want to make adjustments, click "Edit Inputs & Regenerate" above, then refine your goals in the text area and get updated suggestions.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <Card className="bg-muted/30">
                           <CardHeader className="pb-2">
                               <CardTitle className="text-base">Here's What I Used to Create Your Plan:</CardTitle>
                           </CardHeader>
-                          <CardContent className="text-xs space-y-1">
-                              <p className="whitespace-pre-wrap"><span className="font-semibold">Your Stated Goals & Context:</span> {initialInputs.userGoals || "Not specified"}</p>
+                          <CardContent className="text-xs space-y-2">
+                              <div>
+                                <h5 className="font-medium mb-1">Your Stated Goals & Context:</h5>
+                                {renderGranularGoals(initialInputs.granularGoals)}
+                              </div>
                               {initialInputs.statementFileNames.length > 0 && <p><span className="font-semibold">Statements Provided:</span> {initialInputs.statementFileNames.join(', ')}</p> }
-                               <p><span className="font-semibold">Source Month Income (from App Data):</span> ${initialInputs.currentIncome.toFixed(2)}</p>
-                               <p><span className="font-semibold">Source Month Actual Savings (from App Data):</span> ${initialInputs.currentActualSavings.toFixed(2)}</p>
-                               <p><span className="font-semibold">Source Month Est. CC Debt (from App Data):</span> ${initialInputs.currentEstimatedDebt.toFixed(2)}</p>
+                               <p><span className="font-semibold">Source Month Income (App Data):</span> ${initialInputs.currentIncome.toFixed(2)}</p>
+                               <p><span className="font-semibold">Source Month Actual Savings (App Data):</span> ${initialInputs.currentActualSavings.toFixed(2)}</p>
+                               <p><span className="font-semibold">Source Month Est. CC Debt (App Data):</span> ${initialInputs.currentEstimatedDebt.toFixed(2)}</p>
                           </CardContent>
                         </Card>
 
@@ -271,16 +308,9 @@ export default function PrepareBudgetReviewPage() {
                             </ScrollArea>
                         </div>
                         
-                        <div>
-                            <h4 className="text-lg font-medium flex items-center mb-2"><ListChecks className="mr-2 h-5 w-5 text-green-500"/>My Suggested Budget For You:</h4>
-                            {renderSuggestedCategoriesList(currentSuggestions.suggestedCategories)}
-                        </div>
-
-                        <Separator className="my-6"/>
-
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-lg">AI Budget Overview</CardTitle>
+                                <CardTitle className="text-lg">AI Budget Overview for {nextMonthToPrep}</CardTitle>
                                 <CardDescription>Summary of my suggested plan against the income basis I used.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
@@ -299,6 +329,10 @@ export default function PrepareBudgetReviewPage() {
                             </CardContent>
                         </Card>
 
+                        <div>
+                            <h4 className="text-lg font-medium flex items-center mb-2"><ListChecks className="mr-2 h-5 w-5 text-green-500"/>My Suggested Budget For You:</h4>
+                            {renderSuggestedCategoriesList(currentSuggestions.suggestedCategories)}
+                        </div>
 
                         <Separator className="my-6"/>
                         
@@ -306,7 +340,7 @@ export default function PrepareBudgetReviewPage() {
                             <CardHeader>
                                 <CardTitle className="text-lg">Want to Make Changes or Ask Questions?</CardTitle>
                                 <CardDescription>
-                                   Click "Edit Inputs & Regenerate" above. Then, in the "Your Financial Goals & Income" text area, type your questions or requested changes (e.g., "Why is my 'Fun Money' budget $X?", "Increase 'Savings' to $Y"). Click "Update AI Suggestions" on that page, and I'll create a new plan based on your feedback!
+                                   Type your questions or requested changes below (e.g., "Why is my 'Fun Money' budget $X?", "Increase 'Savings' to $Y"). Then click "Update Suggestions Directly" and I'll create a new plan based on your feedback!
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -329,7 +363,7 @@ export default function PrepareBudgetReviewPage() {
                         <div className="mt-6">
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button className="w-full py-3 text-base font-semibold" variant="default" size="lg" disabled={!currentSuggestions.suggestedCategories || currentSuggestions.suggestedCategories.length === 0 || isLoadingAi}>
+                                <Button className="w-full py-3 text-base font-semibold" variant="default" size="lg" disabled={!currentSuggestions.suggestedCategories || (currentSuggestions.suggestedCategories || []).length === 0 || isLoadingAi}>
                                     <CheckCircle className="mr-2 h-5 w-5"/> Apply This Budget
                                 </Button>
                             </AlertDialogTrigger>

@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useEffect } from 'react';
-import { useAuth } from "@/hooks/useAuth"; 
+import { useAuth } from "@/hooks/useAuth";
 import { useBudget } from "@/hooks/useBudget";
 import { MonthNavigator } from "@/components/budget/MonthNavigator";
 import { CategoryCard } from "@/components/budget/CategoryCard";
@@ -10,7 +10,7 @@ import { BudgetActions } from "@/components/budget/BudgetActions";
 import { BudgetChart } from "@/components/budget/BudgetChart";
 import { EditBudgetModal } from "@/components/budget/EditBudgetModal";
 import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
-import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; 
+import { AddIncomeModal } from "@/components/budget/AddIncomeModal";
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle } from 'lucide-react';
 import { useTheme } from "next-themes";
-import { auth } from '@/lib/firebase'; 
+import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { BudgetCategory, BudgetMonth } from '@/types/budget';
 import { parseYearMonth } from '@/hooks/useBudgetCore';
@@ -29,21 +29,21 @@ import { useRouter } from 'next/navigation';
 export default function HomePage() {
   const { user, loading: authLoading, isUserAuthenticated } = useAuth();
   const router = useRouter();
-  
-  const { 
-    currentBudgetMonth, 
-    currentDisplayMonthId, 
-    isLoading: budgetLoading, 
+
+  const {
+    currentBudgetMonth,
+    currentDisplayMonthId,
+    isLoading: budgetLoading,
     budgetMonths,
     getBudgetForMonth,
-    saveMonthEndFeedback, 
+    saveMonthEndFeedback,
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
   const [isAddIncomeModalOpen, setIsAddIncomeModalOpen] = useState(false);
-  const [isMonthEndSummaryModalOpen, setIsMonthEndSummaryModalOpen] = useState(false); 
-  const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined); 
+  const [isMonthEndSummaryModalOpen, setIsMonthEndSummaryModalOpen] = useState(false);
+  const [monthEndSummaryData, setMonthEndSummaryData] = useState<BudgetMonth | undefined>(undefined);
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
 
@@ -71,7 +71,7 @@ export default function HomePage() {
     try {
       await auth.signOut();
       // Optionally, redirect to home or sign-in page after sign-out
-      // router.push('/'); 
+      // router.push('/');
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -83,8 +83,8 @@ export default function HomePage() {
   };
 
   const openMonthEndSummary = () => {
-    const data = getBudgetForMonth(currentDisplayMonthId); 
-    if (data) { 
+    const data = getBudgetForMonth(currentDisplayMonthId);
+    if (data) {
       setMonthEndSummaryData(data);
       setIsMonthEndSummaryModalOpen(true);
     }
@@ -95,12 +95,12 @@ export default function HomePage() {
     if (feedback && monthEndSummaryData) {
       saveMonthEndFeedback(monthEndSummaryData.id, feedback);
     }
-    
+
     const updatedData = getBudgetForMonth(currentDisplayMonthId);
-    if (updatedData) { 
+    if (updatedData) {
         setMonthEndSummaryData(updatedData);
     } else {
-        setMonthEndSummaryData(undefined); 
+        setMonthEndSummaryData(undefined);
     }
   };
 
@@ -123,8 +123,8 @@ export default function HomePage() {
       </div>
     );
   }
-  
-  if (isLoading && (!isUserAuthenticated || (isUserAuthenticated && !hasAnyBudgetData))) { 
+
+  if (isLoading && (!isUserAuthenticated || (isUserAuthenticated && !hasAnyBudgetData))) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
@@ -138,7 +138,7 @@ export default function HomePage() {
       </div>
     );
   }
-  
+
   const allCategories = currentBudgetMonth?.categories || [];
   const systemCategories: BudgetCategory[] = [];
   const operationalCategories: BudgetCategory[] = [];
@@ -152,9 +152,9 @@ export default function HomePage() {
   });
 
   systemCategories.sort((a, b) => {
-    if (a.name.toLowerCase() === 'savings') return -1; 
+    if (a.name.toLowerCase() === 'savings') return -1;
     if (b.name.toLowerCase() === 'savings') return 1;
-    if (a.name.toLowerCase() === 'credit card payments') return -1; 
+    if (a.name.toLowerCase() === 'credit card payments') return -1;
     if (b.name.toLowerCase() === 'credit card payments') return 1;
     return 0;
   });
@@ -213,9 +213,9 @@ export default function HomePage() {
             </AlertDescription>
           </Alert>
         )}
-        
+
         <MonthNavigator />
-        
+
         {!isLoading && !hasAnyBudgetData && !isUserAuthenticated && ( // Guest user, no data
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
@@ -237,17 +237,16 @@ export default function HomePage() {
             </CardContent>
           </Card>
         )}
-        
+
         {/* Case for authenticated user with no data is handled by useEffect redirect */}
 
         {isLoading && hasAnyBudgetData && !currentBudgetMonth ? ( // User has data in other months, but current month is loading
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
-                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
-                 <Skeleton className="h-24 w-full rounded-lg md:col-span-2 lg:col-span-2" />
+                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
               </div>
-              <Skeleton className="h-32 w-full rounded-lg" /> 
-              <Skeleton className="h-20 w-full rounded-lg" /> 
+              <Skeleton className="h-32 w-full rounded-lg" />
+              <Skeleton className="h-20 w-full rounded-lg" />
               <h2 className="text-xl font-semibold mt-8 mb-4 text-primary"><Skeleton className="h-6 w-32"/></h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-lg" />)}
@@ -272,7 +271,7 @@ export default function HomePage() {
           <>
             <SummaryCards budgetMonth={currentBudgetMonth} />
             <CreditCardDebtSummary budgetMonth={currentBudgetMonth} />
-            <BudgetActions 
+            <BudgetActions
               onEditBudget={() => setIsEditBudgetModalOpen(true)}
               onAddExpense={() => setIsAddExpenseModalOpen(true)}
               onAddIncome={() => setIsAddIncomeModalOpen(true)}
@@ -304,13 +303,13 @@ export default function HomePage() {
                 </div>
               </>
             )}
-            
-            {(operationalCategories.length > 0) && ( 
+
+            {(operationalCategories.length > 0) && (
                 <BudgetChart budgetMonth={currentBudgetMonth} />
             )}
 
 
-            {allCategories.length === 0 && currentBudgetMonth && ( 
+            {allCategories.length === 0 && currentBudgetMonth && (
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
                   <XCircle className="mx-auto h-10 w-10 text-accent mb-3" />
@@ -329,17 +328,17 @@ export default function HomePage() {
           </>
         ) : null}
       </main>
-      
+
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.30 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.31 (Studio Preview)
           </div>
       </footer>
 
-      {currentDisplayMonthId && ( 
+      {currentDisplayMonthId && (
         <>
-          <EditBudgetModal 
-            isOpen={isEditBudgetModalOpen} 
+          <EditBudgetModal
+            isOpen={isEditBudgetModalOpen}
             onClose={() => setIsEditBudgetModalOpen(false)}
             monthId={currentDisplayMonthId}
           />
@@ -348,7 +347,7 @@ export default function HomePage() {
             onClose={() => setIsAddExpenseModalOpen(false)}
             monthId={currentDisplayMonthId}
           />
-          <AddIncomeModal 
+          <AddIncomeModal
             isOpen={isAddIncomeModalOpen}
             onClose={() => setIsAddIncomeModalOpen(false)}
             monthId={currentDisplayMonthId}

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useBudget } from "@/hooks/useBudget";
-import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2, AlertTriangle } from "lucide-react"; // Added AlertTriangle
+import { Edit3, PlusCircle, ArchiveRestore, Coins, ArchiveX, Wand2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BudgetActionsProps {

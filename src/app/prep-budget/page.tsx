@@ -83,6 +83,7 @@ export default function PrepareBudgetPage() {
 
   const isInitialOnboarding = !initialMonthId || !getBudgetForMonth(initialMonthId);
 
+  // Effect 1: Fetch current month data
   useEffect(() => {
     setIsLoadingPageData(true);
     const sourceMonthId = initialMonthId || getYearMonthFromDate(new Date());
@@ -90,7 +91,6 @@ export default function PrepareBudgetPage() {
       toast({ title: "Error", description: "Current month ID is not available. Please return to the dashboard.", variant: "destructive" });
       router.push('/');
       setIsLoadingPageData(false);
-      setIsLoadingAi(false); 
       return;
     }
     const data = getBudgetForMonth(sourceMonthId);
@@ -98,11 +98,9 @@ export default function PrepareBudgetPage() {
     setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
-
+  // Effect 2: Reset form and populate snapshot when currentMonthData or isLoadingPageData changes
   useEffect(() => {
-    if (!isLoadingPageData) {
-      setIsLoadingAi(true); 
-
+    if (!isLoadingPageData) { // Only run after initial data load attempt is complete
       setAiError(null);
       setStatementFiles([]);
       setStatementPreviewDetails([]);
@@ -130,11 +128,11 @@ export default function PrepareBudgetPage() {
         const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
         setEditableCurrentIncome(totalIncome.toFixed(2));
 
-        const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+        const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name === 'Savings'); // Exact match
         const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
         setEditableActualSavings(actualSavingsContribution.toFixed(2));
 
-        const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+        const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name === 'Credit Card Payments'); // Exact match
         const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
         setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
       } else {
@@ -142,11 +140,9 @@ export default function PrepareBudgetPage() {
         setEditableActualSavings("0");
         setEditableEstimatedDebt("0");
       }
-      
-      setIsLoadingAi(false); 
+      setIsLoadingAi(false); // Enable inputs after all setup is done
     }
-  }, [isLoadingPageData, currentMonthData]);
-
+  }, [isLoadingPageData, currentMonthData]); // currentMonthData is the key dependency here for snapshot population
 
   const handleGranularGoalChange = (field: keyof GranularGoals, value: string | string[]) => {
     setGranularGoals(prev => ({ ...prev, [field]: value }));
@@ -161,7 +157,6 @@ export default function PrepareBudgetPage() {
       return { ...prev, [field]: newOptions };
     });
   };
-
 
   const handleStatementFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -208,7 +203,6 @@ export default function PrepareBudgetPage() {
       setStatementDataUris(newDataUrisAccumulator.slice(0,5));
       setStatementPreviewDetails(newPreviewDetailsAccumulator.slice(0,5));
       setStatementFiles(filesToProcess.filter(f => newPreviewDetailsAccumulator.some(pd => pd.name === f.name)).slice(0,5));
-
 
       if (Array.from(files).length + statementFiles.length > 5 && statementFiles.length < 5) {
           toast({title: "File Limit Reached", description: "Maximum of 5 statement files allowed. Some files were not added.", variant: "default"});
@@ -349,7 +343,6 @@ export default function PrepareBudgetPage() {
 
   const handleClearAllAndRestart = () => {
     setIsLoadingAi(true); 
-
     setAiError(null);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
@@ -376,11 +369,11 @@ export default function PrepareBudgetPage() {
       const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
       setEditableCurrentIncome(totalIncome.toFixed(2));
 
-      const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+      const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name === 'Savings');
       const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
       setEditableActualSavings(actualSavingsContribution.toFixed(2));
 
-      const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+      const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name === 'Credit Card Payments');
       const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
       setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
     } else {

@@ -36,6 +36,7 @@ const PrepareBudgetInputSchema = z.object({
   currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category). For an initial setup, this might be 0 if no app data exists."),
   currentCCDebtTotal: z.number().describe("The user's current total *outstanding* credit card debt (estimated for end of current month). For an initial setup, this might be 0 or a figure provided in userGoals."),
   previousMonthFeedback: z.string().optional().describe("Optional: User's feedback on how the previous month's budget felt (e.g., 'too_strict', 'just_right', 'easy'). Use this to adjust the tone/flexibility of the new budget."),
+  familySize: z.number().int().positive().optional().describe("Optional: The number of people in the household this budget is for (e.g., 1, 2, 4).")
 });
 export type PrepareBudgetInput = z.infer<typeof PrepareBudgetInputSchema>;
 
@@ -65,6 +66,9 @@ User's Current Financial Context (based on their current month ending '{{current
 - Income This Month (Source Data): \${{currentIncome}} (This is the income reported from their app data for the source month. If 'userGoals' states a specific income for the plan, prioritize that for budgeting. If 'userGoals' suggests this is an initial plan and provides an income, use that.)
 - Actual Savings Contributed This Month (Source Data): \${{currentSavingsTotal}}
 - Estimated Total Outstanding Credit Card Debt at end of this month (Source Data): \${{currentCCDebtTotal}}
+{{#if familySize~}}
+- Household Size: {{familySize}} {{pluralize familySize "person" "people"}}. Consider this when suggesting amounts for categories like Groceries, Utilities, or Entertainment.
+{{/if~}}
 
 {{#if previousMonthFeedback}}
 User's Feedback on Last Month's Budget: "{{previousMonthFeedback}}"
@@ -90,7 +94,7 @@ No past spending document(s) were provided. Base your budget suggestions primari
 {{/if}}
 
 Your Task:
-Based on ALL the information above (goals, income context, debt, savings contributions, past spending if available, previous month's feedback if available, and any specific questions or change requests embedded in their 'userGoals'), provide the following:
+Based on ALL the information above (goals, income context, debt, savings contributions, family size if provided, past spending if available, previous month's feedback if available, and any specific questions or change requests embedded in their 'userGoals'), provide the following:
 
 0.  'incomeBasisForBudget': Determine the income basis for the plan.
     -   If 'userGoals' explicitly state a target income for the plan (e.g., "My income next month will be $X", "My income is $Y", "Plan for an income of $Z"), prioritize that stated income. Report this value in 'incomeBasisForBudget'.
@@ -100,17 +104,17 @@ Based on ALL the information above (goals, income context, debt, savings contrib
 1.  'suggestedCategories': A comprehensive suggested budget for the *next* month (or first month of a new plan), based on the 'incomeBasisForBudget' you determined.
     -   The budget should be realistic, achievable, and sustainable.
     -   DO NOT create a category named "Income" or similar.
-    -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym). If userGoals mention specific needs like "rent payment", ensure "Housing" or "Rent" is a category.
+    -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym). If userGoals mention specific needs like "rent payment", ensure "Housing" or "Rent" is a category. Adjust amounts for Groceries, Utilities, and Entertainment based on 'familySize' if provided.
     -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category. If the user explicitly asks to change a specific category's budget, try to accommodate this if feasible or explain why it's challenging.
     -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments", suggest meaningful progress on debt, considering 'incomeBasisForBudget' and other goals. If currentCCDebtTotal is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise.
-    -   **Include reasonable allocations for some discretionary spending** (e.g., "Entertainment," "Hobbies," "Personal Care," or a general "Fun Money" category) unless the user *explicitly* states they want to eliminate these or income is extremely constrained. A budget that is too restrictive is hard to maintain. Consider `previousMonthFeedback` when setting these.
+    -   **Include reasonable allocations for some discretionary spending** (e.g., "Entertainment," "Hobbies," "Personal Care," or a general "Fun Money" category) unless the user *explicitly* states they want to eliminate these or income is extremely constrained. Consider `previousMonthFeedback` and `familySize` when setting these.
     -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories. However, if their goals require spending cuts, proactively suggest these reductions while still aiming for sustainability.
     -   **The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed 'incomeBasisForBudget'.** If it does, clearly point out the shortfall in 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
     -   If applicable, suggest logical subcategories under broader categories (e.g., Groceries > Produce, Dairy; Utilities > Electricity, Water, Internet; Entertainment > Streaming Services, Movies).
     -   If the user states an urgent need for a large purchase (e.g., "I need a new PC or I can't work"), acknowledge this urgency.
 
 2.  'financialAdvice': Detailed, actionable, empathetic financial advice, and **explanations for your budget choices**.
-    -   **Explain Key Budget Decisions:** For significant categories, or where the budget might differ from what a user might expect, briefly explain the reasoning. For example, "Your 'Dining Out' budget is suggested at $X to help you meet your goal of saving $Y this month, while still allowing for some enjoyment. This is based on your income of $Z and past spending patterns (if available)."
+    -   **Explain Key Budget Decisions:** For significant categories, or where the budget might differ from what a user might expect, briefly explain the reasoning. For example, "Your 'Dining Out' budget is suggested at $X to help you meet your goal of saving $Y this month, while still allowing for some enjoyment. This is based on your income of $Z, household size of {{familySize | default:1}}, and past spending patterns (if available)."
     -   **Address User's Questions/Refinements:** If 'userGoals' text contains explicit questions about previous suggestions or requests for changes, address these directly. Explain the impact of requested changes on the overall budget and other goals.
     -   Directly address how 'suggestedCategories' help achieve their stated goals.
     -   If they have a large purchase goal, explain how the budget helps save towards it. Suggest realistic timelines.
@@ -196,4 +200,5 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     }
   }
 );
+
 

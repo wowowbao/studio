@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks, FileText, Edit3 } from "lucide-react";
+import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks, FileText, Edit3, Users } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { prepareNextMonthBudget, type PrepareBudgetInput, type PrepareBudgetOutput } from "@/ai/flows/prepare-next-month-budget-flow";
@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 type GranularGoalsForReview = {
     planIncome: string;
     planStartMonth: string;
+    familySize: string; // New field
     savingsGoalText: string;
     debtGoalText: string;
     purchaseGoalText: string;
@@ -37,7 +38,8 @@ interface StoredAIPrepData {
     currentActualSavings: number; 
     currentEstimatedDebt: number; 
     statementDataUris?: string[];
-    previousMonthFeedback?: string; // Added to store this context
+    previousMonthFeedback?: string; 
+    familySize?: number; // New field
 }
 
 export default function PrepareBudgetReviewPage() {
@@ -77,6 +79,7 @@ export default function PrepareBudgetReviewPage() {
     if (granular) {
         if (granular.planIncome.trim()) goals += `My income for this plan will be $${granular.planIncome}. `;
         if (granular.planStartMonth.trim()) goals += `I want to start this plan in ${granular.planStartMonth}. `;
+        if (granular.familySize.trim()) goals += `This budget is for a household of ${granular.familySize} people. `;
         if (granular.savingsGoalText.trim()) goals += `Savings goal: ${granular.savingsGoalText}. `;
         if (granular.debtGoalText.trim()) goals += `Debt repayment goal: ${granular.debtGoalText}. `;
         if (granular.purchaseGoalText.trim()) goals += `Major purchase goal: ${granular.purchaseGoalText}. `;
@@ -116,7 +119,8 @@ export default function PrepareBudgetReviewPage() {
       currentIncome: initialInputs.currentIncome, 
       currentSavingsTotal: initialInputs.currentActualSavings,
       currentCCDebtTotal: initialInputs.currentEstimatedDebt,
-      previousMonthFeedback: initialInputs.previousMonthFeedback, // Pass original previous month feedback
+      previousMonthFeedback: initialInputs.previousMonthFeedback, 
+      familySize: initialInputs.familySize, // Pass family size
     };
 
     try {
@@ -129,8 +133,6 @@ export default function PrepareBudgetReviewPage() {
         setRefinementText(""); 
         toast({ title: "AI Suggestions Updated!", description: "Review the updated plan below.", duration: 5000 });
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
-        // The granularGoals in initialInputs remain the same unless user goes back to edit them directly
-        // The 'userGoals' property passed to AI is a dynamic combination.
       }
     } catch (error: any) {
       const message = error.message || "An unexpected error occurred while updating AI suggestions.";
@@ -256,9 +258,10 @@ export default function PrepareBudgetReviewPage() {
 
   const renderGranularGoals = (goals: GranularGoalsForReview | undefined) => {
     if (!goals) return <p className="text-xs italic">No granular goals provided.</p>;
-    const goalItems: {label: string, value: string}[] = [
+    const goalItems: {label: string, value: string | number | undefined}[] = [ // Updated type for value
         {label: "Planned Income for New Plan", value: goals.planIncome ? `$${goals.planIncome}` : "Not specified"},
         {label: "Desired Start Month", value: goals.planStartMonth || "Not specified"},
+        {label: "Household Size", value: goals.familySize || (initialInputs?.familySize ? String(initialInputs.familySize) : "Not specified") }, // Display familySize
         {label: "Savings Goals", value: goals.savingsGoalText || "Not specified"},
         {label: "Debt Repayment Goals", value: goals.debtGoalText || "Not specified"},
         {label: "Major Purchase Goals", value: goals.purchaseGoalText || "Not specified"},
@@ -267,7 +270,7 @@ export default function PrepareBudgetReviewPage() {
     ];
     return (
         <ul className="space-y-1">
-            {goalItems.filter(item => item.value !== "Not specified").map(item => (
+            {goalItems.filter(item => item.value !== "Not specified" && item.value !== undefined).map(item => (
                 <li key={item.label}><span className="font-semibold">{item.label}:</span> {item.value}</li>
             ))}
         </ul>

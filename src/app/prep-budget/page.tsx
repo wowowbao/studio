@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, MessageSquareText, Edit3, ListChecks } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, MessageSquareText, Edit3, ListChecks, Users } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -24,6 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 type GranularGoals = {
   planIncome: string;
   planStartMonth: string;
+  familySize: string; // New field
   savingsGoalText: string;
   debtGoalText: string;
   purchaseGoalText: string;
@@ -46,6 +47,7 @@ export default function PrepareBudgetPage() {
   const [granularGoals, setGranularGoals] = useState<GranularGoals>({
     planIncome: "",
     planStartMonth: "next month",
+    familySize: "", // New field
     savingsGoalText: "",
     debtGoalText: "",
     purchaseGoalText: "",
@@ -86,6 +88,7 @@ export default function PrepareBudgetPage() {
     setGranularGoals({
         planIncome: "",
         planStartMonth: "next month",
+        familySize: "", // Reset new field
         savingsGoalText: "",
         debtGoalText: "",
         purchaseGoalText: "",
@@ -185,6 +188,8 @@ export default function PrepareBudgetPage() {
     if (granularGoals.planStartMonth.trim()) goals += `I want to start this plan in ${granularGoals.planStartMonth}. `;
     else goals += `Assume the plan starts next month. `;
 
+    if (granularGoals.familySize.trim()) goals += `This budget is for a household of ${granularGoals.familySize} people. `;
+
     if (granularGoals.savingsGoalText.trim()) goals += `Savings goal: ${granularGoals.savingsGoalText}. `;
     if (granularGoals.debtGoalText.trim()) goals += `Debt repayment goal: ${granularGoals.debtGoalText}. `;
     if (granularGoals.purchaseGoalText.trim()) goals += `Major purchase goal: ${granularGoals.purchaseGoalText}. `;
@@ -192,7 +197,7 @@ export default function PrepareBudgetPage() {
     if (granularGoals.otherGoalText.trim()) goals += `Other notes: ${granularGoals.otherGoalText}.`;
     
     if (goals.length === 0 || (!granularGoals.savingsGoalText.trim() && !granularGoals.debtGoalText.trim() && !granularGoals.purchaseGoalText.trim() && !granularGoals.cutbackGoalText.trim() && !granularGoals.otherGoalText.trim())) {
-        goals += "User has not provided specific financial goals beyond potentially their income and start month. Provide general, foundational budgeting advice and suggestions."
+        goals += "User has not provided specific financial goals beyond potentially their income, start month, and family size. Provide general, foundational budgeting advice and suggestions."
     }
     return goals.trim();
   };
@@ -212,6 +217,13 @@ export default function PrepareBudgetPage() {
     const incomeForAI = parseFloat(editableCurrentIncome) || 0;
     const savingsForAI = parseFloat(editableActualSavings) || 0;
     const debtForAI = parseFloat(editableEstimatedDebt) || 0;
+    const familySizeForAI = granularGoals.familySize.trim() ? parseInt(granularGoals.familySize, 10) : undefined;
+
+    if (familySizeForAI !== undefined && (isNaN(familySizeForAI) || familySizeForAI <= 0)) {
+        toast({ title: "Invalid Input", description: "Please enter a valid positive number for family size.", variant: "destructive" });
+        setIsLoadingAi(false);
+        return;
+    }
     
     // Fetch the source month's feedback to pass to the AI
     const sourceMonthData = getBudgetForMonth(baseMonthIdForAI);
@@ -225,6 +237,7 @@ export default function PrepareBudgetPage() {
       currentSavingsTotal: savingsForAI, 
       currentCCDebtTotal: debtForAI,
       previousMonthFeedback: previousMonthFeedbackFromSource, // Pass feedback from source month
+      familySize: familySizeForAI, // Pass family size
     };
 
     try {
@@ -242,7 +255,8 @@ export default function PrepareBudgetPage() {
           currentActualSavings: savingsForAI,
           currentEstimatedDebt: debtForAI,
           statementDataUris,
-          previousMonthFeedback: previousMonthFeedbackFromSource, // Store it for the review page
+          previousMonthFeedback: previousMonthFeedbackFromSource, 
+          familySize: familySizeForAI, // Store family size for review page
         }));
         router.push('/prep-budget/review');
       }
@@ -269,6 +283,7 @@ export default function PrepareBudgetPage() {
     setGranularGoals({
         planIncome: "",
         planStartMonth: "next month",
+        familySize: "", // Reset new field
         savingsGoalText: "",
         debtGoalText: "",
         purchaseGoalText: "",
@@ -394,6 +409,13 @@ export default function PrepareBudgetPage() {
                       <div>
                           <Label htmlFor="planStartMonth">When would you like this plan to ideally start?</Label>
                           <Input id="planStartMonth" placeholder="e.g., next month, August" value={granularGoals.planStartMonth} onChange={(e) => handleGranularGoalChange('planStartMonth', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
+                      </div>
+                      <div>
+                          <Label htmlFor="familySize" className="flex items-center">
+                            <Users className="mr-2 h-4 w-4 text-muted-foreground"/>
+                            Number of People in Household (Optional)
+                          </Label>
+                          <Input id="familySize" type="number" placeholder="e.g., 1, 2, 4" value={granularGoals.familySize} onChange={(e) => handleGranularGoalChange('familySize', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
                       </div>
                   </CardContent>
               </Card>

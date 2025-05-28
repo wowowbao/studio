@@ -35,6 +35,7 @@ export default function HomePage() {
     budgetMonths,
     getBudgetForMonth,
     saveMonthEndFeedback, // New from useBudget
+    ensureMonthExists, // Added for potential initial load assurance
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -53,6 +54,24 @@ export default function HomePage() {
       }
     }
   }, [authLoading, isUserAuthenticated]);
+
+  // Ensure the current display month's data structure is initialized when the page loads or dependencies change
+  // This was previously a source of loops if not handled carefully with useBudgetCore.
+  // Now, useBudgetCore's main data loading useEffect is primarily responsible.
+  // We might still call ensureMonthExists here defensively if needed,
+  // but it should be idempotent if the data is already correct.
+  useEffect(() => {
+    if (currentDisplayMonthId && !budgetLoading && !authLoading) {
+      // Defensively ensure the month exists, but useBudgetCore should handle the heavy lifting.
+      // This call primarily makes sure that if the user navigates to a month
+      // that hasn't been auto-created by a previous navigation, its basic shell exists.
+      // The detailed loading and processing happens within useBudgetCore.
+      if (!getBudgetForMonth(currentDisplayMonthId)) {
+         ensureMonthExists(currentDisplayMonthId);
+      }
+    }
+  }, [currentDisplayMonthId, budgetLoading, authLoading, ensureMonthExists, getBudgetForMonth]);
+
 
   const handleSignOut = async () => {
     try {
@@ -306,7 +325,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.28 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.29 (Studio Preview)
           </div>
       </footer>
 

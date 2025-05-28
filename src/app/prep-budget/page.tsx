@@ -83,70 +83,68 @@ export default function PrepareBudgetPage() {
 
   const isInitialOnboarding = !initialMonthId || !getBudgetForMonth(initialMonthId);
 
-  // Effect to load source month data
   useEffect(() => {
-    setIsLoadingPageData(true); // Set loading true at the start of data fetching
+    setIsLoadingPageData(true);
     const sourceMonthId = initialMonthId || getYearMonthFromDate(new Date());
     if (!sourceMonthId) {
       toast({ title: "Error", description: "Current month ID is not available. Please return to the dashboard.", variant: "destructive" });
       router.push('/');
       setIsLoadingPageData(false);
-      setIsLoadingAi(false);
+      setIsLoadingAi(false); // Ensure AI loading is false if we error out
       return;
     }
     const data = getBudgetForMonth(sourceMonthId);
     setCurrentMonthData(data || null);
-    setIsLoadingPageData(false);
+    setIsLoadingPageData(false); // This will trigger the next effect
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
-  // Effect to reset form fields and populate snapshot when currentMonthData is set/updated or page loads
+
   useEffect(() => {
-    // This effect runs when currentMonthData is loaded or changes.
-    // It resets the form, populates the snapshot, and enables inputs.
-    
-    setAiError(null);
-    setStatementFiles([]);
-    setStatementPreviewDetails([]);
-    setStatementDataUris([]);
-    setGranularGoals({
-      planIncome: "",
-      planStartMonth: "next month",
-      familySize: "",
-      savingsGoalOptions: [],
-      savingsGoalOtherText: "",
-      debtGoalText: "",
-      purchaseGoalText: "",
-      cutbackGoalOptions: [],
-      cutbackGoalOtherText: "",
-      otherGoalText: "",
-    });
-    if (statementFileInputRef.current) {
-      statementFileInputRef.current.value = "";
-    }
+    // This effect runs when currentMonthData is loaded or if the page is directly loaded (isLoadingPageData becomes false)
+    if (!isLoadingPageData) {
+      setAiError(null);
+      setStatementFiles([]);
+      setStatementPreviewDetails([]);
+      setStatementDataUris([]);
+      setGranularGoals({
+        planIncome: "",
+        planStartMonth: "next month",
+        familySize: "",
+        savingsGoalOptions: [],
+        savingsGoalOtherText: "",
+        debtGoalText: "",
+        purchaseGoalText: "",
+        cutbackGoalOptions: [],
+        cutbackGoalOtherText: "",
+        otherGoalText: "",
+      });
+      if (statementFileInputRef.current) {
+        statementFileInputRef.current.value = "";
+      }
 
-    if (currentMonthData) {
-      const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
-      const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+      if (currentMonthData) {
+        const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
+        const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+        
+        const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
+        setEditableCurrentIncome(totalIncome.toFixed(2));
+
+        const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+        const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+        setEditableActualSavings(actualSavingsContribution.toFixed(2));
+
+        const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+        const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+        setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
+      } else {
+        setEditableCurrentIncome("0");
+        setEditableActualSavings("0");
+        setEditableEstimatedDebt("0");
+      }
       
-      const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
-      setEditableCurrentIncome(totalIncome.toFixed(2));
-
-      const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
-      const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-      setEditableActualSavings(actualSavingsContribution.toFixed(2));
-
-      const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-      const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-      setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
-    } else {
-      setEditableCurrentIncome("0");
-      setEditableActualSavings("0");
-      setEditableEstimatedDebt("0");
+      setIsLoadingAi(false); // CRITICAL: Enable inputs after all state is reset/populated
     }
-    
-    setIsLoadingAi(false); 
-
-  }, [currentMonthData]); // This effect runs when currentMonthData is available or changes.
+  }, [isLoadingPageData, currentMonthData]);
 
 
   const handleGranularGoalChange = (field: keyof GranularGoals, value: string | string[]) => {
@@ -175,13 +173,11 @@ export default function PrepareBudgetPage() {
       const newPreviewDetailsAccumulator: { name: string; type: string; dataUri?: string }[] = [];
       const newDataUrisAccumulator: string[] = [];
       
-      // Rebuild based on the new combinedFiles
       const filesToProcess = statementFiles.length > 0 ? combinedFiles : newFilesArray;
 
       for (const file of filesToProcess) {
-        if (newDataUrisAccumulator.length >= 5) break; // Ensure we don't exceed 5
-        // Check if this file (by name and size, as a simple heuristic) was already processed
-        const existingDetailIndex = statementPreviewDetails.findIndex(pd => pd.name === file.name); // More robust check needed if files can have same names
+        if (newDataUrisAccumulator.length >= 5) break;
+        const existingDetailIndex = statementPreviewDetails.findIndex(pd => pd.name === file.name); 
         const existingUri = existingDetailIndex !== -1 ? statementDataUris[existingDetailIndex] : undefined;
         
         if (existingUri && statementPreviewDetails[existingDetailIndex]) {
@@ -210,7 +206,6 @@ export default function PrepareBudgetPage() {
 
       setStatementDataUris(newDataUrisAccumulator.slice(0,5));
       setStatementPreviewDetails(newPreviewDetailsAccumulator.slice(0,5));
-      // Update statementFiles to only contain those successfully processed or already present
       setStatementFiles(filesToProcess.filter(f => newPreviewDetailsAccumulator.some(pd => pd.name === f.name)).slice(0,5));
 
 

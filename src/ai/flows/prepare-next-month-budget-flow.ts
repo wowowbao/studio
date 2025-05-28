@@ -17,7 +17,7 @@ const SuggestedSubCategorySchema = z.object({
 });
 
 const SuggestedCategorySchema = z.object({
-  name: z.string().describe("The name of the suggested category (e.g., 'Groceries', 'Rent', 'Savings', 'Credit Card Payments'). Do NOT suggest a category named 'Income' or similar; income is a given figure, not a budget item."),
+  name: z.string().describe("The name of the suggested category (e.g., 'Groceries', 'Rent', 'Savings', 'Credit Card Payments', 'Car Loan'). Do NOT suggest a category named 'Income' or similar; income is a given figure, not a budget item."),
   budgetedAmount: z.number().optional().describe("The suggested budgeted amount for this category. If the category has subcategories, this amount should be the sum of subcategory budgets, or left blank if sums are handled by the app. If no subcategories, this is the direct budget. If not determinable, leave blank."),
   subcategories: z.array(SuggestedSubCategorySchema).optional().describe("An array of suggested subcategories under this category."),
 });
@@ -30,7 +30,7 @@ const PrepareBudgetInputSchema = z.object({
     .describe(
       "Optional: An array of bank statements or spending summaries (images or PDFs), as data URIs. Format for each: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-  userGoals: z.string().describe("A text description of the user's financial goals. This is a critical input. It may contain: an approximate monthly income for the plan (e.g., 'My income is $4000/month'), desired start month for the plan, specific savings targets (e.g., 'save $500 for vacation in 6 months'), debt reduction plans (e.g., 'pay off CC X'), major purchase goals (e.g., 'new PC'), desired spending cutbacks (e.g., 'reduce dining out'), or even questions/refinements to a previous plan you suggested. Analyze this input carefully to understand the user's current intent and whether this is an initial setup or ongoing planning."),
+  userGoals: z.string().describe("A text description of the user's financial goals. This is a critical input. It may contain: an approximate monthly income for the plan (e.g., 'My income is $4000/month'), desired start month for the plan, specific savings targets (e.g., 'save $500 for vacation in 6 months'), debt reduction plans (e.g., 'pay off CC X'), car loan payment details, major purchase goals (e.g., 'new PC'), desired spending cutbacks (e.g., 'reduce dining out'), or even questions/refinements to a previous plan you suggested. Analyze this input carefully to understand the user's current intent and whether this is an initial setup or ongoing planning."),
   currentMonthId: z.string().describe("The ID of the current month (YYYY-MM) from which planning is being done, or if this is an initial setup, it could be the current actual month."),
   currentIncome: z.number().describe("The user's total income for the *current* month from app data. If userGoals specifies a different income for the *next* month or for an initial plan, prioritize that for budgeting and report it in incomeBasisForBudget output. Do NOT create an 'Income' category in your suggestions."),
   currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category). For an initial setup, this might be 0 if no app data exists."),
@@ -105,10 +105,10 @@ Based on ALL the information above (goals, income context, debt, savings contrib
     -   DO NOT create a category named "Income" or similar.
     -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym). If userGoals mention specific needs like "rent payment", ensure "Housing" or "Rent" is a category. Adjust amounts for Groceries, Utilities, and Entertainment based on familySize if provided.
     -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category. If the user explicitly asks to change a specific category's budget, try to accommodate this if feasible or explain why it's challenging.
-    -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments", suggest meaningful progress on debt, considering incomeBasisForBudget and other goals. If currentCCDebtTotal is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise.
+    -   **Always include "Savings", "Credit Card Payments", and "Car Loan" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments" and "Car Loan", suggest meaningful progress on debt or meeting obligations, considering incomeBasisForBudget and other goals. If currentCCDebtTotal is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise. If no car loan is mentioned or implied, a zero budget for "Car Loan" is fine.
     -   **Include reasonable allocations for some discretionary spending** (e.g., "Entertainment," "Hobbies," "Personal Care," or a general "Fun Money" category) unless the user *explicitly* states they want to eliminate these or income is extremely constrained. Consider previousMonthFeedback and familySize when setting these.
     -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories. However, if their goals require spending cuts, proactively suggest these reductions while still aiming for sustainability.
-    -   **The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed 'incomeBasisForBudget'.** If it does, clearly point out the shortfall in 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
+    -   **The sum of all top-level category budgets (including planned savings and debt payments) should ideally not exceed 'incomeBasisForBudget'.** If it does, clearly point out the shortfall in 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
     -   If applicable, suggest logical subcategories under broader categories (e.g., Groceries > Produce, Dairy; Utilities > Electricity, Water, Internet; Entertainment > Streaming Services, Movies).
     -   If the user states an urgent need for a large purchase (e.g., "I need a new PC or I can't work"), acknowledge this urgency.
 
@@ -117,7 +117,7 @@ Based on ALL the information above (goals, income context, debt, savings contrib
     -   **Address User's Questions/Refinements:** If 'userGoals' text contains explicit questions about previous suggestions or requests for changes, address these directly. Explain the impact of requested changes on the overall budget and other goals.
     -   Directly address how 'suggestedCategories' help achieve their stated goals.
     -   If they have a large purchase goal, explain how the budget helps save towards it. Suggest realistic timelines.
-    -   **Debt Management:** If currentCCDebtTotal is high, emphasize strategies for paying it down. Frame debt repayment as a positive step towards financial freedom, but balance aggressive repayment with other life needs unless the user strongly indicates an "all-in" approach to debt.
+    -   **Debt Management:** If currentCCDebtTotal is high, emphasize strategies for paying it down. If they mention a car loan, factor that into advice as well. Frame debt repayment as a positive step towards financial freedom, but balance aggressive repayment with other life needs unless the user strongly indicates an "all-in" approach to debt.
     -   **Large Purchases:**
         -   Generally, strongly advise saving up for large discretionary purchases.
         -   If extreme urgency for an essential item is expressed, and saving quickly isn't feasible, *cautiously* mention exploring 0% interest installment plans as a *last resort*, emphasizing that saving first is always preferable. Explicitly advise AGAINST standard high-interest credit cards.
@@ -150,43 +150,39 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
       if (!output || (!output.suggestedCategories && !output.financialAdvice && !output.incomeBasisForBudget)) {
         return {
             financialAdvice: "The AI could not generate budget suggestions or advice at this time. Please try rephrasing your goals or providing more details (especially income if this is an initial setup), or ensure any uploaded statements are clear.",
-            incomeBasisForBudget: input.currentIncome, 
+            incomeBasisForBudget: input.currentIncome,
             aiError: output?.aiError || 'AI processing returned no meaningful output.'
         };
       }
       
+      const systemCategoryNames = ["Savings", "Credit Card Payments", "Car Loan"];
       if (output.suggestedCategories) {
         output.suggestedCategories = output.suggestedCategories.map(cat => {
           const nameLower = cat.name.toLowerCase();
-          if (nameLower.includes("savings")) { 
-            return { ...cat, name: "Savings", isSystemCategory: true, subcategories: cat.subcategories || [] }; 
-          }
-          if (nameLower.includes("credit card payment")) { 
-            return { ...cat, name: "Credit Card Payments", isSystemCategory: true, subcategories: cat.subcategories || [] };
-          }
-          return { ...cat, isSystemCategory: false, subcategories: cat.subcategories || [] };
+          let isSystem = false;
+          let finalName = cat.name;
+
+          if (nameLower.includes("savings")) { isSystem = true; finalName = "Savings"; }
+          else if (nameLower.includes("credit card payment")) { isSystem = true; finalName = "Credit Card Payments"; }
+          else if (nameLower.includes("car loan") || nameLower.includes("auto loan")) { isSystem = true; finalName = "Car Loan"; }
+          
+          return { ...cat, name: finalName, isSystemCategory: isSystem, subcategories: cat.subcategories || [] };
         });
 
-        const hasSavings = output.suggestedCategories.some(c => c.name === "Savings");
-        const hasCCPayments = output.suggestedCategories.some(c => c.name === "Credit Card Payments");
-
-        if (!hasSavings) {
-            output.suggestedCategories.unshift({ name: "Savings", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
-        }
-        if (!hasCCPayments) { 
-             output.suggestedCategories.push({ name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
-        }
+        systemCategoryNames.forEach(sysName => {
+            if (!output.suggestedCategories!.some(c => c.name === sysName && c.isSystemCategory)) {
+                output.suggestedCategories!.push({ name: sysName, budgetedAmount: 0, subcategories: [], isSystemCategory: true });
+            }
+        });
+        
       } else {
-        output.suggestedCategories = [
-            { name: "Savings", budgetedAmount: 0, subcategories: [], isSystemCategory: true },
-            { name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true }
-        ];
+        output.suggestedCategories = systemCategoryNames.map(sysName => ({
+            name: sysName, budgetedAmount: 0, subcategories: [], isSystemCategory: true
+        }));
       }
       
       if (output.incomeBasisForBudget === undefined || output.incomeBasisForBudget === null) {
-          // If AI didn't set incomeBasisForBudget, default to the currentIncome provided as input
-          // This ensures the review page always has an income to display for calculations
-          output.incomeBasisForBudget = input.currentIncome; 
+          output.incomeBasisForBudget = input.currentIncome;
       }
 
       return output;
@@ -194,12 +190,10 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
       console.error("Error in prepareNextMonthBudgetFlow:", e);
       return {
         financialAdvice: "An unexpected error occurred while preparing your budget. Please try again later.",
-        incomeBasisForBudget: input.currentIncome, // Fallback income basis
+        incomeBasisForBudget: input.currentIncome, 
         aiError: e.message || 'An unexpected error occurred during AI processing.'
       };
     }
   }
 );
 
-
-    

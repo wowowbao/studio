@@ -10,13 +10,13 @@ import { BudgetActions } from "@/components/budget/BudgetActions";
 import { BudgetChart } from "@/components/budget/BudgetChart";
 import { EditBudgetModal } from "@/components/budget/EditBudgetModal";
 import { AddExpenseModal } from "@/components/budget/AddExpenseModal";
-import { AddIncomeModal } from "@/components/budget/AddIncomeModal";
+import { AddIncomeModal } from "@/components/budget/AddIncomeModal"; 
 import { CreditCardDebtSummary } from "@/components/budget/CreditCardDebtSummary";
 import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle, Landmark } from 'lucide-react'; // Added Landmark
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,7 +47,13 @@ export default function HomePage() {
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
 
-  const hasAnyBudgetData = Object.keys(budgetMonths).length > 0;
+  const hasAnyBudgetData = Object.keys(budgetMonths).length > 0 && 
+                         Object.values(budgetMonths).some(month => 
+                           (month.categories && month.categories.length > 0) || 
+                           (month.incomes && month.incomes.length > 0) ||
+                           month.startingCreditCardDebt > 0
+                         );
+
 
   useEffect(() => {
     if (!authLoading && !isUserAuthenticated) {
@@ -59,8 +65,6 @@ export default function HomePage() {
   }, [authLoading, isUserAuthenticated]);
 
   useEffect(() => {
-    // If user is authenticated, not loading, and has no budget data,
-    // redirect them to the AI budget prep page for onboarding.
     if (isUserAuthenticated && !authLoading && !budgetLoading && !hasAnyBudgetData) {
       router.push('/prep-budget');
     }
@@ -70,8 +74,6 @@ export default function HomePage() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      // Optionally, redirect to home or sign-in page after sign-out
-      // router.push('/');
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -114,7 +116,7 @@ export default function HomePage() {
   };
 
 
-  if (isLoading && !hasAnyBudgetData && !isUserAuthenticated) { // Show simpler loading for initial guest experience
+  if (isLoading && !hasAnyBudgetData && !isUserAuthenticated) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
@@ -144,7 +146,7 @@ export default function HomePage() {
   const operationalCategories: BudgetCategory[] = [];
 
   allCategories.forEach(cat => {
-    if (cat.isSystemCategory && (cat.name.toLowerCase() === 'savings' || cat.name.toLowerCase() === 'credit card payments')) {
+    if (cat.isSystemCategory && ["Savings", "Credit Card Payments", "Car Loan"].includes(cat.name)) {
       systemCategories.push(cat);
     } else if (!cat.isSystemCategory) {
       operationalCategories.push(cat);
@@ -152,11 +154,13 @@ export default function HomePage() {
   });
 
   systemCategories.sort((a, b) => {
-    if (a.name.toLowerCase() === 'savings') return -1;
-    if (b.name.toLowerCase() === 'savings') return 1;
-    if (a.name.toLowerCase() === 'credit card payments') return -1;
-    if (b.name.toLowerCase() === 'credit card payments') return 1;
-    return 0;
+    const order = ["Savings", "Credit Card Payments", "Car Loan"];
+    const aIndex = order.indexOf(a.name);
+    const bIndex = order.indexOf(b.name);
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    return 0; 
   });
 
 
@@ -216,7 +220,7 @@ export default function HomePage() {
 
         <MonthNavigator />
 
-        {!isLoading && !hasAnyBudgetData && !isUserAuthenticated && ( // Guest user, no data
+        {!isLoading && !hasAnyBudgetData && !isUserAuthenticated && ( 
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
@@ -238,9 +242,8 @@ export default function HomePage() {
           </Card>
         )}
 
-        {/* Case for authenticated user with no data is handled by useEffect redirect */}
 
-        {isLoading && hasAnyBudgetData && !currentBudgetMonth ? ( // User has data in other months, but current month is loading
+        {isLoading && hasAnyBudgetData && !currentBudgetMonth ? ( 
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
                  {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
@@ -252,7 +255,7 @@ export default function HomePage() {
                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-lg" />)}
               </div>
             </div>
-        ) : hasAnyBudgetData && !currentBudgetMonth ? ( // User has data in other months, but current display month has no budget
+        ) : hasAnyBudgetData && !currentBudgetMonth ? ( 
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
@@ -331,7 +334,7 @@ export default function HomePage() {
 
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.31 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.32 (Studio Preview)
           </div>
       </footer>
 
@@ -365,5 +368,3 @@ export default function HomePage() {
   );
 }
 
-
-    

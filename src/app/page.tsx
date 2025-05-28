@@ -37,7 +37,6 @@ export default function HomePage() {
     budgetMonths,
     getBudgetForMonth,
     saveMonthEndFeedback,
-    // ensureMonthExists, // Removed as per previous fix for infinite loop
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -369,3 +368,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

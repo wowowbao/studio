@@ -1,13 +1,13 @@
 
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react"; // Added useCallback
 import type { BudgetMonth } from "@/types/budget";
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox"; // New import
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Wand2, Loader2, UploadCloud, FileText, Trash2, Users, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, XCircle, Info, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,12 +24,12 @@ type GranularGoals = {
   planIncome: string;
   planStartMonth: string;
   familySize: string;
-  savingsGoalOptions: string[]; // Changed
-  savingsGoalOtherText: string; // New
+  savingsGoalOptions: string[];
+  savingsGoalOtherText: string;
   debtGoalText: string;
   purchaseGoalText: string;
-  cutbackGoalOptions: string[]; // Changed
-  cutbackGoalOtherText: string; // New
+  cutbackGoalOptions: string[];
+  cutbackGoalOtherText: string;
   otherGoalText: string;
 };
 
@@ -248,7 +248,7 @@ export default function PrepareBudgetPage() {
   const constructUserGoalsString = (): string => {
     let goals = "";
     if (granularGoals.planIncome.trim()) goals += `My income for this plan will be $${granularGoals.planIncome}. `;
-    else goals += `User has not specified an income for this plan; use current month's income from app data if available, or assume a general case. `;
+    else goals += `User has not specified an income for this plan; use current month's income snapshot from app data if available, or assume a general case if snapshot is 0. `;
 
     if (granularGoals.planStartMonth.trim()) goals += `I want to start this plan in ${granularGoals.planStartMonth}. `;
     else goals += `Assume the plan starts next month. `;
@@ -256,24 +256,25 @@ export default function PrepareBudgetPage() {
     if (granularGoals.familySize.trim()) goals += `This budget is for a household of ${granularGoals.familySize} people. `;
 
     if (granularGoals.savingsGoalOptions.length > 0) {
-      goals += `Savings goals: ${granularGoals.savingsGoalOptions.join(', ')}. `;
+      goals += `My primary savings goals include: ${granularGoals.savingsGoalOptions.join(', ')}. `;
     }
     if (granularGoals.savingsGoalOtherText.trim()) {
-      goals += `Other savings details: ${granularGoals.savingsGoalOtherText}. `;
+      goals += `Other specific savings details: ${granularGoals.savingsGoalOtherText}. `;
     }
 
     if (granularGoals.debtGoalText.trim()) goals += `Debt repayment goal: ${granularGoals.debtGoalText}. `;
     if (granularGoals.purchaseGoalText.trim()) goals += `Major purchase goal: ${granularGoals.purchaseGoalText}. `;
 
     if (granularGoals.cutbackGoalOptions.length > 0) {
-      goals += `I'd like to cut back on: ${granularGoals.cutbackGoalOptions.join(', ')}. `;
+      goals += `I'd like to try and cut back spending on: ${granularGoals.cutbackGoalOptions.join(', ')}. `;
     }
     if (granularGoals.cutbackGoalOtherText.trim()) {
-      goals += `Other cutback details: ${granularGoals.cutbackGoalOtherText}. `;
+      goals += `Other specific cutback details: ${granularGoals.cutbackGoalOtherText}. `;
     }
 
-    if (granularGoals.otherGoalText.trim()) goals += `Other notes or questions: ${granularGoals.otherGoalText}.`;
+    if (granularGoals.otherGoalText.trim()) goals += `Other general notes, financial questions, or specific changes I'd like for this plan: ${granularGoals.otherGoalText}.`;
 
+    // If minimal goal info, add a default prompt for the AI
     if (goals.length === 0 || (
         !granularGoals.savingsGoalOptions.length && 
         !granularGoals.savingsGoalOtherText.trim() &&
@@ -283,7 +284,7 @@ export default function PrepareBudgetPage() {
         !granularGoals.cutbackGoalOtherText.trim() &&
         !granularGoals.otherGoalText.trim()
     )) {
-        goals += "User has not provided specific financial goals beyond potentially their income, start month, and family size. Provide general, foundational budgeting advice and suggestions."
+        goals += "User has not provided many specific financial goals beyond potentially their income, start month, and family size. Please provide general, foundational budgeting advice and suggestions based on the income provided."
     }
     return goals.trim();
   };
@@ -332,13 +333,13 @@ export default function PrepareBudgetPage() {
       } else {
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
-          granularGoals,
+          granularGoals, // Store the structured goals
           statementFileNames: statementPreviewDetails.map(f => f.name),
           currentMonthId: baseMonthIdForAI,
           currentIncome: incomeForAIContext,
           currentActualSavings: savingsForAIContext,
           currentEstimatedDebt: debtForAIContext,
-          statementDataUris,
+          statementDataUris, // Keep for re-running AI
           previousMonthFeedback: previousMonthFeedbackFromSource,
           familySize: familySizeForAI,
         }));
@@ -446,6 +447,7 @@ export default function PrepareBudgetPage() {
               <Card>
                   <CardHeader>
                       <CardTitle className="text-lg">About Your Income & Timing for This Plan</CardTitle>
+                      <CardDescription>Let's set the stage for your new budget.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                       <div>
@@ -623,3 +625,5 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
+
+    

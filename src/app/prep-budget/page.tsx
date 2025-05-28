@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, MessageSquareText } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, MessageSquareText, Edit3, ListChecks } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from "next/image";
@@ -41,8 +41,12 @@ export default function PrepareBudgetPage() {
   const [currentActualSavingsForDisplay, setCurrentActualSavingsForDisplay] = useState(0);
   const [currentEstimatedDebtForDisplay, setCurrentEstimatedDebtForDisplay] = useState(0);
 
-  const isInitialOnboarding = !currentMonthData; // True if there's no previous month data to base off
+  const isInitialOnboarding = !currentMonthData; 
   
+  const [viewMode, setViewMode] = useState<'input' | 'suggestions'>('input');
+  const [aiSuggestions, setAiSuggestions] = useState<PrepareBudgetOutput | null>(null);
+  const [inputsUsedForSuggestions, setInputsUsedForSuggestions] = useState<Partial<PrepareBudgetInput> | null>(null);
+
 
   useEffect(() => {
     const sourceMonthId = initialMonthId;
@@ -53,8 +57,6 @@ export default function PrepareBudgetPage() {
       return;
     }
     const data = getBudgetForMonth(sourceMonthId);
-    // If no data for current month (e.g., new user via onboarding), setCurrentMonthData to null
-    // This allows the UI to adapt for true onboarding vs. planning for an existing user.
     setCurrentMonthData(data || null); 
     setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
@@ -63,17 +65,23 @@ export default function PrepareBudgetPage() {
   useEffect(() => {
     setIsLoadingAi(false); 
     setAiError(null);
-    setStatementFiles([]);
-    setStatementPreviewDetails([]);
-    setStatementDataUris([]);
-    setUserGoals("");
-    if (statementFileInputRef.current) {
-      statementFileInputRef.current.value = "";
+    
+    // Reset specific fields, keep inputs if user is just switching views or an error occurred
+    if (viewMode === 'input') { // Full reset if going back to input mode from suggestions or on initial load
+        setStatementFiles([]);
+        setStatementPreviewDetails([]);
+        setStatementDataUris([]);
+        setUserGoals("");
+        setAiSuggestions(null);
+        setInputsUsedForSuggestions(null);
+        if (statementFileInputRef.current) {
+          statementFileInputRef.current.value = "";
+        }
     }
-  }, [initialMonthId]); 
+  }, [initialMonthId, viewMode]); 
 
   useEffect(() => {
-    if (currentMonthData) { // Only calculate if there is a current month's data
+    if (currentMonthData) { 
       const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
 
@@ -87,7 +95,7 @@ export default function PrepareBudgetPage() {
       const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
       const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
       setCurrentEstimatedDebtForDisplay(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
-    } else { // For onboarding or if no current month data, default to 0
+    } else { 
       setCurrentIncomeForDisplay(0);
       setCurrentActualSavingsForDisplay(0);
       setCurrentEstimatedDebtForDisplay(0);
@@ -150,7 +158,7 @@ export default function PrepareBudgetPage() {
   };
 
 
-  const handleGetInitialAiSuggestions = async () => {
+  const handleGetAiSuggestions = async () => {
     if (!userGoals.trim()) {
       setAiError("Please describe your financial goals.");
       toast({ title: "Goals Required", description: "Please describe your financial goals.", variant: "destructive" });
@@ -160,18 +168,22 @@ export default function PrepareBudgetPage() {
     setAiError(null);
 
     let baseMonthIdForAI = initialMonthId || getYearMonthFromDate(new Date());
-    let incomeForAI = currentIncomeForDisplay;
-    let savingsForAI = currentActualSavingsForDisplay;
-    let debtForAI = currentEstimatedDebtForDisplay;
+    
+    let incomeForAI = 0;
+    let savingsForAI = 0;
+    let debtForAI = 0;
 
-    if (isInitialOnboarding) { // If it's onboarding, these values are likely 0
-      // The AI flow will be instructed to derive income from userGoals if possible
-      // If not, it will proceed with the provided 0s, and its advice should reflect this.
-      // baseMonthIdForAI remains the current month or next if current is problematic
-      // (though AI plans for the "next" month from this base)
+    if (currentMonthData) {
+      const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
+      const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+      incomeForAI = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
+      const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+      savingsForAI = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+      const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+      const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+      debtForAI = Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth);
     }
-
-
+    
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
       userGoals,
@@ -187,18 +199,17 @@ export default function PrepareBudgetPage() {
         setAiError(result.aiError);
         toast({ title: "AI Suggestion Error", description: result.aiError, variant: "destructive" });
       } else {
+        // Instead of redirecting, store in session and change view
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
           userGoals,
           statementFileNames: statementPreviewDetails.map(f => f.name),
-          currentMonthId: baseMonthIdForAI, // The month ID AI used as its "current"
-          currentIncome: incomeForAI, // The income figure AI started with
+          currentMonthId: baseMonthIdForAI,
+          currentIncome: incomeForAI, 
           currentActualSavings: savingsForAI,
           currentEstimatedDebt: debtForAI,
           statementDataUris 
         }));
-        
-        toast({ title: "AI Suggestions Ready!", description: "Redirecting to review page...", duration: 3000 });
         router.push('/prep-budget/review');
       }
     } catch (error: any) {
@@ -216,13 +227,16 @@ export default function PrepareBudgetPage() {
     return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
   };
   
-  const handleClearInputs = () => {
+  const handleClearAllAndRestart = () => {
     setIsLoadingAi(false);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
     setStatementDataUris([]);
     setUserGoals("");
     setAiError(null);
+    setAiSuggestions(null);
+    setInputsUsedForSuggestions(null);
+    setViewMode('input');
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
@@ -230,7 +244,7 @@ export default function PrepareBudgetPage() {
   };
 
 
-  if (isLoadingPageData) { // Simplified loading, currentMonthData might be null for onboarding
+  if (isLoadingPageData && !currentMonthData && !initialMonthId) { 
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -238,7 +252,7 @@ export default function PrepareBudgetPage() {
              <Button variant="outline" size="icon" onClick={() => router.push('/')} aria-label="Go back to dashboard">
                 <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold text-primary">AI Budget Prep</h1>
+            <h1 className="text-xl font-bold text-primary">Let's Create Your Financial Plan!</h1>
             <div className="w-8"></div> 
           </div>
         </header>
@@ -255,12 +269,12 @@ export default function PrepareBudgetPage() {
 
   const nextMonthToPrepFor = currentMonthData 
     ? getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(currentMonthData.id).setMonth(parseYearMonth(currentMonthData.id).getMonth() + 1))))
-    : getFormattedMonthTitle(getYearMonthFromDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1))); // Default to next calendar month if no current data
+    : getFormattedMonthTitle(getYearMonthFromDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)));
 
 
   const goalsPlaceholderText = isInitialOnboarding 
-    ? "Describe your overall financial goals (e.g., 'Save for a down payment in 1 year', 'Reduce debt by $X in 6 months'). Include your approximate monthly income (e.g., 'My income is $3000/month') and when you'd like this plan to start (e.g., 'Start this plan next month'). The more detail, the better!"
-    : "Describe what you want to achieve next month (e.g., 'Save $500 for vacation', 'Reduce dining out'). The AI will also consider your current month's data. If your income for next month will be different, please specify (e.g., 'My income next month will be $X').";
+    ? "e.g., 'My income is $4000/month. I want to save $500 for a vacation in 6 months, pay off $200 in credit card debt, and reduce my dining out expenses. Start this plan for next month.' The more detail, the better!"
+    : "e.g., 'Save $500 for vacation', 'Reduce dining out'. The AI will also consider your current month's data. If your income for next month will be different, please specify (e.g., 'My income next month will be $X').";
 
 
   return (
@@ -271,10 +285,10 @@ export default function PrepareBudgetPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary truncate px-2">
-              {isInitialOnboarding ? "AI Financial Plan Setup" : `AI Prep for ${nextMonthToPrepFor}`}
+             Let's Create Your Financial Plan!
             </h1>
-             <Button variant="outline" size="sm" onClick={handleClearInputs} disabled={isLoadingAi} aria-label="Clear Inputs">
-                <RotateCcw className="mr-2 h-4 w-4" /> Clear Inputs
+             <Button variant="outline" size="sm" onClick={handleClearAllAndRestart} disabled={isLoadingAi} aria-label="Clear Inputs & Suggestions">
+                <RotateCcw className="mr-2 h-4 w-4" /> Clear All & Restart
             </Button>
           </div>
         </header>
@@ -282,11 +296,11 @@ export default function PrepareBudgetPage() {
         <ScrollArea className="h-full pr-2"> 
           <div className="space-y-8 pb-8">
               
-              {!isInitialOnboarding && currentMonthData && ( // Only show snapshot if not onboarding and current month data exists
+              {!isInitialOnboarding && currentMonthData && (
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
-                        <CardDescription>Based on your latest data for {getFormattedMonthTitle(currentMonthData.id)}. This info helps the AI.</CardDescription>
+                        <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
+                        <CardDescription>Here's a look at your finances for {getFormattedMonthTitle(currentMonthData.id)}, which helps me plan for {nextMonthToPrepFor}.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                         <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
@@ -312,7 +326,7 @@ export default function PrepareBudgetPage() {
                     <Info className="h-4 w-4" />
                     <AlertTitle>Welcome to AI Financial Planning!</AlertTitle>
                     <AlertDescription>
-                      Let's create your first budget. Please describe your financial goals, income, and when you'd like to start. 
+                      To get started, tell me about your financial goals and income. 
                       Optionally, upload past bank statements for more tailored suggestions.
                     </AlertDescription>
                   </Alert>
@@ -320,14 +334,9 @@ export default function PrepareBudgetPage() {
 
               <Card>
                   <CardHeader>
-                      <CardTitle className="text-lg">
-                        {isInitialOnboarding ? "Your Financial Goals & Income" : "Your Financial Goals for Next Month"}
-                      </CardTitle>
+                      <CardTitle className="text-lg">Tell Me About Your Financial Goals & Income</CardTitle>
                       <CardDescription>
-                          {isInitialOnboarding 
-                            ? "Be specific about your goals, your typical monthly income, and when you'd like this plan to begin. The more detail, the better the AI can assist."
-                            : "Describe what you want to achieve. The AI will consider these comments and your current month's data when generating suggestions. If your income for next month will differ, please state it."
-                          }
+                          What do you want to achieve financially? What's your approximate monthly income, and when would you like this plan to ideally start (e.g., 'start next month', 'begin in August')? The more details you share (like desired savings, debt paydown, big purchases, or areas you want to cut back), the better I can tailor a plan for you!
                       </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -345,8 +354,8 @@ export default function PrepareBudgetPage() {
 
               <Card>
                   <CardHeader>
-                      <CardTitle className="text-lg">Upload Past Bank Statement(s) <span className="text-xs text-muted-foreground">(Optional, Max 5 Files)</span></CardTitle>
-                      <CardDescription>Provide images or PDFs of recent bank statements or spending summaries for more tailored AI suggestions.</CardDescription>
+                      <CardTitle className="text-lg">Share Your Spending Habits? <span className="text-xs text-muted-foreground">(Optional, Max 5 Files)</span></CardTitle>
+                      <CardDescription>For even more tailored suggestions, you can upload images or PDFs of recent bank statements or spending summaries. I'll analyze them to understand your typical spending patterns.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                       <Input
@@ -403,7 +412,7 @@ export default function PrepareBudgetPage() {
                   </CardContent>
               </Card>
               
-              <Button onClick={handleGetInitialAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
+              <Button onClick={handleGetAiSuggestions} disabled={isLoadingAi || !userGoals.trim()} className="w-full py-3 text-base font-semibold">
                 {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
                 Get AI Budget Suggestions
               </Button>
@@ -421,3 +430,4 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
+

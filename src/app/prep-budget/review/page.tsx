@@ -1,13 +1,13 @@
 
 "use client";
 import { useState, useEffect, useRef } from "react";
-import type { BudgetMonth, BudgetCategory as BudgetCategoryType } from "@/types/budget"; // Renamed to avoid conflict
+import type { BudgetMonth, BudgetCategory as BudgetCategoryType } from "@/types/budget"; 
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks, FileText } from "lucide-react";
+import { Wand2, Loader2, CheckCircle, XCircle, Info, DollarSign, PiggyBank, CreditCard, ArrowLeft, MessageSquareText, ListChecks, FileText, Edit3 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { prepareNextMonthBudget, type PrepareBudgetInput, type PrepareBudgetOutput } from "@/ai/flows/prepare-next-month-budget-flow";
@@ -22,7 +22,7 @@ interface StoredAIPrepData {
     userGoals: string;
     statementFileNames: string[];
     currentMonthId: string;
-    currentIncome: number; // Income from the source month (used as fallback)
+    currentIncome: number;
     currentActualSavings: number;
     currentEstimatedDebt: number;
     statementDataUris?: string[]; 
@@ -66,17 +66,20 @@ export default function PrepareBudgetReviewPage() {
       toast({ title: "Error", description: "Missing initial data. Please start over.", variant: "destructive" });
       return;
     }
+    if (!refinementText.trim()) {
+        toast({ title: "Refinement Needed", description: "Please type your questions or requested changes.", variant: "default" });
+        return;
+    }
     setIsLoadingAi(true);
     setAiError(null);
 
-    // Combine original goals with new refinement text
-    const updatedUserGoals = `${initialInputs.userGoals}\n\n--- Refinement Request ---\n${refinementText}`;
+    const updatedUserGoals = `${initialInputs.userGoals}\n\n--- User Refinement Request ---\n${refinementText}`;
 
     const input: PrepareBudgetInput = {
       statementDataUris: initialInputs.statementDataUris, 
       userGoals: updatedUserGoals,
       currentMonthId: initialInputs.currentMonthId,
-      currentIncome: initialInputs.currentIncome, // This is the source month's income
+      currentIncome: initialInputs.currentIncome, 
       currentSavingsTotal: initialInputs.currentActualSavings,
       currentCCDebtTotal: initialInputs.currentEstimatedDebt,
     };
@@ -89,12 +92,13 @@ export default function PrepareBudgetReviewPage() {
       } else {
         setCurrentSuggestions(result);
         setRefinementText(""); 
-        toast({ title: "AI Suggestions Updated", description: "Review the updated plan.", duration: 5000 });
+        toast({ title: "AI Suggestions Updated!", description: "Review the updated plan below.", duration: 5000 });
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         // Update the userGoals in sessionStorage to reflect the refinement
+        setInitialInputs(prev => prev ? ({...prev, userGoals: updatedUserGoals}) : null); // Update local state too
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
-            ...initialInputs,
-            userGoals: updatedUserGoals 
+            ...initialInputs, // Spread existing initialInputs
+            userGoals: updatedUserGoals // Only update the userGoals part for the next refinement
         }));
 
       }
@@ -121,15 +125,11 @@ export default function PrepareBudgetReviewPage() {
     currentMonthDate.setMonth(currentMonthDate.getMonth() + 1);
     const nextMonthId = getYearMonthFromDate(currentMonthDate);
     
-    const ccPaymentsCategory = currentSuggestions.suggestedCategories.find(c => c.name.toLowerCase() === "credit card payments");
-    const aiSuggestedCCPaymentForNextMonth = ccPaymentsCategory?.budgetedAmount || 0;
-    
     applyAiGeneratedBudget(
       nextMonthId,
       currentSuggestions.suggestedCategories,
-      currentSuggestions.incomeBasisForBudget, // Use the income basis AI confirmed it used
-      initialInputs.currentEstimatedDebt, // This is the debt at the END of the current month, so it's STARTING for next
-      aiSuggestedCCPaymentForNextMonth 
+      currentSuggestions.incomeBasisForBudget, 
+      initialInputs.currentEstimatedDebt
     );
 
     toast({
@@ -150,6 +150,9 @@ export default function PrepareBudgetReviewPage() {
   };
 
   const handleGoBackToInputs = () => {
+    // Clear session storage related to review, so /prep-budget starts fresh
+    // but keep the original userGoals and statement files potentially pre-filled if desired
+    // For now, just navigate. /prep-budget's useEffect will handle reset if needed.
     router.push('/prep-budget');
   };
   
@@ -193,10 +196,9 @@ export default function PrepareBudgetReviewPage() {
             totalBudgeted += cat.budgetedAmount || 0;
         }
     });
-    // Use incomeBasisForBudget from AI suggestions if available, otherwise fallback
     const projectedIncome = typeof currentSuggestions.incomeBasisForBudget === 'number' 
                             ? currentSuggestions.incomeBasisForBudget 
-                            : initialInputs.currentIncome;
+                            : initialInputs.currentIncome; // Fallback just in case
     const balance = projectedIncome - totalBudgeted;
     return { totalBudgeted, balance, projectedIncome };
   };
@@ -208,7 +210,11 @@ export default function PrepareBudgetReviewPage() {
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between max-w-5xl mx-auto px-4">
+             <Button variant="outline" size="icon" onClick={handleGoBackToInputs} aria-label="Back to inputs">
+                <ArrowLeft className="h-5 w-5" />
+            </Button>
             <h1 className="text-xl font-bold text-primary">Review AI Budget</h1>
+             <div className="w-10"></div>
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
@@ -227,11 +233,13 @@ export default function PrepareBudgetReviewPage() {
     <div className="flex flex-col min-h-screen bg-background">
        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between max-w-5xl mx-auto px-4">
-            <Button variant="outline" size="icon" onClick={handleGoBackToInputs} aria-label="Back to inputs">
+            <Button variant="outline" size="icon" onClick={handleGoBackToInputs} aria-label="Back to initial inputs">
                 <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold text-primary truncate px-2">Review & Refine for {nextMonthToPrep}</h1>
-            <div className="w-8"></div> 
+            <h1 className="text-xl font-bold text-primary truncate px-2">Your AI-Powered Financial Plan for {nextMonthToPrep}</h1>
+             <Button variant="outline" size="sm" onClick={handleGoBackToInputs} disabled={isLoadingAi}>
+                <Edit3 className="mr-2 h-4 w-4" /> Edit Inputs & Regenerate
+            </Button>
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
@@ -239,30 +247,32 @@ export default function PrepareBudgetReviewPage() {
           <div className="space-y-8 pb-8">
                 <Card className="shadow-lg border-primary/30">
                     <CardHeader>
-                        <CardTitle className="text-xl text-primary">AI Suggestions for {nextMonthToPrep}</CardTitle>
-                        <CardDescription>Review the AI's plan. You can refine it below or apply if satisfied.</CardDescription>
+                        <CardTitle className="text-xl text-primary">My AI Financial Advisor's Plan for {nextMonthToPrep}</CardTitle>
+                        <CardDescription>Review the plan below. If you want to make adjustments, click "Edit Inputs & Regenerate" above, then refine your goals in the text area and get updated suggestions.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <Card className="bg-muted/30">
                           <CardHeader className="pb-2">
-                              <CardTitle className="text-base">Inputs Used for Current Suggestion:</CardTitle>
+                              <CardTitle className="text-base">Here's What I Used to Create Your Plan:</CardTitle>
                           </CardHeader>
                           <CardContent className="text-xs space-y-1">
-                              <p className="whitespace-pre-wrap"><span className="font-semibold">Your Goals:</span> {initialInputs.userGoals || "Not specified"}</p>
-                              <p><span className="font-semibold">Source Month Income (from App):</span> ${initialInputs.currentIncome.toFixed(2)}</p>
-                              <p><span className="font-semibold">Statements:</span> {initialInputs.statementFileNames.length > 0 ? initialInputs.statementFileNames.join(', ') : "None provided"}</p>
+                              <p className="whitespace-pre-wrap"><span className="font-semibold">Your Stated Goals & Context:</span> {initialInputs.userGoals || "Not specified"}</p>
+                              {initialInputs.statementFileNames.length > 0 && <p><span className="font-semibold">Statements Provided:</span> {initialInputs.statementFileNames.join(', ')}</p> }
+                               <p><span className="font-semibold">Source Month Income (from App Data):</span> ${initialInputs.currentIncome.toFixed(2)}</p>
+                               <p><span className="font-semibold">Source Month Actual Savings (from App Data):</span> ${initialInputs.currentActualSavings.toFixed(2)}</p>
+                               <p><span className="font-semibold">Source Month Est. CC Debt (from App Data):</span> ${initialInputs.currentEstimatedDebt.toFixed(2)}</p>
                           </CardContent>
                         </Card>
 
                         <div>
-                            <h4 className="text-lg font-medium flex items-center mb-2"><MessageSquareText className="mr-2 h-5 w-5 text-blue-500"/>Financial Advice & Explanations:</h4>
+                            <h4 className="text-lg font-medium flex items-center mb-2"><MessageSquareText className="mr-2 h-5 w-5 text-blue-500"/>My Financial Advice & How This Plan Helps You:</h4>
                             <ScrollArea className="h-48 p-4 border rounded-lg bg-muted/20 text-sm shadow-inner">
                                 <p className="whitespace-pre-wrap leading-relaxed">{currentSuggestions.financialAdvice}</p>
                             </ScrollArea>
                         </div>
                         
                         <div>
-                            <h4 className="text-lg font-medium flex items-center mb-2"><ListChecks className="mr-2 h-5 w-5 text-green-500"/>Suggested Budget Categories:</h4>
+                            <h4 className="text-lg font-medium flex items-center mb-2"><ListChecks className="mr-2 h-5 w-5 text-green-500"/>My Suggested Budget For You:</h4>
                             {renderSuggestedCategoriesList(currentSuggestions.suggestedCategories)}
                         </div>
 
@@ -271,11 +281,11 @@ export default function PrepareBudgetReviewPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-lg">AI Budget Overview</CardTitle>
-                                <CardDescription>Summary of the AI's suggested plan against the income basis it used.</CardDescription>
+                                <CardDescription>Summary of my suggested plan against the income basis I used.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                    <span>Projected Income (AI Basis):</span> 
+                                    <span>Projected Income (AI Basis for Plan):</span> 
                                     <span className="font-semibold">${budgetSummary.projectedIncome.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between">
@@ -294,10 +304,9 @@ export default function PrepareBudgetReviewPage() {
                         
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-lg">Refine Suggestions</CardTitle>
+                                <CardTitle className="text-lg">Want to Make Changes or Ask Questions?</CardTitle>
                                 <CardDescription>
-                                    Type any questions, desired changes, or clarifications here. The AI will use this and your original inputs to generate an updated plan. 
-                                    E.g., "Why is my dining out budget so low?", "Can you try to allocate $100 more to Groceries?", "Explain the savings strategy."
+                                   Click "Edit Inputs & Regenerate" above. Then, in the "Your Financial Goals & Income" text area, type your questions or requested changes (e.g., "Why is my 'Fun Money' budget $X?", "Increase 'Savings' to $Y"). Click "Update AI Suggestions" on that page, and I'll create a new plan based on your feedback!
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -305,14 +314,14 @@ export default function PrepareBudgetReviewPage() {
                                     id="refinementText"
                                     value={refinementText}
                                     onChange={(e) => setRefinementText(e.target.value)}
-                                    placeholder="Enter your refinement requests or questions here..."
+                                    placeholder="For direct refinement, type your questions or changes here (e.g., 'Increase savings by $100') and click 'Update Suggestions Directly' below."
                                     className="min-h-[100px] text-base"
                                     rows={4}
                                     disabled={isLoadingAi}
                                 />
                                 <Button onClick={handleUpdateSuggestions} disabled={isLoadingAi || !refinementText.trim()} className="w-full mt-4 py-3 text-base font-semibold">
                                     {isLoadingAi ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Wand2 className="mr-2 h-5 w-5" />}
-                                    Update Suggestions with Refinements
+                                    Update Suggestions Directly With Above Refinements
                                 </Button>
                             </CardContent>
                         </Card>
@@ -360,4 +369,3 @@ export default function PrepareBudgetReviewPage() {
 }
 
     
-

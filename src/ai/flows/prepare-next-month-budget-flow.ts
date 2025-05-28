@@ -30,7 +30,7 @@ const PrepareBudgetInputSchema = z.object({
     .describe(
       "Optional: An array of bank statements or spending summaries (images or PDFs), as data URIs. Format for each: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-  userGoals: z.string().describe("A text description of the user's financial goals. For an initial plan, this should include desired outcomes, timelines (e.g., 'save for a house in 2 years'), and approximate monthly income (e.g., 'my income is $4000/month'). For next month planning, this might contain refinements to a previous plan or specific goals for the upcoming month. Analyze this input carefully to understand the user's current intent and whether this is an initial setup or ongoing planning."),
+  userGoals: z.string().describe("A text description of the user's financial goals. For an initial plan, this should include desired outcomes, timelines (e.g., 'save for a house in 2 years'), approximate monthly income (e.g., 'my income is $4000/month'), and if they specify a desired starting month (e.g., 'start this plan in August'). For next month planning, this might contain refinements, specific questions about a previous plan, or goals for the upcoming month. Analyze this input carefully to understand the user's current intent and whether this is an initial setup or ongoing planning."),
   currentMonthId: z.string().describe("The ID of the current month (YYYY-MM) from which planning is being done, or if this is an initial setup, it could be the current actual month."),
   currentIncome: z.number().describe("The user's total income for the *current* month from app data. If userGoals specifies a different income for the *next* month or for an initial plan, prioritize that for budgeting and report it in incomeBasisForBudget output. Do NOT create an 'Income' category in your suggestions."),
   currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category). For an initial setup, this might be 0 if no app data exists."),
@@ -142,13 +142,37 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
       }
       
       if (output.suggestedCategories) {
+        // Ensure "Savings" and "Credit Card Payments" are consistently named if AI suggests them
         output.suggestedCategories = output.suggestedCategories.map(cat => {
           const nameLower = cat.name.toLowerCase();
-          if (nameLower === "savings" || nameLower === "credit card payments") {
-            return { ...cat, name: nameLower === "savings" ? "Savings" : "Credit Card Payments", subcategories: [] }; 
+          if (nameLower === "savings") {
+            return { ...cat, name: "Savings", isSystemCategory: true, subcategories: [] }; 
           }
-          return cat;
+          if (nameLower === "credit card payments") {
+            return { ...cat, name: "Credit Card Payments", isSystemCategory: true, subcategories: [] };
+          }
+          // Ensure non-system categories are explicitly marked
+          return { ...cat, isSystemCategory: false };
         });
+
+        // Ensure system categories are present if not suggested by AI but relevant (e.g., if debt exists)
+        const hasSavings = output.suggestedCategories.some(c => c.name === "Savings");
+        const hasCCPayments = output.suggestedCategories.some(c => c.name === "Credit Card Payments");
+
+        if (!hasSavings) {
+            output.suggestedCategories.unshift({ name: "Savings", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
+        }
+        if (!hasCCPayments && input.currentCCDebtTotal > 0) { // Only add CC payments if there's debt
+             output.suggestedCategories.push({ name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
+        } else if (!hasCCPayments) {
+             output.suggestedCategories.push({ name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true });
+        }
+      } else {
+        // If AI suggests nothing, at least provide system categories as a base
+        output.suggestedCategories = [
+            { name: "Savings", budgetedAmount: 0, subcategories: [], isSystemCategory: true },
+            { name: "Credit Card Payments", budgetedAmount: 0, subcategories: [], isSystemCategory: true }
+        ];
       }
       
       if (output.incomeBasisForBudget === undefined || output.incomeBasisForBudget === null) {

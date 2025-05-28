@@ -16,7 +16,7 @@ import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle, Landmark } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -341,7 +341,7 @@ export default function HomePage() {
       {currentDisplayMonthId && (
         <>
           <EditBudgetModal
-            key={`edit-budget-${currentDisplayMonthId}`} // Ensure modal re-renders if month changes
+            key={`edit-budget-${currentDisplayMonthId}`} 
             isOpen={isEditBudgetModalOpen}
             onClose={() => setIsEditBudgetModalOpen(false)}
             monthId={currentDisplayMonthId}

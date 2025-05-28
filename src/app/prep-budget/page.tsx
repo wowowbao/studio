@@ -1,6 +1,6 @@
 
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react"; // Added useCallback
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { BudgetMonth } from "@/types/budget";
 import { useBudget } from "@/hooks/useBudget";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Define specific goal input states
 type GranularGoals = {
   planIncome: string;
   planStartMonth: string;
@@ -74,7 +73,7 @@ export default function PrepareBudgetPage() {
     otherGoalText: "",
   });
 
-  const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
+  const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false); // Start as false
   const [aiError, setAiError] = useState<string | null>(null);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -84,7 +83,7 @@ export default function PrepareBudgetPage() {
 
   const isInitialOnboarding = !initialMonthId || !getBudgetForMonth(initialMonthId);
 
-
+  // Effect to load source month data
   useEffect(() => {
     const sourceMonthId = initialMonthId || getYearMonthFromDate(new Date());
     if (!sourceMonthId) {
@@ -98,8 +97,9 @@ export default function PrepareBudgetPage() {
     setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
-  const resetFormAndSnapshot = useCallback(() => {
-    setIsLoadingAi(false);
+  // Effect to reset form fields and populate snapshot when currentMonthData is set/updated
+  useEffect(() => {
+    setIsLoadingAi(false); // Ensure AI loading is false when page/data initializes
     setAiError(null);
     setStatementFiles([]);
     setStatementPreviewDetails([]);
@@ -120,6 +120,7 @@ export default function PrepareBudgetPage() {
       statementFileInputRef.current.value = "";
     }
 
+    // Populate snapshot based on currentMonthData
     if (currentMonthData) {
       const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
@@ -138,13 +139,7 @@ export default function PrepareBudgetPage() {
       setEditableActualSavings("0");
       setEditableEstimatedDebt("0");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMonthData]); // Dependency on currentMonthData for snapshot reset
-
-  useEffect(() => {
-    resetFormAndSnapshot();
-  }, [resetFormAndSnapshot]);
-
+  }, [currentMonthData]); // This effect runs when currentMonthData is set/updated.
 
   const handleGranularGoalChange = (field: keyof GranularGoals, value: string | string[]) => {
     setGranularGoals(prev => ({ ...prev, [field]: value }));
@@ -274,7 +269,6 @@ export default function PrepareBudgetPage() {
 
     if (granularGoals.otherGoalText.trim()) goals += `Other general notes, financial questions, or specific changes I'd like for this plan: ${granularGoals.otherGoalText}.`;
 
-    // If minimal goal info, add a default prompt for the AI
     if (goals.length === 0 || (
         !granularGoals.savingsGoalOptions.length && 
         !granularGoals.savingsGoalOtherText.trim() &&
@@ -333,13 +327,13 @@ export default function PrepareBudgetPage() {
       } else {
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
-          granularGoals, // Store the structured goals
+          granularGoals, 
           statementFileNames: statementPreviewDetails.map(f => f.name),
           currentMonthId: baseMonthIdForAI,
           currentIncome: incomeForAIContext,
           currentActualSavings: savingsForAIContext,
           currentEstimatedDebt: debtForAIContext,
-          statementDataUris, // Keep for re-running AI
+          statementDataUris, 
           previousMonthFeedback: previousMonthFeedbackFromSource,
           familySize: familySizeForAI,
         }));
@@ -361,11 +355,52 @@ export default function PrepareBudgetPage() {
   };
 
   const handleClearAllAndRestart = () => {
-    resetFormAndSnapshot(); // Use the consolidated reset function
+    // Reset form fields
+    setIsLoadingAi(false);
+    setAiError(null);
+    setStatementFiles([]);
+    setStatementPreviewDetails([]);
+    setStatementDataUris([]);
+    setGranularGoals({
+      planIncome: "",
+      planStartMonth: "next month",
+      familySize: "",
+      savingsGoalOptions: [],
+      savingsGoalOtherText: "",
+      debtGoalText: "",
+      purchaseGoalText: "",
+      cutbackGoalOptions: [],
+      cutbackGoalOtherText: "",
+      otherGoalText: "",
+    });
+    if (statementFileInputRef.current) {
+      statementFileInputRef.current.value = "";
+    }
+
+    // Re-populate snapshot from currentMonthData or defaults
+    if (currentMonthData) {
+      const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
+      const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
+      const totalIncome = incomesArray.reduce((sum, inc) => sum + inc.amount, 0);
+      setEditableCurrentIncome(totalIncome.toFixed(2));
+
+      const savingsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
+      const actualSavingsContribution = (savingsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+      setEditableActualSavings(actualSavingsContribution.toFixed(2));
+
+      const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
+      const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+      setEditableEstimatedDebt(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth).toFixed(2));
+    } else {
+      setEditableCurrentIncome("0");
+      setEditableActualSavings("0");
+      setEditableEstimatedDebt("0");
+    }
+    
     toast({title: "Form Reset", description: "All inputs cleared. Please enter your goals and upload statements again."});
   };
 
-  if (isLoadingPageData && !currentMonthData) {
+  if (isLoadingPageData) { // Simplified loading check
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -374,7 +409,7 @@ export default function PrepareBudgetPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary">Let's Create Your Financial Plan!</h1>
-            <div className="w-10"></div>
+            <div className="w-10"></div> {/* Spacer */}
           </div>
         </header>
         <main className="flex-1 container max-w-3xl mx-auto p-4 sm:p-6 md:p-8">
@@ -588,7 +623,7 @@ export default function PrepareBudgetPage() {
                                   <div className="flex items-center space-x-2 overflow-hidden flex-1">
                                       {detail.type.startsWith('image/') && detail.dataUri ? (
                                       <div className="relative w-12 h-12 border rounded-sm overflow-hidden bg-muted shrink-0">
-                                          <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="financial statement"/>
+                                          <Image src={detail.dataUri} alt={`${detail.name} preview`} layout="fill" objectFit="contain" data-ai-hint="financial document"/>
                                       </div>
                                       ) : detail.type === 'application/pdf' ? (
                                       <FileText className="h-8 w-8 text-destructive shrink-0" />

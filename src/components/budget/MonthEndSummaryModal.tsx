@@ -1,12 +1,16 @@
 
 "use client";
-import type { BudgetMonth, BudgetCategory } from "@/types/budget";
+import type { BudgetMonth } from "@/types/budget";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, TrendingDown, CheckCircle, DollarSign, PiggyBank, Landmark, Coins } from "lucide-react"; // Added Coins
+import { TrendingUp, TrendingDown, CheckCircle, DollarSign, PiggyBank, Landmark, Coins, MessageCircleQuestion } from "lucide-react"; 
 import { cn } from "@/lib/utils";
 import { parseYearMonth } from "@/hooks/useBudgetCore";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useState } from "react";
+import { Separator } from "@/components/ui/separator";
 
 interface MonthEndSummaryModalProps {
   isOpen: boolean;
@@ -15,6 +19,8 @@ interface MonthEndSummaryModalProps {
 }
 
 export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndSummaryModalProps) {
+  const [budgetFeel, setBudgetFeel] = useState<string | undefined>(undefined);
+
   if (!isOpen || !budgetMonth) {
     return null;
   }
@@ -72,14 +78,19 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        if (!open) {
+            setBudgetFeel(undefined); // Reset feedback on close
+            onClose();
+        }
+    }}>
       <DialogContent className="sm:max-w-md md:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-center">
             Month-End Summary: {getFormattedMonthTitle(budgetMonth.id)}
           </DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh] p-1 pr-3">
+        <ScrollArea className="max-h-[70vh] p-1 pr-3">
           <div className="space-y-3 mt-4 text-sm">
             
             <div className="p-3 rounded-lg bg-muted/30">
@@ -122,6 +133,37 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
                 }
               </p>
             </div>
+
+            <Separator className="my-4" />
+            
+            <div className="p-3 rounded-lg bg-muted/30">
+              <h3 className="font-medium text-base mb-3 flex items-center">
+                <MessageCircleQuestion className="mr-2 h-5 w-5 text-primary/80" /> Monthly Reflection
+              </h3>
+              <Label htmlFor="budgetFeel" className="text-sm font-normal text-muted-foreground mb-2 block">How did this month's budget feel?</Label>
+              <RadioGroup
+                id="budgetFeel"
+                value={budgetFeel}
+                onValueChange={setBudgetFeel}
+                className="flex flex-col sm:flex-row sm:justify-around gap-2 sm:gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="strict" id="feel-strict" />
+                  <Label htmlFor="feel-strict" className="text-sm font-normal">Too Strict</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="just_right" id="feel-right" />
+                  <Label htmlFor="feel-right" className="text-sm font-normal">Just Right</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="easy" id="feel-easy" />
+                  <Label htmlFor="feel-easy" className="text-sm font-normal">A Bit Easy</Label>
+                </div>
+              </RadioGroup>
+              {budgetFeel && (
+                <p className="text-xs text-muted-foreground italic mt-3 text-center">Thanks for your feedback! This can help you plan for next month.</p>
+              )}
+            </div>
             
             <p className="text-xs text-muted-foreground text-center mt-4 pt-2 border-t">
               This month is now closed. Further edits to budget, income, or expenses are disabled.
@@ -130,7 +172,10 @@ export function MonthEndSummaryModal({ isOpen, onClose, budgetMonth }: MonthEndS
         </ScrollArea>
         <DialogFooter className="mt-6">
           <DialogClose asChild>
-            <Button variant="default" onClick={onClose}>
+            <Button variant="default" onClick={() => {
+                setBudgetFeel(undefined); // Reset feedback on close
+                onClose();
+            }}>
               <CheckCircle className="mr-2 h-4 w-4" /> Done
             </Button>
           </DialogClose>

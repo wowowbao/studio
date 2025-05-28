@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 export default function PrepareBudgetPage() {
-  const { getBudgetForMonth, applyAiGeneratedBudget, setCurrentDisplayMonthId, currentDisplayMonthId: initialMonthId } = useBudget();
+  const { getBudgetForMonth, setCurrentDisplayMonthId, currentDisplayMonthId: initialMonthId } = useBudget();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -40,6 +40,8 @@ export default function PrepareBudgetPage() {
   const [currentIncomeForDisplay, setCurrentIncomeForDisplay] = useState(0);
   const [currentActualSavingsForDisplay, setCurrentActualSavingsForDisplay] = useState(0);
   const [currentEstimatedDebtForDisplay, setCurrentEstimatedDebtForDisplay] = useState(0);
+
+  const isInitialOnboarding = !currentMonthData; // True if there's no previous month data to base off
   
 
   useEffect(() => {
@@ -51,14 +53,10 @@ export default function PrepareBudgetPage() {
       return;
     }
     const data = getBudgetForMonth(sourceMonthId);
-    if (data) {
-      setCurrentMonthData(data);
-      setIsLoadingPageData(false);
-    } else {
-      toast({ title: "Error", description: `Could not load data for month ${getFormattedMonthTitle(sourceMonthId) || sourceMonthId}. Please ensure the month exists.`, variant: "destructive" });
-      router.push('/');
-      setIsLoadingPageData(false);
-    }
+    // If no data for current month (e.g., new user via onboarding), setCurrentMonthData to null
+    // This allows the UI to adapt for true onboarding vs. planning for an existing user.
+    setCurrentMonthData(data || null); 
+    setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
 
@@ -75,7 +73,7 @@ export default function PrepareBudgetPage() {
   }, [initialMonthId]); 
 
   useEffect(() => {
-    if (currentMonthData) {
+    if (currentMonthData) { // Only calculate if there is a current month's data
       const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
       const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
 
@@ -89,7 +87,7 @@ export default function PrepareBudgetPage() {
       const ccPaymentsCat = categoriesArray.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
       const paymentsMadeThisMonth = (ccPaymentsCat?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
       setCurrentEstimatedDebtForDisplay(Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonth));
-    } else {
+    } else { // For onboarding or if no current month data, default to 0
       setCurrentIncomeForDisplay(0);
       setCurrentActualSavingsForDisplay(0);
       setCurrentEstimatedDebtForDisplay(0);
@@ -153,39 +151,34 @@ export default function PrepareBudgetPage() {
 
 
   const handleGetInitialAiSuggestions = async () => {
-    if (!currentMonthData) {
-        setAiError("Source month data is not available.");
-        toast({ title: "Data Error", description: "Could not load data for the current month to base suggestions on.", variant: "destructive" });
-        return;
-    }
     if (!userGoals.trim()) {
-      setAiError("Please describe your financial goals for next month.");
+      setAiError("Please describe your financial goals.");
       toast({ title: "Goals Required", description: "Please describe your financial goals.", variant: "destructive" });
       return;
     }
     setIsLoadingAi(true);
     setAiError(null);
 
-    // Recalculate financial snapshot directly from currentMonthData for AI input
-    const incomesArrayForSnapshot = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
-    const calculatedCurrentIncome = incomesArrayForSnapshot.reduce((sum, inc) => sum + inc.amount, 0);
+    let baseMonthIdForAI = initialMonthId || getYearMonthFromDate(new Date());
+    let incomeForAI = currentIncomeForDisplay;
+    let savingsForAI = currentActualSavingsForDisplay;
+    let debtForAI = currentEstimatedDebtForDisplay;
 
-    const categoriesArrayForSnapshot = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
-    const savingsCatForSnapshot = categoriesArrayForSnapshot.find(c => c.isSystemCategory && c.name.toLowerCase() === 'savings');
-    const calculatedCurrentActualSavings = (savingsCatForSnapshot?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-    
-    const ccPaymentsCatForSnapshot = categoriesArrayForSnapshot.find(c => c.isSystemCategory && c.name.toLowerCase() === 'credit card payments');
-    const paymentsMadeThisMonthForSnapshot = (ccPaymentsCatForSnapshot?.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
-    const calculatedCurrentEstimatedDebt = Math.max(0, (currentMonthData.startingCreditCardDebt || 0) - paymentsMadeThisMonthForSnapshot);
+    if (isInitialOnboarding) { // If it's onboarding, these values are likely 0
+      // The AI flow will be instructed to derive income from userGoals if possible
+      // If not, it will proceed with the provided 0s, and its advice should reflect this.
+      // baseMonthIdForAI remains the current month or next if current is problematic
+      // (though AI plans for the "next" month from this base)
+    }
 
 
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
       userGoals,
-      currentMonthId: currentMonthData.id,
-      currentIncome: calculatedCurrentIncome,
-      currentSavingsTotal: calculatedCurrentActualSavings, 
-      currentCCDebtTotal: calculatedCurrentEstimatedDebt,
+      currentMonthId: baseMonthIdForAI,
+      currentIncome: incomeForAI,
+      currentSavingsTotal: savingsForAI, 
+      currentCCDebtTotal: debtForAI,
     };
 
     try {
@@ -198,10 +191,10 @@ export default function PrepareBudgetPage() {
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
           userGoals,
           statementFileNames: statementPreviewDetails.map(f => f.name),
-          currentMonthId: currentMonthData.id,
-          currentIncome: calculatedCurrentIncome,
-          currentActualSavings: calculatedCurrentActualSavings,
-          currentEstimatedDebt: calculatedCurrentEstimatedDebt,
+          currentMonthId: baseMonthIdForAI, // The month ID AI used as its "current"
+          currentIncome: incomeForAI, // The income figure AI started with
+          currentActualSavings: savingsForAI,
+          currentEstimatedDebt: debtForAI,
           statementDataUris 
         }));
         
@@ -237,7 +230,7 @@ export default function PrepareBudgetPage() {
   };
 
 
-  if (isLoadingPageData || !currentMonthData) {
+  if (isLoadingPageData) { // Simplified loading, currentMonthData might be null for onboarding
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -260,7 +253,15 @@ export default function PrepareBudgetPage() {
     );
   }
 
-  const nextMonthToPrep = getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(currentMonthData.id).setMonth(parseYearMonth(currentMonthData.id).getMonth() + 1))));
+  const nextMonthToPrepFor = currentMonthData 
+    ? getFormattedMonthTitle(getYearMonthFromDate(new Date(parseYearMonth(currentMonthData.id).setMonth(parseYearMonth(currentMonthData.id).getMonth() + 1))))
+    : getFormattedMonthTitle(getYearMonthFromDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1))); // Default to next calendar month if no current data
+
+
+  const goalsPlaceholderText = isInitialOnboarding 
+    ? "Describe your overall financial goals (e.g., 'Save for a down payment in 1 year', 'Reduce debt by $X in 6 months'). Include your approximate monthly income (e.g., 'My income is $3000/month') and when you'd like this plan to start (e.g., 'Start this plan next month'). The more detail, the better!"
+    : "Describe what you want to achieve next month (e.g., 'Save $500 for vacation', 'Reduce dining out'). The AI will also consider your current month's data. If your income for next month will be different, please specify (e.g., 'My income next month will be $X').";
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -269,7 +270,9 @@ export default function PrepareBudgetPage() {
             <Button variant="outline" size="icon" onClick={() => router.push('/')} aria-label="Back to dashboard">
                 <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold text-primary truncate px-2">AI Prep for {nextMonthToPrep}</h1>
+            <h1 className="text-xl font-bold text-primary truncate px-2">
+              {isInitialOnboarding ? "AI Financial Plan Setup" : `AI Prep for ${nextMonthToPrepFor}`}
+            </h1>
              <Button variant="outline" size="sm" onClick={handleClearInputs} disabled={isLoadingAi} aria-label="Clear Inputs">
                 <RotateCcw className="mr-2 h-4 w-4" /> Clear Inputs
             </Button>
@@ -279,36 +282,52 @@ export default function PrepareBudgetPage() {
         <ScrollArea className="h-full pr-2"> 
           <div className="space-y-8 pb-8">
               
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
-                      <CardDescription>Based on your latest data for {getFormattedMonthTitle(currentMonthData.id)}. This info helps the AI.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                          <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
-                          <p className="text-xs text-muted-foreground">Income This Month</p>
-                          <p className="font-semibold text-lg">${currentIncomeForDisplay.toFixed(2)}</p>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                          <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
-                          <p className="text-xs text-muted-foreground">Actual Savings This Month</p>
-                          <p className="font-semibold text-lg">${currentActualSavingsForDisplay.toFixed(2)}</p>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
-                          <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
-                          <p className="text-xs text-muted-foreground">Est. CC Debt End of Month</p>
-                          <p className="font-semibold text-lg">${currentEstimatedDebtForDisplay.toFixed(2)}</p>
-                      </div>
-                  </CardContent>
-              </Card>
+              {!isInitialOnboarding && currentMonthData && ( // Only show snapshot if not onboarding and current month data exists
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Current Financial Snapshot</CardTitle>
+                        <CardDescription>Based on your latest data for {getFormattedMonthTitle(currentMonthData.id)}. This info helps the AI.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                            <DollarSign className="h-5 w-5 text-green-500 mb-1"/>
+                            <p className="text-xs text-muted-foreground">Income This Month</p>
+                            <p className="font-semibold text-lg">${currentIncomeForDisplay.toFixed(2)}</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                            <PiggyBank className="h-5 w-5 text-blue-500 mb-1"/>
+                            <p className="text-xs text-muted-foreground">Actual Savings This Month</p>
+                            <p className="font-semibold text-lg">${currentActualSavingsForDisplay.toFixed(2)}</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg shadow-inner">
+                            <CreditCard className="h-5 w-5 text-red-500 mb-1"/>
+                            <p className="text-xs text-muted-foreground">Est. CC Debt End of Month</p>
+                            <p className="font-semibold text-lg">${currentEstimatedDebtForDisplay.toFixed(2)}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+              )}
+              {isInitialOnboarding && (
+                 <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Welcome to AI Financial Planning!</AlertTitle>
+                    <AlertDescription>
+                      Let's create your first budget. Please describe your financial goals, income, and when you'd like to start. 
+                      Optionally, upload past bank statements for more tailored suggestions.
+                    </AlertDescription>
+                  </Alert>
+              )}
 
               <Card>
                   <CardHeader>
-                      <CardTitle className="text-lg">Your Financial Goals for Next Month</CardTitle>
+                      <CardTitle className="text-lg">
+                        {isInitialOnboarding ? "Your Financial Goals & Income" : "Your Financial Goals for Next Month"}
+                      </CardTitle>
                       <CardDescription>
-                          Describe what you want to achieve. E.g., "Save $500 for vacation, reduce dining out, start an emergency fund, buy a new PC for $5000..."
-                          The more detail, the better the AI can assist.
+                          {isInitialOnboarding 
+                            ? "Be specific about your goals, your typical monthly income, and when you'd like this plan to begin. The more detail, the better the AI can assist."
+                            : "Describe what you want to achieve. The AI will consider these comments and your current month's data when generating suggestions. If your income for next month will differ, please state it."
+                          }
                       </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -316,7 +335,7 @@ export default function PrepareBudgetPage() {
                           id="userGoals"
                           value={userGoals}
                           onChange={(e) => setUserGoals(e.target.value)}
-                          placeholder="Be specific about your goals. The AI will consider these comments when generating suggestions."
+                          placeholder={goalsPlaceholderText}
                           className="min-h-[100px] text-base"
                           rows={5}
                           disabled={isLoadingAi}
@@ -402,10 +421,3 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
-    
-
-    
-
-    
-
-    

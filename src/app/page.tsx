@@ -16,7 +16,7 @@ import { MonthEndSummaryModal } from "@/components/budget/MonthEndSummaryModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, Moon, Sun, LogOut, UserCircle, ShieldX, Sparkles, Coins, PiggyBank, XCircle, PlayCircle } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { auth } from '@/lib/firebase'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,8 +82,10 @@ export default function HomePage() {
     return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
   };
 
+  // Check if there's any budget data at all (across all months)
+  const hasAnyBudgetData = Object.keys(budgetMonths).length > 0;
 
-  if (isLoading && !Object.keys(budgetMonths).length && !currentBudgetMonth) { 
+  if (isLoading && !hasAnyBudgetData) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
@@ -175,6 +177,28 @@ export default function HomePage() {
         
         <MonthNavigator />
         
+        {!isLoading && !hasAnyBudgetData && (
+          <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
+            <CardHeader>
+              <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
+              <CardTitle className="text-2xl">Welcome to BudgetFlow!</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-muted-foreground mb-6">
+                Ready to take control of your finances? Let our AI help you create a personalized plan, or set up your budget manually.
+              </p>
+              <Link href="/prep-budget" passHref legacyBehavior>
+                 <Button asChild size="lg" className="w-full sm:w-auto sm:mr-2 mb-2 sm:mb-0">
+                    <a><PlayCircle className="mr-2 h-5 w-5" /> Get Started with AI Financial Plan</a>
+                 </Button>
+              </Link>
+              <Button onClick={() => setIsEditBudgetModalOpen(true)} size="lg" variant="outline" className="w-full sm:w-auto">
+                Create Budget Manually
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
@@ -187,22 +211,22 @@ export default function HomePage() {
                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-lg" />)}
               </div>
             </div>
-        ) : !currentBudgetMonth ? (
+        ) : hasAnyBudgetData && !currentBudgetMonth ? (
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
-              <CardTitle className="text-2xl">Welcome to BudgetFlow!</CardTitle>
+              <CardTitle className="text-2xl">Set Up Your Budget</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-6">
-                Let's set up your first budget for {getFormattedMonthTitle(currentDisplayMonthId)}.
+                Let's set up your budget for {getFormattedMonthTitle(currentDisplayMonthId)}.
               </p>
               <Button onClick={() => setIsEditBudgetModalOpen(true)} size="lg">
                 Create Budget for {getFormattedMonthTitle(currentDisplayMonthId)}
               </Button>
             </CardContent>
           </Card>
-        ) : (
+        ) : hasAnyBudgetData && currentBudgetMonth ? (
           <>
             <SummaryCards budgetMonth={currentBudgetMonth} />
             <CreditCardDebtSummary budgetMonth={currentBudgetMonth} />
@@ -218,7 +242,7 @@ export default function HomePage() {
                 <h2 className="text-xl font-semibold mt-8 mb-4 text-primary flex items-center">
                   <PiggyBank className="mr-2 h-6 w-6 text-primary/80" /> Financial Goals &amp; Obligations
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                   {systemCategories.map(cat => (
                     <CategoryCard key={cat.id} category={cat} />
                   ))}
@@ -244,7 +268,7 @@ export default function HomePage() {
             )}
 
 
-            {allCategories.length === 0 && ( 
+            {allCategories.length === 0 && currentBudgetMonth && ( // Ensure currentBudgetMonth exists to avoid flicker
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
                   <XCircle className="mx-auto h-10 w-10 text-accent mb-3" />
@@ -261,7 +285,7 @@ export default function HomePage() {
               </Card>
             )}
           </>
-        )}
+        ) : null}
       </main>
       
       <footer className="py-6 mt-auto border-t">

@@ -34,8 +34,7 @@ export default function HomePage() {
     isLoading: budgetLoading, 
     budgetMonths,
     getBudgetForMonth,
-    saveMonthEndFeedback, // New from useBudget
-    ensureMonthExists, // Added for potential initial load assurance
+    saveMonthEndFeedback, 
   } = useBudget();
 
   const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
@@ -54,23 +53,6 @@ export default function HomePage() {
       }
     }
   }, [authLoading, isUserAuthenticated]);
-
-  // Ensure the current display month's data structure is initialized when the page loads or dependencies change
-  // This was previously a source of loops if not handled carefully with useBudgetCore.
-  // Now, useBudgetCore's main data loading useEffect is primarily responsible.
-  // We might still call ensureMonthExists here defensively if needed,
-  // but it should be idempotent if the data is already correct.
-  useEffect(() => {
-    if (currentDisplayMonthId && !budgetLoading && !authLoading) {
-      // Defensively ensure the month exists, but useBudgetCore should handle the heavy lifting.
-      // This call primarily makes sure that if the user navigates to a month
-      // that hasn't been auto-created by a previous navigation, its basic shell exists.
-      // The detailed loading and processing happens within useBudgetCore.
-      if (!getBudgetForMonth(currentDisplayMonthId)) {
-         ensureMonthExists(currentDisplayMonthId);
-      }
-    }
-  }, [currentDisplayMonthId, budgetLoading, authLoading, ensureMonthExists, getBudgetForMonth]);
 
 
   const handleSignOut = async () => {
@@ -99,7 +81,7 @@ export default function HomePage() {
     if (feedback && monthEndSummaryData) {
       saveMonthEndFeedback(monthEndSummaryData.id, feedback);
     }
-    // Refresh monthEndSummaryData if month was rolled over to reflect feedback saved
+    
     const updatedData = getBudgetForMonth(currentDisplayMonthId);
     if (updatedData) { 
         setMonthEndSummaryData(updatedData);
@@ -117,7 +99,6 @@ export default function HomePage() {
     return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
   };
 
-  // Check if there's any budget data at all (across all months)
   const hasAnyBudgetData = Object.keys(budgetMonths).length > 0;
 
   if (isLoading && !hasAnyBudgetData) { 
@@ -237,7 +218,8 @@ export default function HomePage() {
         {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
-                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
+                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
+                 <Skeleton className="h-24 w-full rounded-lg md:col-span-2 lg:col-span-2" />
               </div>
               <Skeleton className="h-32 w-full rounded-lg" /> 
               <Skeleton className="h-20 w-full rounded-lg" /> 
@@ -303,7 +285,7 @@ export default function HomePage() {
             )}
 
 
-            {allCategories.length === 0 && currentBudgetMonth && ( // Ensure currentBudgetMonth exists to avoid flicker
+            {allCategories.length === 0 && currentBudgetMonth && ( 
               <Card className="text-center p-8 mt-8 shadow-md border-dashed border-primary/30">
                 <CardHeader>
                   <XCircle className="mx-auto h-10 w-10 text-accent mb-3" />
@@ -325,7 +307,7 @@ export default function HomePage() {
       
       <footer className="py-6 mt-auto border-t">
           <div className="container mx-auto text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.29 (Studio Preview)
+              © {new Date().getFullYear()} BudgetFlow. Your finances, simplified. v1.0.30 (Studio Preview)
           </div>
       </footer>
 

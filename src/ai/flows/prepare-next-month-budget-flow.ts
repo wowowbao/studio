@@ -30,7 +30,7 @@ const PrepareBudgetInputSchema = z.object({
     .describe(
       "Optional: An array of bank statements or spending summaries (images or PDFs), as data URIs. Format for each: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-  userGoals: z.string().describe("A text description of the user's financial goals. For an initial plan, this should include desired outcomes, timelines (e.g., 'save for a house in 2 years'), approximate monthly income (e.g., 'my income is $4000/month'), and if they specify a desired starting month (e.g., 'start this plan in August'). For next month planning, this might contain refinements, specific questions about a previous plan, or goals for the upcoming month. Analyze this input carefully to understand the user's current intent and whether this is an initial setup or ongoing planning."),
+  userGoals: z.string().describe("A text description of the user's financial goals. This is a critical input. It may contain: an approximate monthly income for the plan (e.g., 'My income is $4000/month'), desired start month for the plan, specific savings targets (e.g., 'save $500 for vacation in 6 months'), debt reduction plans (e.g., 'pay off CC X'), major purchase goals (e.g., 'new PC'), desired spending cutbacks (e.g., 'reduce dining out'), or even questions/refinements to a previous plan you suggested. Analyze this input carefully to understand the user's current intent and whether this is an initial setup or ongoing planning."),
   currentMonthId: z.string().describe("The ID of the current month (YYYY-MM) from which planning is being done, or if this is an initial setup, it could be the current actual month."),
   currentIncome: z.number().describe("The user's total income for the *current* month from app data. If userGoals specifies a different income for the *next* month or for an initial plan, prioritize that for budgeting and report it in incomeBasisForBudget output. Do NOT create an 'Income' category in your suggestions."),
   currentSavingsTotal: z.number().describe("The user's current total *actual savings contribution* for this month (sum of amounts put into the 'Savings' category). For an initial setup, this might be 0 if no app data exists."),
@@ -59,8 +59,7 @@ const prompt = ai.definePrompt({
   name: 'prepareNextMonthBudgetPrompt',
   input: {schema: PrepareBudgetInputSchema},
   output: {schema: PrepareBudgetOutputSchema},
-  prompt: `You are a friendly, empathetic, and highly skilled financial planning assistant.
-Your primary goal is to help the user create a realistic, effective, AND sustainable budget for their *next* month (or the first month of a new plan if 'userGoals' suggests an initial setup). A budget that sacrifices all joy or discretionary spending is unlikely to be followed long-term. Aim for a balance that allows the user to achieve their financial goals while maintaining a reasonable quality of life.
+  prompt: `You are a friendly, empathetic, and highly skilled financial planning assistant. Your primary goal is to help the user create a realistic, effective, AND sustainable budget for their *next* month (or the first month of a new plan if 'userGoals' suggests an initial setup). A budget that sacrifices all joy or discretionary spending is unlikely to be followed long-term. Aim for a balance that allows the user to achieve their financial goals while maintaining a reasonable quality of life. For users who are new to budgeting or struggling, be especially encouraging and break down advice into simple, actionable steps.
 
 User's Current Financial Context (based on their current month ending '{{currentMonthId}}', or potentially representing initial inputs if this is a new plan):
 - Income This Month (Source Data): \${{currentIncome}} (This is the income reported from their app data for the source month. If 'userGoals' states a specific income for the plan, prioritize that for budgeting. If 'userGoals' suggests this is an initial plan and provides an income, use that.)
@@ -104,9 +103,9 @@ Based on ALL the information above (goals, income context, debt, savings contrib
 1.  'suggestedCategories': A comprehensive suggested budget for the *next* month (or first month of a new plan), based on the 'incomeBasisForBudget' you determined.
     -   The budget should be realistic, achievable, and sustainable.
     -   DO NOT create a category named "Income" or similar.
-    -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym). If userGoals mention specific needs like "rent payment", ensure "Housing" or "Rent" is a category. Adjust amounts for Groceries, Utilities, and Entertainment based on 'familySize' if provided.
+    -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym). If userGoals mention specific needs like "rent payment", ensure "Housing" or "Rent" is a category. Adjust amounts for Groceries, Utilities, and Entertainment based on familySize if provided.
     -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category. If the user explicitly asks to change a specific category's budget, try to accommodate this if feasible or explain why it's challenging.
-    -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments", suggest meaningful progress on debt, considering 'incomeBasisForBudget' and other goals. If currentCCDebtTotal is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise.
+    -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments", suggest meaningful progress on debt, considering incomeBasisForBudget and other goals. If currentCCDebtTotal is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise.
     -   **Include reasonable allocations for some discretionary spending** (e.g., "Entertainment," "Hobbies," "Personal Care," or a general "Fun Money" category) unless the user *explicitly* states they want to eliminate these or income is extremely constrained. Consider previousMonthFeedback and familySize when setting these.
     -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories. However, if their goals require spending cuts, proactively suggest these reductions while still aiming for sustainability.
     -   **The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed 'incomeBasisForBudget'.** If it does, clearly point out the shortfall in 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
@@ -126,7 +125,7 @@ Based on ALL the information above (goals, income context, debt, savings contrib
     -   If this is an initial plan setup, offer foundational advice and a brief roadmap if a timeline was mentioned in their goals.
     -   **Address Trade-offs Gently:** If achieving one goal means reducing spending elsewhere, acknowledge this supportively and explain the rationale.
     -   If incomeBasisForBudget is 0 or very low because no income was provided, your primary advice must be that a realistic budget cannot be formed without income information, and prompt the user to provide it.
-    -   Your tone should be encouraging, supportive, and non-judgmental. Help them feel empowered, not restricted. Focus on positive framing.
+    *   Your tone should be encouraging, supportive, and non-judgmental. Help them feel empowered, not restricted. Focus on positive framing.
 
 Ensure your 'suggestedCategories' output is well-structured.
 If you cannot reasonably create a budget (e.g., no income info and impossible goals), set 'aiError'.
@@ -157,7 +156,6 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
       }
       
       if (output.suggestedCategories) {
-        // Ensure "Savings" and "Credit Card Payments" are consistently named if AI suggests them
         output.suggestedCategories = output.suggestedCategories.map(cat => {
           const nameLower = cat.name.toLowerCase();
           if (nameLower.includes("savings")) { 
@@ -200,5 +198,6 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     }
   }
 );
+
 
 

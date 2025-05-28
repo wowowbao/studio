@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 type GranularGoalsForReview = {
     planIncome: string;
     planStartMonth: string;
-    familySize: string; // New field
+    familySize: string; 
     savingsGoalText: string;
     debtGoalText: string;
     purchaseGoalText: string;
@@ -39,7 +39,7 @@ interface StoredAIPrepData {
     currentEstimatedDebt: number; 
     statementDataUris?: string[];
     previousMonthFeedback?: string; 
-    familySize?: number; // New field
+    familySize?: number; 
 }
 
 export default function PrepareBudgetReviewPage() {
@@ -109,7 +109,6 @@ export default function PrepareBudgetReviewPage() {
     setIsLoadingAi(true);
     setAiError(null);
 
-    // Combine original granular goals with the new refinement text
     const updatedUserGoalsForAI = constructUserGoalsStringFromGranular(initialInputs.granularGoals, refinementText);
 
     const input: PrepareBudgetInput = {
@@ -120,7 +119,7 @@ export default function PrepareBudgetReviewPage() {
       currentSavingsTotal: initialInputs.currentActualSavings,
       currentCCDebtTotal: initialInputs.currentEstimatedDebt,
       previousMonthFeedback: initialInputs.previousMonthFeedback, 
-      familySize: initialInputs.familySize, // Pass family size
+      familySize: initialInputs.familySize, 
     };
 
     try {
@@ -161,7 +160,7 @@ export default function PrepareBudgetReviewPage() {
       nextMonthId,
       currentSuggestions.suggestedCategories,
       currentSuggestions.incomeBasisForBudget, 
-      initialInputs.currentEstimatedDebt // This is the debt at end of SOURCE month
+      initialInputs.currentEstimatedDebt 
     );
 
     toast({
@@ -258,10 +257,10 @@ export default function PrepareBudgetReviewPage() {
 
   const renderGranularGoals = (goals: GranularGoalsForReview | undefined) => {
     if (!goals) return <p className="text-xs italic">No granular goals provided.</p>;
-    const goalItems: {label: string, value: string | number | undefined}[] = [ // Updated type for value
+    const goalItems: {label: string, value: string | number | undefined}[] = [ 
         {label: "Planned Income for New Plan", value: goals.planIncome ? `$${goals.planIncome}` : "Not specified"},
         {label: "Desired Start Month", value: goals.planStartMonth || "Not specified"},
-        {label: "Household Size", value: goals.familySize || (initialInputs?.familySize ? String(initialInputs.familySize) : "Not specified") }, // Display familySize
+        {label: "Household Size", value: goals.familySize || (initialInputs?.familySize ? String(initialInputs.familySize) : "Not specified") }, 
         {label: "Savings Goals", value: goals.savingsGoalText || "Not specified"},
         {label: "Debt Repayment Goals", value: goals.debtGoalText || "Not specified"},
         {label: "Major Purchase Goals", value: goals.purchaseGoalText || "Not specified"},
@@ -270,7 +269,7 @@ export default function PrepareBudgetReviewPage() {
     ];
     return (
         <ul className="space-y-1">
-            {goalItems.filter(item => item.value !== "Not specified" && item.value !== undefined).map(item => (
+            {goalItems.filter(item => item.value !== "Not specified" && item.value !== undefined && String(item.value).trim() !== "").map(item => (
                 <li key={item.label}><span className="font-semibold">{item.label}:</span> {item.value}</li>
             ))}
         </ul>
@@ -324,8 +323,8 @@ export default function PrepareBudgetReviewPage() {
                         
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-lg">AI Budget Overview for {nextMonthToPrep}</CardTitle>
-                                <CardDescription>Summary of my suggested plan against the income basis I used.</CardDescription>
+                                <CardTitle className="text-lg">AI Budget Overview</CardTitle>
+                                <CardDescription>Summary of my suggested plan against the income basis I used for {nextMonthToPrep}.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
                                 <div className="flex justify-between">
@@ -354,7 +353,7 @@ export default function PrepareBudgetReviewPage() {
                             <CardHeader>
                                 <CardTitle className="text-lg">Want to Make Changes or Ask Questions?</CardTitle>
                                 <CardDescription>
-                                   Type your questions or requested changes below (e.g., "Why is my 'Fun Money' budget $X?", "Increase 'Savings' to $Y"). Then click "Update Suggestions Directly" and I'll create a new plan based on your feedback!
+                                   This is your plan! Type your questions or requested changes below (e.g., "Why is my 'Fun Money' budget $X?", "Can we try to increase savings by $Y and reduce X by $Z?"). Then click "Update Suggestions Directly" and I'll revise the plan based on your feedback!
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>

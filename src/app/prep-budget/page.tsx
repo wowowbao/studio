@@ -24,7 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 type GranularGoals = {
   planIncome: string;
   planStartMonth: string;
-  familySize: string; // New field
+  familySize: string; 
   savingsGoalText: string;
   debtGoalText: string;
   purchaseGoalText: string;
@@ -33,7 +33,7 @@ type GranularGoals = {
 };
 
 export default function PrepareBudgetPage() {
-  const { getBudgetForMonth, setCurrentDisplayMonthId, currentDisplayMonthId: initialMonthId } = useBudget();
+  const { getBudgetForMonth, currentDisplayMonthId: initialMonthId } = useBudget();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -47,7 +47,7 @@ export default function PrepareBudgetPage() {
   const [granularGoals, setGranularGoals] = useState<GranularGoals>({
     planIncome: "",
     planStartMonth: "next month",
-    familySize: "", // New field
+    familySize: "",
     savingsGoalText: "",
     debtGoalText: "",
     purchaseGoalText: "",
@@ -88,7 +88,7 @@ export default function PrepareBudgetPage() {
     setGranularGoals({
         planIncome: "",
         planStartMonth: "next month",
-        familySize: "", // Reset new field
+        familySize: "", 
         savingsGoalText: "",
         debtGoalText: "",
         purchaseGoalText: "",
@@ -225,7 +225,6 @@ export default function PrepareBudgetPage() {
         return;
     }
     
-    // Fetch the source month's feedback to pass to the AI
     const sourceMonthData = getBudgetForMonth(baseMonthIdForAI);
     const previousMonthFeedbackFromSource = sourceMonthData?.monthEndFeedback;
 
@@ -236,8 +235,8 @@ export default function PrepareBudgetPage() {
       currentIncome: incomeForAI, 
       currentSavingsTotal: savingsForAI, 
       currentCCDebtTotal: debtForAI,
-      previousMonthFeedback: previousMonthFeedbackFromSource, // Pass feedback from source month
-      familySize: familySizeForAI, // Pass family size
+      previousMonthFeedback: previousMonthFeedbackFromSource, 
+      familySize: familySizeForAI, 
     };
 
     try {
@@ -256,7 +255,7 @@ export default function PrepareBudgetPage() {
           currentEstimatedDebt: debtForAI,
           statementDataUris,
           previousMonthFeedback: previousMonthFeedbackFromSource, 
-          familySize: familySizeForAI, // Store family size for review page
+          familySize: familySizeForAI,
         }));
         router.push('/prep-budget/review');
       }
@@ -283,7 +282,7 @@ export default function PrepareBudgetPage() {
     setGranularGoals({
         planIncome: "",
         planStartMonth: "next month",
-        familySize: "", // Reset new field
+        familySize: "", 
         savingsGoalText: "",
         debtGoalText: "",
         purchaseGoalText: "",
@@ -294,7 +293,6 @@ export default function PrepareBudgetPage() {
     if (statementFileInputRef.current) {
       statementFileInputRef.current.value = "";
     }
-    // Re-initialize editable snapshot from currentMonthData or to 0
     if (currentMonthData) {
         const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
         const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
@@ -364,8 +362,7 @@ export default function PrepareBudgetPage() {
                   <CardHeader>
                       <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
                       <CardDescription>
-                        This snapshot from {currentMonthData ? getFormattedMonthTitle(currentMonthData.id) : 'your current situation'} helps the AI plan for {nextMonthToPrepFor}. 
-                        Adjust these figures if they don't reflect your true starting point for the plan. If this is your first time, these might be 0.
+                        This snapshot helps us set a baseline for your new financial plan. Feel free to adjust these numbers to best reflect your starting point for the plan we're about to create for {nextMonthToPrepFor}. If this is your first time, these might be 0.
                       </CardDescription>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
@@ -396,24 +393,21 @@ export default function PrepareBudgetPage() {
 
               <Card>
                   <CardHeader>
-                      <CardTitle className="text-lg">Your Financial Picture for the New Plan</CardTitle>
-                      <CardDescription>
-                          Let's get some details to help me create the best plan for you.
-                      </CardDescription>
+                      <CardTitle className="text-lg">About Your Income & Timing for This Plan</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                       <div>
-                          <Label htmlFor="planIncome">What is your approximate monthly income for this new plan? (Required if this is your first plan)</Label>
+                          <Label htmlFor="planIncome">What's your approximate monthly income we'll be working with for this plan? (Required if this is your first plan)</Label>
                           <Input id="planIncome" type="number" placeholder="e.g., 4000" value={granularGoals.planIncome} onChange={(e) => handleGranularGoalChange('planIncome', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
                       </div>
                       <div>
-                          <Label htmlFor="planStartMonth">When would you like this plan to ideally start?</Label>
-                          <Input id="planStartMonth" placeholder="e.g., next month, August" value={granularGoals.planStartMonth} onChange={(e) => handleGranularGoalChange('planStartMonth', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
+                          <Label htmlFor="planStartMonth">When would you ideally like this new financial chapter to begin?</Label>
+                          <Input id="planStartMonth" placeholder="e.g., next month, or a specific month like August" value={granularGoals.planStartMonth} onChange={(e) => handleGranularGoalChange('planStartMonth', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
                       </div>
                       <div>
                           <Label htmlFor="familySize" className="flex items-center">
                             <Users className="mr-2 h-4 w-4 text-muted-foreground"/>
-                            Number of People in Household (Optional)
+                            How many people (including yourself!) are we budgeting for in your household? (Optional)
                           </Label>
                           <Input id="familySize" type="number" placeholder="e.g., 1, 2, 4" value={granularGoals.familySize} onChange={(e) => handleGranularGoalChange('familySize', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
                       </div>
@@ -422,28 +416,28 @@ export default function PrepareBudgetPage() {
 
               <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg">Your Financial Goals</CardTitle>
-                    <CardDescription>The more detail you provide, the better I can assist you!</CardDescription>
+                    <CardTitle className="text-lg">What Are Your Financial Dreams & Priorities?</CardTitle>
+                    <CardDescription>Thinking about your goals helps us build a plan that truly works for you. No goal is too big or too small!</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Label htmlFor="savingsGoalText">What are your primary savings goals? (e.g., amount per month, specific target like 'vacation fund $200/month')</Label>
-                        <Textarea id="savingsGoalText" placeholder="e.g., Save $500/month for an emergency fund, contribute to vacation fund." value={granularGoals.savingsGoalText} onChange={(e) => handleGranularGoalChange('savingsGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
+                        <Label htmlFor="savingsGoalText">What are you aiming to save for? (e.g., emergency fund, vacation, down payment? Tell me about the goal and any timeline.)</Label>
+                        <Textarea id="savingsGoalText" placeholder="e.g., Save $500/month for an emergency fund, contribute to vacation fund of $2000 in 1 year." value={granularGoals.savingsGoalText} onChange={(e) => handleGranularGoalChange('savingsGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
                     </div>
                     <div>
-                        <Label htmlFor="debtGoalText">What are your debt repayment goals? (e.g., 'Pay off CC X with $300/month', 'Reduce student loan payments')</Label>
-                        <Textarea id="debtGoalText" placeholder="e.g., Pay an extra $100 on my main credit card." value={granularGoals.debtGoalText} onChange={(e) => handleGranularGoalChange('debtGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
+                        <Label htmlFor="debtGoalText">Are there any debts you're focused on reducing or paying off?</Label>
+                        <Textarea id="debtGoalText" placeholder="e.g., Pay an extra $100 on my main credit card with $3000 balance." value={granularGoals.debtGoalText} onChange={(e) => handleGranularGoalChange('debtGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
                     </div>
                     <div>
-                        <Label htmlFor="purchaseGoalText">Are you planning any major purchases or have specific financial milestones? (e.g., 'New car in 1 year, approx $10k', 'Down payment for a house')</Label>
+                        <Label htmlFor="purchaseGoalText">Any significant purchases or financial milestones on your mind? (e.g., new computer, car, home improvements)</Label>
                         <Textarea id="purchaseGoalText" placeholder="e.g., Save for a new computer, $1500 in 6 months." value={granularGoals.purchaseGoalText} onChange={(e) => handleGranularGoalChange('purchaseGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
                     </div>
                     <div>
-                        <Label htmlFor="cutbackGoalText">Are there any specific areas where you'd like to reduce spending?</Label>
+                        <Label htmlFor="cutbackGoalText">Are there specific areas where you'd like to try and reduce spending?</Label>
                         <Textarea id="cutbackGoalText" placeholder="e.g., Dining out less, cancel unused subscriptions." value={granularGoals.cutbackGoalText} onChange={(e) => handleGranularGoalChange('cutbackGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={2}/>
                     </div>
                     <div>
-                        <Label htmlFor="otherGoalText">Any other financial notes, questions you have for me, or specific changes to a previous suggestion?</Label>
+                        <Label htmlFor="otherGoalText">Anything else important for your financial plan? (e.g., specific questions for me, or changes you'd like from a previous plan)</Label>
                         <Textarea id="otherGoalText" placeholder="e.g., 'My previous month's budget felt too strict.' or 'Can we increase travel to $Y?'" value={granularGoals.otherGoalText} onChange={(e) => handleGranularGoalChange('otherGoalText', e.target.value)} disabled={isLoadingAi} className="mt-1" rows={3}/>
                     </div>
                 </CardContent>
@@ -452,8 +446,8 @@ export default function PrepareBudgetPage() {
 
               <Card>
                   <CardHeader>
-                      <CardTitle className="text-lg">Share Your Spending Habits? <span className="text-xs text-muted-foreground">(Optional, Max 5 Files)</span></CardTitle>
-                      <CardDescription>For even more tailored suggestions, you can upload images or PDFs of recent bank statements or spending summaries. I'll analyze them to understand your typical spending patterns.</CardDescription>
+                      <CardTitle className="text-lg">Want Even More Personalized Advice? <span className="text-xs text-muted-foreground">(Optional, Max 5 Files)</span></CardTitle>
+                      <CardDescription>If you have recent bank statements or spending summaries (images or PDFs), sharing them helps me understand your current habits to give smarter suggestions.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                       <Input

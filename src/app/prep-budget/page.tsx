@@ -9,10 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, Users, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, XCircle, Info, Sparkles } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, Users, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, XCircle, Info, Sparkles, MessageSquareText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
-import { prepareNextMonthBudget, type PrepareBudgetInput } from "@/ai/flows/prepare-next-month-budget-flow";
+import { prepareNextMonthBudget, type PrepareBudgetInput, type PrepareBudgetOutput } from "@/ai/flows/prepare-next-month-budget-flow";
 import { getYearMonthFromDate, parseYearMonth } from "@/hooks/useBudgetCore";
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,7 +73,7 @@ export default function PrepareBudgetPage() {
     otherGoalText: "",
   });
 
-  const [isLoadingAi, setIsLoadingAi] = useState<boolean>(true); // Start as true
+  const [isLoadingAi, setIsLoadingAi] = useState<boolean>(true); // Initialize to true
   const [aiError, setAiError] = useState<string | null>(null);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,23 +85,24 @@ export default function PrepareBudgetPage() {
 
   // Effect to load source month data
   useEffect(() => {
+    setIsLoadingPageData(true); // Set loading true at the start of data fetching
     const sourceMonthId = initialMonthId || getYearMonthFromDate(new Date());
     if (!sourceMonthId) {
       toast({ title: "Error", description: "Current month ID is not available. Please return to the dashboard.", variant: "destructive" });
       router.push('/');
       setIsLoadingPageData(false);
-      setIsLoadingAi(false); // Also ensure AI loading is false if we error out early
+      setIsLoadingAi(false);
       return;
     }
     const data = getBudgetForMonth(sourceMonthId);
-    setCurrentMonthData(data || null); // This will trigger the next useEffect
+    setCurrentMonthData(data || null);
     setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
-  // Effect to reset form fields and populate snapshot when currentMonthData is set/updated
+  // Effect to reset form fields and populate snapshot when currentMonthData is set/updated or page loads
   useEffect(() => {
-    // This effect runs when currentMonthData is available or changes.
-    // It resets the form, populates the snapshot, and importantly, enables inputs.
+    // This effect runs when currentMonthData is loaded or changes.
+    // It resets the form, populates the snapshot, and enables inputs.
     
     setAiError(null);
     setStatementFiles([]);
@@ -110,7 +111,7 @@ export default function PrepareBudgetPage() {
     setGranularGoals({
       planIncome: "",
       planStartMonth: "next month",
-      familySize: "", // Ensure familySize is reset here
+      familySize: "",
       savingsGoalOptions: [],
       savingsGoalOtherText: "",
       debtGoalText: "",
@@ -143,10 +144,10 @@ export default function PrepareBudgetPage() {
       setEditableEstimatedDebt("0");
     }
     
-    // Crucially, set isLoadingAi to false here, enabling the inputs.
     setIsLoadingAi(false); 
 
-  }, [currentMonthData]); // This effect runs when currentMonthData is set/updated.
+  }, [currentMonthData]); // This effect runs when currentMonthData is available or changes.
+
 
   const handleGranularGoalChange = (field: keyof GranularGoals, value: string | string[]) => {
     setGranularGoals(prev => ({ ...prev, [field]: value }));
@@ -167,23 +168,26 @@ export default function PrepareBudgetPage() {
     const files = event.target.files;
     if (files && files.length > 0) {
       const newFilesArray = Array.from(files);
-      const combinedFiles = [...statementFiles, ...newFilesArray].slice(0, 5); // Limit to 5 files total
+      const combinedFiles = [...statementFiles, ...newFilesArray].slice(0, 5); 
       setStatementFiles(combinedFiles);
       setAiError(null);
 
       const newPreviewDetailsAccumulator: { name: string; type: string; dataUri?: string }[] = [];
       const newDataUrisAccumulator: string[] = [];
+      
+      // Rebuild based on the new combinedFiles
+      const filesToProcess = statementFiles.length > 0 ? combinedFiles : newFilesArray;
 
-      // Process already selected files first to maintain their order and dataUris
-      for (let i = 0; i < statementFiles.length; i++) {
-        const file = statementFiles[i];
-        const existingUri = statementDataUris[i];
-        const existingDetail = statementPreviewDetails[i];
-
-        if (existingUri && existingDetail) {
+      for (const file of filesToProcess) {
+        if (newDataUrisAccumulator.length >= 5) break; // Ensure we don't exceed 5
+        // Check if this file (by name and size, as a simple heuristic) was already processed
+        const existingDetailIndex = statementPreviewDetails.findIndex(pd => pd.name === file.name); // More robust check needed if files can have same names
+        const existingUri = existingDetailIndex !== -1 ? statementDataUris[existingDetailIndex] : undefined;
+        
+        if (existingUri && statementPreviewDetails[existingDetailIndex]) {
             newDataUrisAccumulator.push(existingUri);
-            newPreviewDetailsAccumulator.push(existingDetail);
-        } else { // Fallback if details are missing (should not happen if state is consistent)
+            newPreviewDetailsAccumulator.push(statementPreviewDetails[existingDetailIndex]);
+        } else {
             try {
                 const dataUri = await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader();
@@ -198,43 +202,23 @@ export default function PrepareBudgetPage() {
                     dataUri: file.type.startsWith('image/') ? dataUri : undefined,
                 });
             } catch (error) {
-                console.error("Error re-reading existing file:", file.name, error);
-            }
-        }
-      }
-      
-      // Process newly added files
-      for (const file of newFilesArray) {
-        if (newDataUrisAccumulator.length < 5) { // Ensure we don't exceed 5
-            try {
-            const dataUri = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-            newDataUrisAccumulator.push(dataUri);
-            newPreviewDetailsAccumulator.push({
-                name: file.name,
-                type: file.type,
-                dataUri: file.type.startsWith('image/') ? dataUri : undefined,
-            });
-            } catch (error) {
-            console.error("Error reading new file:", file.name, error);
-            setAiError(`Error processing file: ${file.name}.`);
+                console.error("Error reading new file:", file.name, error);
+                setAiError(`Error processing file: ${file.name}.`);
             }
         }
       }
 
       setStatementDataUris(newDataUrisAccumulator.slice(0,5));
       setStatementPreviewDetails(newPreviewDetailsAccumulator.slice(0,5));
-      setStatementFiles(combinedFiles.slice(0,5)); // Update statementFiles to match the processed ones
+      // Update statementFiles to only contain those successfully processed or already present
+      setStatementFiles(filesToProcess.filter(f => newPreviewDetailsAccumulator.some(pd => pd.name === f.name)).slice(0,5));
+
 
       if (Array.from(files).length + statementFiles.length > 5 && statementFiles.length < 5) {
           toast({title: "File Limit Reached", description: "Maximum of 5 statement files allowed. Some files were not added.", variant: "default"});
       }
     }
-    if (event.target) event.target.value = ''; // Reset file input
+    if (event.target) event.target.value = ''; 
   };
 
   const handleClearAllStatementFiles = () => {
@@ -368,7 +352,7 @@ export default function PrepareBudgetPage() {
   };
 
   const handleClearAllAndRestart = () => {
-    setIsLoadingAi(true); // Temporarily disable inputs while resetting
+    setIsLoadingAi(true); 
 
     setAiError(null);
     setStatementFiles([]);
@@ -410,7 +394,7 @@ export default function PrepareBudgetPage() {
     }
     
     toast({title: "Form Reset", description: "All inputs cleared. Please enter your goals and upload statements again."});
-    setIsLoadingAi(false); // Re-enable inputs
+    setIsLoadingAi(false); 
   };
 
   if (isLoadingPageData) { 
@@ -673,6 +657,3 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
-
-
-    

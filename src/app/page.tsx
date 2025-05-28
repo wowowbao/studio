@@ -23,10 +23,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { BudgetCategory, BudgetMonth } from '@/types/budget';
 import { parseYearMonth } from '@/hooks/useBudgetCore';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 
 export default function HomePage() {
   const { user, loading: authLoading, isUserAuthenticated } = useAuth();
+  const router = useRouter();
   
   const { 
     currentBudgetMonth, 
@@ -45,6 +47,8 @@ export default function HomePage() {
   const { theme, setTheme } = useTheme();
   const [showGuestAlert, setShowGuestAlert] = useState(false);
 
+  const hasAnyBudgetData = Object.keys(budgetMonths).length > 0;
+
   useEffect(() => {
     if (!authLoading && !isUserAuthenticated) {
       const guestAlertDismissed = sessionStorage.getItem('guestAlertDismissed');
@@ -54,10 +58,20 @@ export default function HomePage() {
     }
   }, [authLoading, isUserAuthenticated]);
 
+  useEffect(() => {
+    // If user is authenticated, not loading, and has no budget data,
+    // redirect them to the AI budget prep page for onboarding.
+    if (isUserAuthenticated && !authLoading && !budgetLoading && !hasAnyBudgetData) {
+      router.push('/prep-budget');
+    }
+  }, [isUserAuthenticated, authLoading, budgetLoading, hasAnyBudgetData, router]);
+
 
   const handleSignOut = async () => {
     try {
       await auth.signOut();
+      // Optionally, redirect to home or sign-in page after sign-out
+      // router.push('/'); 
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -99,14 +113,23 @@ export default function HomePage() {
     return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
   };
 
-  const hasAnyBudgetData = Object.keys(budgetMonths).length > 0;
 
-  if (isLoading && !hasAnyBudgetData) { 
+  if (isLoading && !hasAnyBudgetData && !isUserAuthenticated) { // Show simpler loading for initial guest experience
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
         <h1 className="text-3xl font-bold text-primary mb-2">BudgetFlow</h1>
         <p className="text-muted-foreground">Getting your budget ready...</p>
+      </div>
+    );
+  }
+  
+  if (isLoading && (!isUserAuthenticated || (isUserAuthenticated && !hasAnyBudgetData))) { 
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+        <LayoutDashboard className="h-16 w-16 text-primary mb-4 animate-bounce" />
+        <h1 className="text-3xl font-bold text-primary mb-2">BudgetFlow</h1>
+        <p className="text-muted-foreground">Loading your financial dashboard...</p>
         <div className="w-full max-w-md mt-8 space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-32 w-full" />
@@ -193,7 +216,7 @@ export default function HomePage() {
         
         <MonthNavigator />
         
-        {!isLoading && !hasAnyBudgetData && (
+        {!isLoading && !hasAnyBudgetData && !isUserAuthenticated && ( // Guest user, no data
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
@@ -214,8 +237,10 @@ export default function HomePage() {
             </CardContent>
           </Card>
         )}
+        
+        {/* Case for authenticated user with no data is handled by useEffect redirect */}
 
-        {isLoading && Object.keys(budgetMonths).length > 0 && !currentBudgetMonth ? ( 
+        {isLoading && hasAnyBudgetData && !currentBudgetMonth ? ( // User has data in other months, but current month is loading
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {}
                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
@@ -228,7 +253,7 @@ export default function HomePage() {
                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-lg" />)}
               </div>
             </div>
-        ) : hasAnyBudgetData && !currentBudgetMonth ? (
+        ) : hasAnyBudgetData && !currentBudgetMonth ? ( // User has data in other months, but current display month has no budget
           <Card className="text-center p-8 shadow-lg border-dashed border-primary/30 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Sparkles className="mx-auto h-12 w-12 text-primary/70 mb-4" />
@@ -293,7 +318,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">
-                    You haven't added any categories to your budget for {getFormattedMonthTitle(currentDisplayMonthId)} yet. Use "Manage Budget" to add them or try the AI setup options.
+                    You haven't added any categories to your budget for {getFormattedMonthTitle(currentDisplayMonthId)} yet. Use "Manage Budget" to add them.
                   </p>
                   <Button variant="outline" onClick={() => setIsEditBudgetModalOpen(true)}>
                     Manage Budget
@@ -340,5 +365,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

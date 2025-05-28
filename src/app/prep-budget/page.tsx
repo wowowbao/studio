@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Loader2, UploadCloud, FileText, Trash2, Users, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw } from "lucide-react";
+import { Wand2, Loader2, UploadCloud, FileText, Trash2, Users, DollarSign, PiggyBank, CreditCard, Paperclip, ArrowLeft, RotateCcw, XCircle } from "lucide-react"; // Added XCircle
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 import { prepareNextMonthBudget, type PrepareBudgetInput } from "@/ai/flows/prepare-next-month-budget-flow";
@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react"; // Added Info icon
+import { Info } from "lucide-react";
 
 // Define specific goal input states
 type GranularGoals = {
@@ -235,9 +235,11 @@ export default function PrepareBudgetPage() {
 
   const handleGetInitialAiSuggestions = async () => {
     const userGoalsString = constructUserGoalsString();
-    if (!granularGoals.planIncome.trim() && (!currentMonthData || parseFloat(editableCurrentIncome) === 0)) {
-      setAiError("Please provide your approximate monthly income for the new plan, or ensure your current month's income is set in the app.");
-      toast({ title: "Income Required", description: "Please provide your planned income or ensure current income is logged.", variant: "destructive" });
+    // Use editableCurrentIncome for the current month's income context for the AI, if the user hasn't specified a planIncome.
+    // If planIncome IS specified, it will take precedence in the userGoalsString and the AI will pick it up.
+    if (!granularGoals.planIncome.trim() && parseFloat(editableCurrentIncome) === 0) {
+      setAiError("Please provide your approximate monthly income for the new plan (in the 'About Your Income...' section), or ensure your current month's income snapshot above is set if that's what you intend to use.");
+      toast({ title: "Income Required", description: "Please provide your planned income or ensure current income is reflected in the snapshot.", variant: "destructive" });
       return;
     }
     setIsLoadingAi(true);
@@ -245,9 +247,9 @@ export default function PrepareBudgetPage() {
 
     const baseMonthIdForAI = currentMonthData?.id || initialMonthId || getYearMonthFromDate(new Date());
 
-    const incomeForAI = parseFloat(editableCurrentIncome) || 0;
-    const savingsForAI = parseFloat(editableActualSavings) || 0;
-    const debtForAI = parseFloat(editableEstimatedDebt) || 0;
+    const incomeForAIContext = parseFloat(editableCurrentIncome) || 0; // This is context from current month
+    const savingsForAIContext = parseFloat(editableActualSavings) || 0;
+    const debtForAIContext = parseFloat(editableEstimatedDebt) || 0;
     const familySizeForAI = granularGoals.familySize.trim() ? parseInt(granularGoals.familySize, 10) : undefined;
 
     if (familySizeForAI !== undefined && (isNaN(familySizeForAI) || familySizeForAI <= 0)) {
@@ -261,11 +263,11 @@ export default function PrepareBudgetPage() {
 
     const input: PrepareBudgetInput = {
       statementDataUris: statementDataUris.length > 0 ? statementDataUris : undefined,
-      userGoals: userGoalsString,
+      userGoals: userGoalsString, // This string now potentially contains the planIncome
       currentMonthId: baseMonthIdForAI,
-      currentIncome: incomeForAI,
-      currentSavingsTotal: savingsForAI,
-      currentCCDebtTotal: debtForAI,
+      currentIncome: incomeForAIContext, // Income from current month for context
+      currentSavingsTotal: savingsForAIContext,
+      currentCCDebtTotal: debtForAIContext,
       previousMonthFeedback: previousMonthFeedbackFromSource,
       familySize: familySizeForAI,
     };
@@ -278,13 +280,13 @@ export default function PrepareBudgetPage() {
       } else {
         sessionStorage.setItem('aiPrepInitialSuggestions', JSON.stringify(result));
         sessionStorage.setItem('aiPrepInitialInputs', JSON.stringify({
-          granularGoals,
+          granularGoals, // Store the granular goals
           statementFileNames: statementPreviewDetails.map(f => f.name),
           currentMonthId: baseMonthIdForAI,
-          currentIncome: incomeForAI,
-          currentActualSavings: savingsForAI,
-          currentEstimatedDebt: debtForAI,
-          statementDataUris,
+          currentIncome: incomeForAIContext, // This is the SOURCE month income
+          currentActualSavings: savingsForAIContext,
+          currentEstimatedDebt: debtForAIContext,
+          statementDataUris, // Pass the actual URIs for reprocessing if needed
           previousMonthFeedback: previousMonthFeedbackFromSource,
           familySize: familySizeForAI,
         }));
@@ -325,6 +327,7 @@ export default function PrepareBudgetPage() {
       statementFileInputRef.current.value = "";
     }
 
+    // Reset editable snapshot based on currentMonthData
     if (currentMonthData) {
         const incomesArray = Array.isArray(currentMonthData.incomes) ? currentMonthData.incomes : [];
         const categoriesArray = Array.isArray(currentMonthData.categories) ? currentMonthData.categories : [];
@@ -378,7 +381,7 @@ export default function PrepareBudgetPage() {
                 <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold text-primary truncate px-2">
-             AI Financial Plan
+             Let's Create Your Financial Plan!
             </h1>
              <Button variant="outline" size="sm" onClick={handleClearAllAndRestart} disabled={isLoadingAi} aria-label="Clear Inputs & Suggestions">
                 <RotateCcw className="mr-2 h-4 w-4" /> Clear All
@@ -392,7 +395,7 @@ export default function PrepareBudgetPage() {
                   <CardHeader>
                       <CardTitle className="text-lg">Your Current Financial Starting Point</CardTitle>
                       <CardDescription>
-                        This is a snapshot from <span className="font-semibold">{getFormattedMonthTitle(sourceMonthForSnapshot)}</span> to help plan for <span className="font-semibold">{nextMonthToPrepFor}</span>.
+                        This is a read-only snapshot from <span className="font-semibold">{getFormattedMonthTitle(sourceMonthForSnapshot)}</span> to help plan for <span className="font-semibold">{nextMonthToPrepFor}</span>.
                         Adjust these numbers if your starting point for the new plan will be different.
                         <span className="block mt-1 text-xs text-muted-foreground">For a completely fresh AI plan, you can set these values to 0 or your new desired baseline.</span>
                       </CardDescription>
@@ -430,8 +433,9 @@ export default function PrepareBudgetPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                       <div>
-                          <Label htmlFor="planIncome">What's your approximate monthly income we'll be working with for this plan? (Required if this is your first plan or current income above is 0)</Label>
+                          <Label htmlFor="planIncome">What's your approximate monthly income we'll be working with for this plan? (Required if snapshot income is 0)</Label>
                           <Input id="planIncome" type="number" placeholder="e.g., 4000" value={granularGoals.planIncome} onChange={(e) => handleGranularGoalChange('planIncome', e.target.value)} disabled={isLoadingAi} className="mt-1"/>
+                          <p className="text-xs text-muted-foreground mt-1">If this is for a new plan, enter the income you want me to use. Otherwise, I'll use the snapshot income if this is blank.</p>
                       </div>
                       <div>
                           <Label htmlFor="planStartMonth">When would you ideally like this new financial chapter to begin?</Label>
@@ -554,3 +558,6 @@ export default function PrepareBudgetPage() {
     </div>
   );
 }
+
+
+    

@@ -93,7 +93,7 @@ Based on ALL the information above (goals, income context, debt, savings contrib
     -   DO NOT create a category named "Income" or similar.
     -   Include essential categories (e.g., Housing, Utilities, Groceries, Transportation). Try to be specific where possible (e.g., Utilities -> Electricity, Internet; Subscriptions -> Netflix, Gym). If userGoals mention specific needs like "rent payment", ensure "Housing" or "Rent" is a category.
     -   Critically, incorporate categories related to their stated goals (e.g., a "Vacation Fund" category if they want to save for one, or a "New PC Fund"). If a goal is to "reduce dining out", reflect this by suggesting a lower budget for that category. If the user explicitly asks to change a specific category's budget, try to accommodate this if feasible or explain why it's challenging.
-    -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments", suggest meaningful progress on debt, considering 'incomeBasisForBudget' and other goals. If `currentCCDebtTotal` is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise.
+    -   **Always include "Savings" and "Credit Card Payments" as top-level categories.** Suggest reasonable budgeted amounts. For "Savings", align with their goals. For "Credit Card Payments", suggest meaningful progress on debt, considering 'incomeBasisForBudget' and other goals. If currentCCDebtTotal is 0, a small or zero budget for "Credit Card Payments" is fine unless goals indicate otherwise.
     -   If past spending patterns are available, use them to inform realistic budget amounts for discretionary categories. However, if their goals require spending cuts, proactively suggest these reductions.
     -   **The sum of all top-level category budgets (including planned savings and CC payments) should ideally not exceed 'incomeBasisForBudget'.** If it does, clearly point out the shortfall in 'financialAdvice' and suggest specific categories where cuts could be made, or discuss if goals need to be adjusted or timelines extended.
     -   If applicable, suggest logical subcategories under broader categories (e.g., Groceries > Produce, Dairy; Utilities > Electricity, Water, Internet; Entertainment > Streaming Services, Movies).
@@ -110,7 +110,7 @@ Based on ALL the information above (goals, income context, debt, savings contrib
         -   If extreme urgency for an essential item is expressed, and saving quickly isn't feasible, *cautiously* mention exploring 0% interest installment plans as a *last resort*, emphasizing that saving first is always preferable. Explicitly advise AGAINST standard high-interest credit cards.
     -   Provide general tips for improving financial health. If this is an initial plan setup, offer foundational advice and a brief roadmap if a timeline was mentioned in their goals.
     -   **Address Trade-offs:** If achieving one goal means reducing spending elsewhere, acknowledge this supportively.
-    -   If `incomeBasisForBudget` is 0 or very low because no income was provided, your primary advice must be that a realistic budget cannot be formed without income information, and prompt the user to provide it.
+    -   If incomeBasisForBudget is 0 or very low because no income was provided, your primary advice must be that a realistic budget cannot be formed without income information, and prompt the user to provide it.
     -   Your tone should be encouraging, supportive, and non-judgmental. Help them feel empowered.
 
 Ensure your 'suggestedCategories' output is well-structured.
@@ -166,3 +166,4 @@ const prepareNextMonthBudgetFlow = ai.defineFlow(
     }
   }
 );
+

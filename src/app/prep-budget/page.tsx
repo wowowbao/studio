@@ -90,18 +90,19 @@ export default function PrepareBudgetPage() {
       toast({ title: "Error", description: "Current month ID is not available. Please return to the dashboard.", variant: "destructive" });
       router.push('/');
       setIsLoadingPageData(false);
-      setIsLoadingAi(false); // Ensure AI loading is false if we error out
+      setIsLoadingAi(false); 
       return;
     }
     const data = getBudgetForMonth(sourceMonthId);
     setCurrentMonthData(data || null);
-    setIsLoadingPageData(false); // This will trigger the next effect
+    setIsLoadingPageData(false);
   }, [initialMonthId, getBudgetForMonth, router, toast]);
 
 
   useEffect(() => {
-    // This effect runs when currentMonthData is loaded or if the page is directly loaded (isLoadingPageData becomes false)
     if (!isLoadingPageData) {
+      setIsLoadingAi(true); 
+
       setAiError(null);
       setStatementFiles([]);
       setStatementPreviewDetails([]);
@@ -142,7 +143,7 @@ export default function PrepareBudgetPage() {
         setEditableEstimatedDebt("0");
       }
       
-      setIsLoadingAi(false); // CRITICAL: Enable inputs after all state is reset/populated
+      setIsLoadingAi(false); 
     }
   }, [isLoadingPageData, currentMonthData]);
 
